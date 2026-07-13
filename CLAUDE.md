@@ -1,6 +1,6 @@
 # AI Ideas Hub — project context
 
-Working context for the AI Ideas Hub. The full requirements live in `AI_Ideas_Hub_Requirements_v0_2.docx` (kept alongside the repo, not committed); this file is the working brief around it.
+Working context for the AI Ideas Hub. The full requirements live in [`docs/AI_Ideas_Hub_Requirements_v0.1.docx`](docs/AI_Ideas_Hub_Requirements_v0.1.docx) (authored by Trung Vo, 3 Jul 2026); this file is the working brief around it. See the condensed spec and gap analysis at the bottom.
 
 ## Who I am and what this is
 
@@ -51,3 +51,27 @@ I'm Khoa Vu, a Technical Support Engineer at Skedulo (Vietnam, APAC team). I'm l
 
 - UI palette: navy `#0d1f3c` header, blue `#2b52d6` accent, Sora for display type, Inter for body — consistent across the app, docs, and slide deck already shared with the team.
 - Customer/team-facing writing: plain and direct, no marketing fluff.
+
+## Requirements reference (v0.1 doc — condensed)
+
+Full doc: [`docs/AI_Ideas_Hub_Requirements_v0.1.docx`](docs/AI_Ideas_Hub_Requirements_v0.1.docx). Requirements are written platform-neutral; the doc recommends a phased hybrid (low-code MVP → custom app), and this repo is the custom-app path.
+
+- **Lifecycle (9 statuses):** Draft → New/Submitted → In Review (7-day SLA) → Approved → In Progress → Pilot → Launched; plus On Hold and Archived/Declined (both require a reason). Rules: New → In Review → (Approved | On Hold | Declined); Approved → In Progress → Pilot → Launched. Every change is timestamped and notifies followers.
+- **Two role layers:** *workspace* roles (Admin/Project Lead, Member, Viewer) and *per-idea* roles (Initiator/Idea Lead ×1, AI Design 0–2, Form/UX Design 0–2, Data/Ops 0–2, Tester 1+ before Pilot, Observer ∞).
+- **Submission form** — required: Idea Name, Category, Context, Pain Points, Expected Benefit, Expected Time Frame. Optional: AI Capability type, Estimated Effort (S/M/L), Roles Needed, Attachments/links, Related ideas. Author auto-becomes Idea Lead; idea gets an ID (e.g. IDEA-007); Draft saving.
+- **Engagement:** Likes (1/person, toggle), Requests with lead follow-up status (Accepted/Under discussion/Declined), Join-team with role + lead approval, Follow, Progress Updates on a timeline, @mentions.
+- **Leader dashboard (mock-up 4, not yet built):** KPI tiles (total/active/launched, participation %, est. hours saved/week), pipeline funnel, category breakdown, needs-attention flags (SLA breach, stale >N days, on-hold past revisit), engagement table, contributor view.
+- **Data model entities:** Idea, Membership, Engagement, Request, Update, StatusChange, User. Richer than the current Notion DB.
+- **Notifications:** Slack #ai-ideas + email; status changes within 2 min; weekly digest; per-user preferences. n8n is the automation backbone.
+- **NFRs:** Google SSO restricted to the team; <2 min to submit; board/dashboard <3s up to 500 ideas/50 users; CSV export; English UI, EN/VI content; audit log; no customer data in ideas.
+- **Proposed starting categories:** Support/CX, Internal Ops, Knowledge, Reporting, + Other (to be confirmed).
+
+## Spec vs current build — known gaps
+
+The MVP app covers the board + detail + comments + status + submit loop. Notable deltas from the v0.1 spec, in rough priority order:
+
+1. **Statuses:** app has 4 (New/In Progress/On Hold/Launched); spec defines 9 (adds Draft, In Review, Approved, Pilot, Declined). The 7-day review SLA depends on an In Review state that doesn't exist yet.
+2. **Category mismatch:** the Notion `Tags` values are `Work / Personal Development / Family / Home` (a leftover personal-template set) — not the spec's Support/CX, Internal Ops, Knowledge, Reporting, Other. Needs a real decision + Notion cleanup before rollout.
+3. **Engagement:** likes, join-team-with-roles, follow, structured requests, and progress-update timeline are all in the spec but not built (comments only today). Most depend on **auth** for attribution — already the #1 roadmap item.
+4. **Roles:** the two-layer role model isn't modelled; current DB has flat `Person` + `Lead` people fields.
+5. **Leader dashboard:** mock-up 4, still unbuilt (roadmap item 3).
