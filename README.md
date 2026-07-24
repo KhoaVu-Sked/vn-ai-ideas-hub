@@ -1,53 +1,41 @@
 # AI Ideas Hub
 
-One home for the team's AI ideas — submit them, follow them on a board, and ship them. Next.js frontend + API routes on Vercel; **Notion is the database only** (no UI role).
+One home for the team's AI ideas — submit them, follow them on a board, and ship them. Next.js frontend + API routes on Vercel; **Neon Postgres is the data layer** (accessed server-side only).
 
-Built from the interaction design in `ai-ideas-hub-app-design-and-hosting-plan.md`:
+Interaction design (the fetch-scoping that keeps it fast and cheap):
 
 - **Refresh fetches the light project list only** (name, status, tags, people)
 - **Clicking a project fetches that one project's detail**, then caches it for the session
 - **Board-level writes** (new idea, status change) → refetch the **list only**
 - **In-project writes** (comments) → refetch **that project only**
-- The Notion secret lives in a server env var; the browser only ever calls `/api/*`
+- The database connection string lives in a server env var; the browser only ever calls `/api/*`
 
 ## Stack
 
 - Next.js 15 (App Router) — frontend + serverless API routes
-- Notion REST API (`2022-06-28`) — data layer, called server-side only
-- No database of our own, no ORM, no auth yet (see Roadmap)
+- Neon Postgres via `@neondatabase/serverless` (HTTP driver) — raw parameterised SQL, no ORM
+- No auth yet (see Roadmap)
 
 ## Setup
 
-### 1. Notion integration (one-time)
+### 1. Neon database (one-time)
 
-1. Notion → **Settings → Connections → Develop or manage integrations** → **New integration** (internal). Copy the secret (`ntn_…`).
-2. Give it capabilities: **Read content, Insert content, Update content, Read comments, Insert comments**.
-3. Open the **My Projects** database *as a full page* → `•••` menu → **Connections** → add your integration. (Per-database — easy to forget.)
-4. Get the database id: copy the database page link; the 32-char hex string in the URL is the id. The expected value for the AI Idea Hub workspace is already in `.env.example`.
+1. [neon.tech](https://neon.tech) → create a project (free tier is fine). This gives you a Postgres database.
+2. Open **SQL Editor**, paste the contents of [`schema.sql`](schema.sql), and run it. This creates the `ideas`, `comments`, and `members` tables.
+3. **Connect** (top right) → copy the connection string. Use the **pooled** one — it looks like `postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/dbname?sslmode=require` and is the one meant for serverless.
 
 ### 2. Local development
 
 ```bash
-cp .env.example .env.local   # then fill in NOTION_TOKEN
+cp .env.example .env.local   # then paste your connection string as DATABASE_URL
 npm install
 npm run dev                  # http://localhost:3000
 ```
 
-### 3. Push to GitHub
-
-```bash
-git init
-git add -A
-git commit -m "AI Ideas Hub: Next.js frontend + Notion API routes"
-git branch -M main
-git remote add origin https://github.com/KhoaVu-Sked/vn-ai-ideas-hub.git
-git push -u origin main
-```
-
-### 4. Deploy on Vercel
+### 3. Deploy on Vercel
 
 1. vercel.com → **Add New → Project** → import `KhoaVu-Sked/vn-ai-ideas-hub`. Next.js is auto-detected; no build settings needed.
-2. **Environment Variables** → add `NOTION_TOKEN` and `NOTION_PROJECTS_DB_ID` (Production + Preview).
+2. **Environment Variables** → add `DATABASE_URL` (Production + Preview) with the pooled Neon string.
 3. Deploy. Pin the URL in `#ai-ideas`.
 
 > **Plan check:** Vercel's free Hobby tier is licensed for personal, non-commercial use. An internal Skedulo tool should run under a Skedulo Vercel Team / Pro account — confirm before the team-wide rollout.
@@ -58,22 +46,27 @@ git push -u origin main
 |---|---|---|---|
 | `/api/projects` | GET | Light board list | — |
 | `/api/projects` | POST `{name, tag}` | Create idea | List only |
-| `/api/projects/:id` | GET | One project: properties + content blocks + comments | — (cached) |
+| `/api/projects/:id` | GET | One project: fields + content (Problem/Solution/Detail) + comments | — (cached) |
 | `/api/projects/:id` | PATCH `{status}` | Change status | List only |
 | `/api/projects/:id/comments` | POST `{text}` | Add comment | That project only |
 
 Statuses map to the board labels: `Not started`→New, `In progress`→In Progress, `On Hold`→On Hold, `Done`→Launched.
 
+## Data model
+
+- `ideas` — `id, name, status, tags text[], lead, problem, solution, detail, created_at, updated_at`. The detail drawer's "content" blocks are built from the Problem / Solution / Detail columns.
+- `comments` — `id, idea_id, body, author, created_at`. Author is `Anonymous` until auth lands.
+- `members` — `id, idea_id, name, role, created_at`. Rows with `role <> 'watcher'` render as the board avatars ("people").
+
 ## Known caveats
 
-- **Comment author**: comments posted through the app are attributed to the integration (a Notion API limitation), not the person typing. Real attribution arrives with auth (below).
-- **Status property type**: the code tries Notion's `status` type first and falls back to `select`, since templates vary.
-- **Notion rate limit** ~3 req/s average — fine at team scale with this fetch design; add caching on `/api/projects` if usage grows.
+- **Comment author**: comments are stored as `Anonymous` for now — real names arrive with auth (below).
 - **No auth yet**: the deployed URL is open. Don't share it beyond the team until auth lands.
+- **Pooled connection**: use Neon's pooled connection string for serverless; the HTTP driver is stateless, so no connection-pool tuning is needed.
 
 ## Roadmap
 
-1. **Auth** — Auth.js (NextAuth) with Google sign-in restricted to `skedulo.com` (satisfies the SSO NFR and gives real names on comments/likes)
+1. **Auth** — Auth.js (NextAuth) with Google sign-in restricted to `skedulo.com` (satisfies the SSO NFR and gives real names on comments/likes; add `author_email` to `comments` and a user id to `members`)
 2. **Likes / "I'm in!"** — needs auth first for attribution
 3. **Leader dashboard page** — KPIs, funnel, needs-attention (port of the dashboard mock-up)
 4. **n8n automations** — Slack notify on status transitions, 7-day review-SLA checks, stale-idea flags
