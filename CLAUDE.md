@@ -40,10 +40,14 @@ I'm Khoa Vu, a Technical Support Engineer at Skedulo (Vietnam, APAC team). I'm l
 2. **Vercel plan check:** free Hobby tier is non-commercial only — this should run under a Skedulo Vercel Team/Pro account before team rollout.
 3. **Branch naming:** Skedulo convention caps branch names at 60 chars — use something like `feature/ai-ideas-hub-app`.
 
+## Auth (built)
+
+Custom username/password auth (not the Google SSO originally planned): `accounts` table (bcrypt `password_hash`), `/login` page, signed httpOnly session cookie (jose JWT, `AUTH_SECRET`), `middleware.js` gates pages, and `/api/*` routes self-guard with `requireUser()`. Seeded admin `skedadmin` (role `admin`) — password must be rotated (it was weak + shared). Comments now attributed to the signed-in username. Deploy needs `AUTH_SECRET` set or sign-in breaks. See README "Auth". Google SSO restricted to skedulo.com remains a possible future swap if the team wants the SSO NFR.
+
 ## Roadmap after deploy
 
-1. **Auth** — Auth.js (NextAuth) with Google sign-in restricted to skedulo.com (satisfies the SSO requirement in the docx; unlocks real names on comments)
-2. **Likes / "I'm in!" actions** (need auth for attribution — the requirements doc's engagement model depends on these)
+1. **Auth hardening** — self-serve password change/reset, admin user-management UI (add/remove accounts is SQL-only today); optional Google SSO swap
+2. **Likes / "I'm in!" actions** (now unblocked — accounts exist for attribution)
 3. **Leader dashboard page** — KPIs, pipeline funnel, needs-attention flags, engagement table, top contributors (mock-up 4 in the docx is the spec; it's the one mock-up not yet built)
 4. **n8n automations** — Slack notifications within 2 minutes of transitions, 7-day review-SLA breach flags
 

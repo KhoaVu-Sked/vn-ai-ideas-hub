@@ -149,6 +149,14 @@ export default function Board() {
     loadList(); // cheap now: our own API route, no tokens
   }, [loadList]);
 
+  const signOut = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
+  }, []);
+
   // — DETAIL: on click, cache-first —
   const openProject = useCallback(async (p) => {
     setSelected(p);
@@ -284,6 +292,13 @@ export default function Board() {
             style={{ background: "var(--blue-bright)", border: "none", color: "#fff", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
           >
             + Submit New Idea
+          </button>
+          <button
+            onClick={signOut}
+            title="Sign out"
+            style={{ background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          >
+            Sign out
           </button>
         </div>
       </header>

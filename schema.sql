@@ -43,3 +43,18 @@ create table if not exists members (
 );
 
 create index if not exists members_idea_id_idx on members (idea_id);
+
+-- Accounts ─ username/password login. Passwords are stored ONLY as bcrypt hashes.
+create table if not exists accounts (
+  id            uuid primary key default gen_random_uuid(),
+  username      text unique not null,
+  password_hash text not null,
+  role          text not null default 'member',
+  created_at    timestamptz not null default now()
+);
+
+-- Seed the admin account (username: skedadmin). The hash below is bcrypt('sked123').
+-- Change this password after first login (weak + shared) — see README.
+insert into accounts (username, password_hash, role)
+values ('skedadmin', '$2b$10$jXuVkyeenk74ziHvW17gtuAZMdtDJOYcvG5KuvaE/GPhCg5lyDzKS', 'admin')
+on conflict (username) do nothing;

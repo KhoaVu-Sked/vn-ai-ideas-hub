@@ -1,9 +1,11 @@
 import { getProject, updateStatus, jsonError } from "@/lib/db";
+import { requireUser } from "@/lib/guard";
 
 // GET /api/projects/:id → one project's full detail
 // (fetched only when a card is clicked; the board list never includes this)
 export async function GET(_request, { params }) {
   try {
+    await requireUser();
     const { id } = await params;
     return Response.json(await getProject(id));
   } catch (e) {
@@ -15,6 +17,7 @@ export async function GET(_request, { params }) {
 // (the frontend follows this with a LIST refetch only)
 export async function PATCH(request, { params }) {
   try {
+    await requireUser();
     const { id } = await params;
     const { status } = await request.json();
     const allowed = ["Not started", "In progress", "On Hold", "Done"];
