@@ -119,6 +119,7 @@ export default function Board() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Link href="/" style={ghostBtn}>Home</Link>
           {me?.role === "admin" && <Link href="/dashboard" style={ghostBtn}>Dashboard</Link>}
+          {me?.role === "admin" && <Link href="/tasks" style={ghostBtn}>Tasks</Link>}
           {me?.role === "admin" && <Link href="/manage" style={ghostBtn}>Manage</Link>}
           <button onClick={() => setShowSubmit(true)} style={{ background: "var(--blue-bright)", border: "none", color: "#fff", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Submit New Idea</button>
           <button onClick={signOut} title="Sign out" style={ghostBtn}>Sign out</button>

@@ -51,6 +51,7 @@ export default function DashboardPage() {
             <option value="quarter">This quarter</option>
           </select>
           <Link href="/" style={ghost}>Home</Link>
+          <Link href="/tasks" style={ghost}>Tasks</Link>
           <Link href="/manage" style={ghost}>Manage</Link>
           <button onClick={signOut} style={ghost}>Sign out</button>
         </div>

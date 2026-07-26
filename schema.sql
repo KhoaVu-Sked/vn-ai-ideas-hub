@@ -83,6 +83,17 @@ create table if not exists follows (
   primary key (idea_id, account_id)
 );
 
+-- Admin to-do list (shared across admins). Free-text checklist, not tied to ideas.
+create table if not exists tasks (
+  id         uuid primary key default gen_random_uuid(),
+  title      text not null,
+  done       boolean not null default false,
+  created_by uuid,
+  created_at timestamptz not null default now(),
+  done_at    timestamptz
+);
+create index if not exists tasks_created_at_idx on tasks (created_at desc);
+
 -- ── Migration for existing databases (no-ops on a fresh one) ───────
 
 do $$ begin
