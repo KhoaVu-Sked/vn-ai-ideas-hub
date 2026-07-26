@@ -43,6 +43,7 @@ function Avatars({ people }) {
 }
 
 const cardStyle = { background: "var(--card)", borderRadius: 12, border: "1px solid var(--line)", boxShadow: "0 1px 3px rgba(16,42,67,0.06)" };
+const ghostBtn = { background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "none" };
 
 export default function Board() {
   const router = useRouter();
@@ -59,6 +60,8 @@ export default function Board() {
   const [showSubmit, setShowSubmit] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [mineOnly, setMineOnly] = useState(false);
+  const [me, setMe] = useState(null);
 
   const loadList = useCallback(async () => {
     setListBusy(true); setListError("");
@@ -69,6 +72,7 @@ export default function Board() {
   }, []);
 
   useEffect(() => { loadList(); }, [loadList]);
+  useEffect(() => { api("/api/auth/me").then((d) => setMe(d.user)).catch(() => {}); }, []);
 
   const signOut = useCallback(async () => {
     try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; }
@@ -93,10 +97,11 @@ export default function Board() {
   }, []);
 
   const filtered = useMemo(() => projects.filter((p) => {
+    if (mineOnly && !p.mine) return false;
     if (statusFilter !== "All" && p.status !== statusFilter) return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
-  }), [projects, statusFilter, search]);
+  }), [projects, statusFilter, search, mineOnly]);
 
   const pipeline = useMemo(() => {
     const c = {}; STATUS_ORDER.forEach((s) => (c[s] = 0));
@@ -111,9 +116,11 @@ export default function Board() {
           <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--blue)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, fontFamily: "var(--font-sora)" }}>AI</div>
           <span style={{ color: "#fff", fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16 }}>AI Ideas Hub</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Link href="/" style={ghostBtn}>Home</Link>
+          {me?.role === "admin" && <Link href="/manage" style={ghostBtn}>Manage</Link>}
           <button onClick={() => setShowSubmit(true)} style={{ background: "var(--blue-bright)", border: "none", color: "#fff", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Submit New Idea</button>
-          <button onClick={signOut} title="Sign out" style={{ background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Sign out</button>
+          <button onClick={signOut} title="Sign out" style={ghostBtn}>Sign out</button>
         </div>
       </header>
 
@@ -130,6 +137,7 @@ export default function Board() {
             <option value="All">Status: All</option>
             {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
+          <button onClick={() => setMineOnly((v) => !v)} title="Ideas you've joined or follow" style={{ border: mineOnly ? "1px solid var(--blue)" : "1px solid #dde3ec", background: mineOnly ? "#eef1fb" : "#fff", color: mineOnly ? "var(--blue)" : "#3a4a63", borderRadius: 8, padding: "7px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>My ideas</button>
           <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>{filtered.length} idea{filtered.length === 1 ? "" : "s"}</span>
         </div>
 
@@ -152,13 +160,12 @@ export default function Board() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
             {filtered.map((p) => {
               const m = STATUS_META[p.status] || STATUS_META.Submitted;
-              const tag = p.tags[0]; const ts = tagColor(tag);
               const cached = !!detailCache.current[p.id];
               return (
                 <div key={p.id} onClick={() => router.push(`/idea/${p.id}`)} style={{ ...cardStyle, padding: "14px 16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 9 }}>
                   <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                     <Pill bg={m.bg} fg={m.fg}>{p.status}</Pill>
-                    {tag && <Pill bg={ts.bg} fg={ts.fg}>{tag}</Pill>}
+                    {p.tags.map((t) => { const ts = tagColor(t); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
                   </div>
                   <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3 }}>{p.name}</div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -180,7 +187,7 @@ export default function Board() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {(() => { const m = STATUS_META[selected.status] || STATUS_META.Submitted; return <Pill bg={m.bg} fg={m.fg}>{selected.status}</Pill>; })()}
-                  {selected.tags[0] && (() => { const ts = tagColor(selected.tags[0]); return <Pill bg={ts.bg} fg={ts.fg}>{selected.tags[0]}</Pill>; })()}
+                  {selected.tags.map((t) => { const ts = tagColor(t); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
                 </div>
                 <button onClick={() => setSelected(null)} aria-label="Close" style={{ border: "none", background: "#f3f5f9", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "#5a6a82", fontSize: 14, fontWeight: 700 }}>✕</button>
               </div>
@@ -233,38 +240,78 @@ export default function Board() {
   );
 }
 
+const TIME_FRAMES = ["Sprint (2–4 weeks)", "Quarter (8–12 weeks)", "Half-year"];
+
 function SubmitModal({ onClose, onCreated }) {
-  const [name, setName] = useState("");
-  const [tags, setTags] = useState([]);
-  const [tag, setTag] = useState("");
+  const [tagOptions, setTagOptions] = useState([]);
+  const [form, setForm] = useState({ name: "", tags: [], context: "", pain_points: "", expected_benefit: "", target_date: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  useEffect(() => {
-    api("/api/tags").then(({ tags: t }) => { setTags(t); setTag(t[0] || ""); }).catch(() => {});
-  }, []);
+  useEffect(() => { api("/api/tags").then(({ tags: t }) => setTagOptions(t)).catch(() => {}); }, []);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const toggleTag = (t) => setForm((f) => ({ ...f, tags: f.tags.includes(t) ? f.tags.filter((x) => x !== t) : [...f.tags, t] }));
 
   const submit = async () => {
-    if (!name.trim()) { setErr("Give the idea a name first."); return; }
+    if (!form.name.trim()) { setErr("Give the idea a name first."); return; }
     setBusy(true); setErr("");
-    try { await api("/api/projects", { method: "POST", body: JSON.stringify({ name: name.trim(), tag }) }); await onCreated(); }
+    try { await api("/api/projects", { method: "POST", body: JSON.stringify({ ...form, name: form.name.trim() }) }); await onCreated(); }
     catch (e) { setErr(e.message); setBusy(false); }
   };
 
+  const label = { fontSize: 12, fontWeight: 600, color: "#5a6a82", display: "block", marginBottom: 6 };
+  const field = { width: "100%", padding: "9px 12px", border: "1px solid #d5dce6", borderRadius: 8, fontSize: 13.5, outline: "none" };
+  const area = { ...field, resize: "vertical", fontFamily: "inherit" };
+  const req = <span style={{ color: "#e03131" }}> *</span>;
+
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 24, width: 380, boxShadow: "0 20px 60px rgba(10,22,44,0.3)" }}>
-        <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", marginBottom: 14 }}>Submit new idea</div>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Idea name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="e.g. AI Ticket Triage Assistant" autoFocus style={{ width: "100%", margin: "6px 0 14px", padding: "9px 12px", border: "1px solid #d5dce6", borderRadius: 8, fontSize: 13.5, outline: "none" }} />
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Tag</label>
-        <select value={tag} onChange={(e) => setTag(e.target.value)} style={{ width: "100%", margin: "6px 0 18px", padding: "9px 12px", border: "1px solid #d5dce6", borderRadius: 8, fontSize: 13.5, background: "#fff" }}>
-          {tags.map((t) => <option key={t}>{t}</option>)}
-        </select>
-        {err && <div style={{ fontSize: 12, color: "#e03131", marginBottom: 10 }}>{err}</div>}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, overflowY: "auto", padding: "40px 16px" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 28, width: 620, maxWidth: "100%", boxShadow: "0 20px 60px rgba(10,22,44,0.3)" }}>
+        <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", marginBottom: 4 }}>Submit a new AI idea</div>
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 18 }}>Fields marked * are required. Your idea is visible to the whole team once submitted.</div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={label}>Idea Name{req}</label>
+          <input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. AI Ticket Triage Assistant" autoFocus style={field} />
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={label}>Category (tags)</label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {tagOptions.length === 0 && <span style={{ fontSize: 12.5, color: "var(--faint)" }}>No tags yet.</span>}
+            {tagOptions.map((t) => {
+              const on = form.tags.includes(t); const ts = tagColor(t);
+              return <button key={t} type="button" onClick={() => toggleTag(t)} style={{ border: on ? `1px solid ${ts.fg}` : "1px solid #d5dce6", background: on ? ts.bg : "#fff", color: on ? ts.fg : "#5a6a82", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{on ? "✓ " : ""}{t}</button>;
+            })}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={label}>Context{req}</label>
+          <textarea value={form.context} onChange={(e) => set("context", e.target.value)} rows={3} placeholder="What's the situation today?" style={area} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={label}>Pain Points{req}</label>
+          <textarea value={form.pain_points} onChange={(e) => set("pain_points", e.target.value)} rows={3} placeholder="What's slow, costly, or error-prone?" style={area} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={label}>Expected Benefit{req}</label>
+          <textarea value={form.expected_benefit} onChange={(e) => set("expected_benefit", e.target.value)} rows={3} placeholder="What improves, and how would you measure it?" style={area} />
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={label}>Expected time frame</label>
+          <select value={form.target_date} onChange={(e) => set("target_date", e.target.value)} style={{ ...field, background: "#fff" }}>
+            <option value="">Not sure yet</option>
+            {TIME_FRAMES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        {err && <div style={{ fontSize: 12.5, color: "#e03131", marginBottom: 12 }}>{err}</div>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} disabled={busy} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid #d5dce6", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#44536b" }}>Cancel</button>
-          <button onClick={submit} disabled={busy} style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: busy ? "#7b96ea" : "var(--blue)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}>{busy ? "Creating…" : "Create idea"}</button>
+          <button onClick={onClose} disabled={busy} style={{ padding: "10px 18px", borderRadius: 8, border: "1px solid #d5dce6", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#44536b" }}>Cancel</button>
+          <button onClick={submit} disabled={busy} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: busy ? "#7b96ea" : "var(--blue)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}>{busy ? "Submitting…" : "Submit idea"}</button>
         </div>
       </div>
     </div>

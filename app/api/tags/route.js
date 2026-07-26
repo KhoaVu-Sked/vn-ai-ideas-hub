@@ -1,4 +1,4 @@
-import { listTags, addTag, jsonError } from "@/lib/db";
+import { listTags, addTag, deleteTag, jsonError } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
 
 // GET /api/tags → the tag catalog (for the submit form + filters)
@@ -21,5 +21,18 @@ export async function POST(request) {
     return Response.json({ tags }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not add the tag.");
+  }
+}
+
+// DELETE /api/tags { name } → remove a tag (admin only); strips it from ideas
+export async function DELETE(request) {
+  try {
+    const user = await requireUser();
+    if (user.role !== "admin") return Response.json({ error: "Only an admin can delete tags." }, { status: 403 });
+    const { name } = await request.json();
+    const tags = await deleteTag(name);
+    return Response.json({ tags });
+  } catch (e) {
+    return jsonError(e, "Could not delete the tag.");
   }
 }

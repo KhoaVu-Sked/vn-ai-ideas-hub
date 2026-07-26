@@ -19,12 +19,12 @@ insert into tags (name) values ('Work'), ('Personal Development'), ('Family'), (
 on conflict (name) do nothing;
 
 -- 3) Sample teammate accounts (display-only; not login-able).
-insert into accounts (username, password_hash, name, role) values
-  ('trung', '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Trung Vo', 'member'),
-  ('thao',  '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Thao Lai', 'member'),
-  ('thu',   '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Thu Nguyen Duong', 'member'),
-  ('haanh', '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Ha Anh', 'member'),
-  ('quang', '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Quang Duc', 'member')
+insert into accounts (username, email, password_hash, name, role) values
+  ('trung', 'trung@example.com', '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Trung Vo', 'member'),
+  ('thao',  'thao@example.com',  '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Thao Lai', 'member'),
+  ('thu',   'thu@example.com',   '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Thu Nguyen Duong', 'member'),
+  ('haanh', 'haanh@example.com', '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Ha Anh', 'member'),
+  ('quang', 'quang@example.com', '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Quang Duc', 'member')
 on conflict (username) do update set name = excluded.name;
 
 -- 4) Sample ideas (explicit seq → IDEA-001..007; the flagship is IDEA-007).

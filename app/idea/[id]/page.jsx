@@ -82,7 +82,6 @@ export default function IdeaPage() {
 
   const { idea, members, requests, likeCount, likedByMe, followedByMe, myRole, canEdit, meId } = data;
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
-  const tc = tagColor(idea.tags[0]);
 
   const toggleLike = () => {
     patch({ likedByMe: !likedByMe, likeCount: likeCount + (likedByMe ? -1 : 1) }); // optimistic
@@ -154,7 +153,7 @@ export default function IdeaPage() {
         <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "22px 26px" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             <Pill bg={sm.bg} fg={sm.fg}>{idea.status}</Pill>
-            {idea.tags[0] && <Pill bg={tc.bg} fg={tc.fg}>{idea.tags[0]}</Pill>}
+            {idea.tags.map((t) => { const ts = tagColor(t); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
           </div>
 
           <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px" }}>{idea.name}</h1>
@@ -211,9 +210,9 @@ export default function IdeaPage() {
             </div>
           ) : (
             [["Context", idea.context], ["Pain points", idea.pain_points], ["Expected benefit", idea.expected_benefit]].map(([label, text]) => (
-              <div key={label}>
-                <div style={sectionLabel}>{label}</div>
-                <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>{text?.trim() || <span style={{ color: "var(--faint)" }}>—</span>}</p>
+              <div key={label} style={{ background: "#f8fafc", border: "1px solid var(--line)", borderLeft: "3px solid var(--blue)", borderRadius: 10, padding: "12px 16px", marginTop: 12 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+                <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>{text?.trim() || <span style={{ color: "var(--faint)" }}>—</span>}</p>
               </div>
             ))
           )}
@@ -272,20 +271,6 @@ export default function IdeaPage() {
               {members.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No team yet.</div>}
             </div>
           </div>
-
-          <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 18px" }}>
-            <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 8 }}>Notifications</div>
-            <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.7 }}>
-              • Posted to #ai-ideas on submission<br />• Followers emailed on status change
-            </div>
-          </div>
-
-          <div style={{ background: "var(--navy)", borderRadius: 14, padding: "16px 18px", color: "#c4d1e8" }}>
-            <div style={{ fontSize: 11.5, color: "#8fa3c4", marginBottom: 8 }}>Slack preview — #ai-ideas</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>New idea: {idea.name}</div>
-            <div style={{ fontSize: 11.5, marginTop: 4 }}>{idea.initiator ? `by ${idea.initiator}` : ""} {idea.tags[0] ? `· ${idea.tags[0]}` : ""}{idea.target_date ? ` · target ${idea.target_date}` : ""}</div>
-            <div style={{ fontSize: 11, color: "#8fa3c4", marginTop: 6 }}>[View idea] [Like] [Request] [Join]</div>
-          </div>
         </div>
       </div>
 
@@ -306,17 +291,27 @@ export default function IdeaPage() {
 }
 
 function Shell({ name, children }) {
+  const ghost = { background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "none" };
+  const signOut = async () => {
+    try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; }
+  };
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
-      <header style={{ background: "var(--navy)", padding: "0 24px", height: 58, display: "flex", alignItems: "center", gap: 10 }}>
-        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--blue)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, fontFamily: "var(--font-sora)" }}>AI</div>
-          <span style={{ color: "#fff", fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16 }}>AI Ideas Hub</span>
-        </Link>
-        <span style={{ color: "#8fa3c4", fontSize: 13 }}>
-          <Link href="/" style={{ color: "#8fa3c4", textDecoration: "none" }}>Board</Link>
-          {name ? ` › ${name}` : ""}
-        </span>
+      <header style={{ background: "var(--navy)", padding: "0 24px", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--blue)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, fontFamily: "var(--font-sora)" }}>AI</div>
+            <span style={{ color: "#fff", fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16 }}>AI Ideas Hub</span>
+          </Link>
+          <span style={{ color: "#8fa3c4", fontSize: 13 }}>
+            <Link href="/" style={{ color: "#8fa3c4", textDecoration: "none" }}>Board</Link>
+            {name ? ` › ${name}` : ""}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Link href="/" style={ghost}>Home</Link>
+          <button onClick={signOut} style={ghost}>Sign out</button>
+        </div>
       </header>
       <main style={{ maxWidth: 1060, margin: "0 auto", padding: "20px 22px 0" }}>{children}</main>
     </div>

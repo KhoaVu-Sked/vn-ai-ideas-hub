@@ -47,7 +47,7 @@ export default function LoginPage() {
           <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)" }}>AI Ideas Hub</span>
         </div>
 
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Username</label>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Username or email</label>
         <input
           value={username}
           onChange={(e) => setUsername(e.target.value)}

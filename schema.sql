@@ -26,11 +26,14 @@ create index if not exists ideas_updated_at_idx on ideas (updated_at desc);
 create table if not exists accounts (
   id            uuid primary key default gen_random_uuid(),
   username      text unique not null,
+  email         text,                                    -- unique (index added below); login works with either
   password_hash text not null,
   name          text,                                    -- display name, e.g. "Trung Vo"
   role          text not null default 'member',          -- workspace role: admin | member
   created_at    timestamptz not null default now()
 );
+-- (the accounts_email unique index is created in the migration block below, after
+--  ALTER ... ADD COLUMN email — so it works on both fresh and existing databases)
 
 -- Tags catalog — admin-managed list of allowed tags.
 create table if not exists tags (
@@ -96,6 +99,8 @@ alter table ideas add column if not exists seq bigserial;
 alter table ideas add column if not exists initiator_account_id uuid;
 alter table ideas add column if not exists target_date text;
 alter table accounts add column if not exists name text;
+alter table accounts add column if not exists email text;
+create unique index if not exists accounts_email_key on accounts (email);
 
 -- Drop any old CHECK that pinned status to the previous 4 values (the app
 -- validates the allowed statuses, so we don't re-add a DB-level check).
@@ -115,9 +120,10 @@ drop table if exists members;
 insert into tags (name) values ('Work'), ('Personal Development'), ('Family'), ('Home')
 on conflict (name) do nothing;
 
--- Admin account (username: skedadmin). Hash below is bcrypt('sked123').
--- Change this password after first login — see README.
-insert into accounts (username, password_hash, name, role)
-values ('skedadmin', '$2b$10$jXuVkyeenk74ziHvW17gtuAZMdtDJOYcvG5KuvaE/GPhCg5lyDzKS', 'Sked Admin', 'admin')
+-- Admin account (username: skedadmin, email: khoa.vu@skedulo.com).
+-- Hash below is bcrypt('sked123'). Change this password after first login.
+insert into accounts (username, email, password_hash, name, role)
+values ('skedadmin', 'khoa.vu@skedulo.com', '$2b$10$jXuVkyeenk74ziHvW17gtuAZMdtDJOYcvG5KuvaE/GPhCg5lyDzKS', 'Sked Admin', 'admin')
 on conflict (username) do nothing;
 update accounts set name = 'Sked Admin' where username = 'skedadmin' and name is null;
+update accounts set email = 'khoa.vu@skedulo.com' where username = 'skedadmin' and email is null;

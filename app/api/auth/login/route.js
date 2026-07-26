@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
-import { getAccountByUsername, jsonError } from "@/lib/db";
+import { getAccountByLogin, jsonError } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth";
 import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
 
-// POST /api/auth/login { username, password } → set session cookie
+// POST /api/auth/login { username, password } → set session cookie.
+// `username` is an identifier: it matches either a username or an email.
 export async function POST(request) {
   try {
     const { username, password } = await request.json();
     if (!username?.trim() || !password) {
-      return Response.json({ error: "Username and password are required." }, { status: 400 });
+      return Response.json({ error: "Username/email and password are required." }, { status: 400 });
     }
 
-    const account = await getAccountByUsername(username);
+    const account = await getAccountByLogin(username);
     // Same response whether the account is missing or the password is wrong.
     const ok = account && (await verifyPassword(password, account.password_hash));
     if (!ok) {
