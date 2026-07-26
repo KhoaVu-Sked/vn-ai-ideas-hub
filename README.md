@@ -50,33 +50,48 @@ npm run dev                  # http://localhost:3000
 - **Accounts** live in the `accounts` table. Passwords are stored **only as bcrypt hashes** — never plaintext.
 - **Seeded admin:** `skedadmin` (role `admin`). Its hash is set by `schema.sql`. **Change this password after first login** — it's weak and was shared in setup.
 - **Add a user:** insert a row with a bcrypt hash. Generate one with `node -e "console.log(require('bcryptjs').hashSync('their-password',10))"`, then `insert into accounts (username, password_hash, role) values ('name','<hash>','member');`.
-- Comments are attributed to the signed-in username (no longer `Anonymous`).
+## Views
+
+- **Board** (`/`) — cards with status + tag pills and team avatars, a 6-stage pipeline strip, search and status filter. Clicking a card opens the full idea page; the **Preview** button opens a read-only drawer.
+- **Idea detail** (`/idea/[id]`) — the full page (Mock-up 3): Like (toggle), Add request, Join the team (role picker), Follow updates; Context / Pain points / Expected benefit (Project-Lead-editable); a Requests & input thread; the Team & roles sidebar; and a progress timeline.
+
+## Lifecycle
+
+Six stages: **Submitted → In Review → Approved → In Progress → Pilot → Launched**, plus **On Hold** and **Declined** as off-timeline states. Only a Project Lead (or admin) changes an idea's status.
+
+## Roles (per idea)
+
+Project Lead (max 1), Initiator / Idea Lead, AI Design, Form / UX Design, Data / Ops, Tester, Observer. The idea's creator becomes its Project Lead. Observers don't show as board avatars.
 
 ## API
 
-| Route | Method | Purpose | Frontend refetch scope after |
-|---|---|---|---|
-| `/api/auth/login` | POST `{username, password}` | Sign in (sets session cookie) | — |
-| `/api/auth/logout` | POST | Sign out (clears cookie) | — |
-| `/api/auth/me` | GET | Current user, or 401 | — |
-| `/api/projects` | GET | Light board list | — |
-| `/api/projects` | POST `{name, tag}` | Create idea | List only |
-| `/api/projects/:id` | GET | One project: fields + content (Problem/Solution/Detail) + comments | — (cached) |
-| `/api/projects/:id` | PATCH `{status}` | Change status | List only |
-| `/api/projects/:id/comments` | POST `{text}` | Add comment | That project only |
-
-Statuses map to the board labels: `Not started`→New, `In progress`→In Progress, `On Hold`→On Hold, `Done`→Launched.
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/auth/login` \| `logout` \| `me` | POST / POST / GET | Session sign-in, sign-out, current user |
+| `/api/projects` | GET / POST | Board list / create idea |
+| `/api/projects/:id` | GET / PATCH | Drawer preview / change status (lead) |
+| `/api/ideas/:id` | GET / PATCH | Full detail / edit content (lead) |
+| `/api/ideas/:id/like` | POST | Toggle like |
+| `/api/ideas/:id/follow` | POST | Toggle follow |
+| `/api/ideas/:id/requests` | POST | Add a request |
+| `/api/ideas/:id/requests/:reqId` | DELETE / PATCH | Remove (author/lead) / triage state (lead) |
+| `/api/ideas/:id/members` | POST / DELETE | Join in a role / leave |
+| `/api/tags` | GET / POST | List tags / add tag (admin) |
 
 ## Data model
 
-- `ideas` — `id, name, status, tags text[], lead, problem, solution, detail, created_at, updated_at`. The detail drawer's "content" blocks are built from the Problem / Solution / Detail columns.
-- `comments` — `id, idea_id, body, author, created_at`. Author is `Anonymous` until auth lands.
-- `members` — `id, idea_id, name, role, created_at`. Rows with `role <> 'watcher'` render as the board avatars ("people").
-- `accounts` — `id, username, password_hash, role, created_at`. Login credentials; `password_hash` is bcrypt.
+- `ideas` — `id, seq, name, status, tags text[], initiator_account_id, target_date, context, pain_points, expected_benefit, created_at, updated_at`. `seq` drives the `IDEA-007` number; the detail page's content is Context / Pain points / Expected benefit.
+- `accounts` — `id, username, password_hash, name, role, created_at`. Login credentials + display name; `password_hash` is bcrypt.
+- `tags` — `id, name, created_at`. Admin-managed catalog of allowed tags.
+- `idea_members` — `id, idea_id, account_id, role, created_at`. Per-idea team; unique `(idea_id, account_id)`; a partial unique index enforces one Project Lead per idea.
+- `likes` — `(idea_id, account_id)` PK. One like per person (toggle).
+- `requests` — `id, idea_id, account_id, body, state, created_at`. `state`: open / accepted / under_discussion / declined.
+- `follows` — `(idea_id, account_id)` PK.
 
 ## Known caveats
 
-- **Password reset / user management** is manual for now — add or update accounts by SQL (see Auth above). No self-serve reset yet.
+- **Follow emails aren't wired yet** — the Follow button records the follow; the email/Slack side is a later n8n job.
+- **User management is SQL-only** — add accounts / change passwords via SQL (see Auth). No self-serve reset UI yet.
 - **AUTH_SECRET must be set** in every environment, or sign-in fails and everyone is redirected to `/login`.
 - **Pooled connection**: use Neon's pooled connection string for serverless; the HTTP driver is stateless, so no connection-pool tuning is needed.
 

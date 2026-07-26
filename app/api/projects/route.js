@@ -11,13 +11,14 @@ export async function GET() {
   }
 }
 
-// POST /api/projects { name, tag } → create an idea (starts as Not started)
+// POST /api/projects { name, tag } → create an idea (starts as Submitted;
+// the creator becomes its Project Lead)
 export async function POST(request) {
   try {
-    await requireUser();
+    const user = await requireUser();
     const { name, tag } = await request.json();
     if (!name?.trim()) return Response.json({ error: "Idea name is required." }, { status: 400 });
-    const project = await createProject({ name, tag });
+    const project = await createProject({ name, tag, initiatorAccountId: user.uid });
     return Response.json({ project }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not create the idea.");

@@ -70,12 +70,16 @@ Full doc: [`docs/AI_Ideas_Hub_Requirements_v0.1.docx`](docs/AI_Ideas_Hub_Require
 - **NFRs:** Google SSO restricted to the team; <2 min to submit; board/dashboard <3s up to 500 ideas/50 users; CSV export; English UI, EN/VI content; audit log; no customer data in ideas.
 - **Proposed starting categories:** Support/CX, Internal Ops, Knowledge, Reporting, + Other (to be confirmed).
 
+## Detail page + engagement (built)
+
+Mock-up 3 is built: `/idea/[id]` full page (card click → page; card **Preview** button → read-only drawer). Engagement tables in Postgres: `likes` (toggle), `requests` (task-like, author-removable, lead-triaged open/accepted/under_discussion/declined), `idea_members` (per-idea roles, one Project Lead via partial unique index), `follows` (email side is a later n8n job). Content is Context / Pain points / Expected benefit (ideas columns renamed from problem/solution/detail), editable by the Project Lead only. Tags moved to an admin-managed `tags` table (still seeded with Work/Personal Development/Family/Home per Khoa's call). See README "Views/Lifecycle/Roles/Data model".
+
 ## Spec vs current build — known gaps
 
-The MVP app covers the board + detail + comments + status + submit loop. Notable deltas from the v0.1 spec, in rough priority order:
+The app now covers board + full detail page + engagement + auth. Remaining deltas from the v0.1 spec:
 
-1. **Statuses:** app has 4 (New/In Progress/On Hold/Launched); spec defines 9 (adds Draft, In Review, Approved, Pilot, Declined). The 7-day review SLA depends on an In Review state that doesn't exist yet.
-2. **Category mismatch:** the Notion `Tags` values are `Work / Personal Development / Family / Home` (a leftover personal-template set) — not the spec's Support/CX, Internal Ops, Knowledge, Reporting, Other. Needs a real decision + Notion cleanup before rollout.
-3. **Engagement:** likes, join-team-with-roles, follow, structured requests, and progress-update timeline are all in the spec but not built (comments only today). Most depend on **auth** for attribution — already the #1 roadmap item.
-4. **Roles:** the two-layer role model isn't modelled; current DB has flat `Person` + `Lead` people fields.
-5. **Leader dashboard:** mock-up 4, still unbuilt (roadmap item 3).
+1. **Statuses:** now the 6-stage lifecycle (Submitted → In Review → Approved → In Progress → Pilot → Launched) + On Hold / Declined. Draft and Archived not modelled. The In Review state exists, but the **7-day review SLA flagging** is still unautomated (n8n).
+2. **Categories:** admin-managed `tags` table exists, but the values are still `Work / Personal Development / Family / Home` — the spec's Support/CX, Internal Ops, Knowledge, Reporting, Other is a pending content decision (deliberately deferred).
+3. **Engagement:** likes, join-team-with-roles, requests, follow — **built**. Progress-update *timeline notes* (distinct from the status progress bar) and @mentions not yet built. Follow notifications (email/Slack) not wired.
+4. **Roles:** two-layer model now in place (workspace `accounts.role` admin/member + per-idea `idea_members.role`). No admin UI to manage them yet (SQL only).
+5. **Leader dashboard:** mock-up 4, still unbuilt.
