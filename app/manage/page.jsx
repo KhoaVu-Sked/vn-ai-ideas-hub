@@ -70,6 +70,7 @@ export default function ManagePage() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Link href="/" style={ghost}>Home</Link>
+          <Link href="/dashboard" style={ghost}>Dashboard</Link>
           <button onClick={signOut} style={ghost}>Sign out</button>
         </div>
       </header>
