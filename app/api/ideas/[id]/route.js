@@ -7,8 +7,10 @@ export async function GET(_request, { params }) {
     const user = await requireUser();
     const { id } = await params;
     const data = await getIdea(id, user.uid);
+    data.meId = user.uid;
+    data.isAdmin = user.role === "admin";
     // Whether the viewer may edit content / change status.
-    data.canEdit = user.role === "admin" || data.myRole === "Project Lead";
+    data.canEdit = data.isAdmin || data.myRole === "Project Lead";
     return Response.json(data);
   } catch (e) {
     return jsonError(e, "Could not load this idea.");

@@ -72,32 +72,78 @@ export default function IdeaPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const act = useCallback(async (fn) => {
-    setActionErr("");
-    try { await fn(); await load(); } catch (e) { setActionErr(e.message); }
-  }, [load]);
+  // Merge into local state (obj or updater); run an action with optional revert.
+  const patch = (upd) => setData((d) => ({ ...d, ...(typeof upd === "function" ? upd(d) : upd) }));
+  const run = async (fn, revert) => { setActionErr(""); try { await fn(); } catch (e) { if (revert) revert(); setActionErr(e.message); } };
 
   if (busy && !data) return <Shell><div style={{ color: "var(--muted)", padding: 40 }}>Loading idea…</div></Shell>;
   if (err) return <Shell><div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>{err} <button onClick={load} style={{ ...btnBase, marginLeft: 8 }}>Retry</button></div></Shell>;
   if (!data) return null;
 
-  const { idea, members, requests, likeCount, likedByMe, followedByMe, myRole, canEdit } = data;
+  const { idea, members, requests, likeCount, likedByMe, followedByMe, myRole, canEdit, meId } = data;
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
   const tc = tagColor(idea.tags[0]);
 
-  const toggleLike = () => act(() => api(`/api/ideas/${id}/like`, { method: "POST" }));
-  const toggleFollow = () => act(() => api(`/api/ideas/${id}/follow`, { method: "POST" }));
+  const toggleLike = () => {
+    patch({ likedByMe: !likedByMe, likeCount: likeCount + (likedByMe ? -1 : 1) }); // optimistic
+    run(async () => { const r = await api(`/api/ideas/${id}/like`, { method: "POST" }); patch({ likedByMe: r.liked, likeCount: r.count }); },
+        () => patch({ likedByMe, likeCount }));
+  };
+  const toggleFollow = () => {
+    patch({ followedByMe: !followedByMe }); // optimistic
+    run(async () => { const r = await api(`/api/ideas/${id}/follow`, { method: "POST" }); patch({ followedByMe: r.following }); },
+        () => patch({ followedByMe }));
+  };
   const postRequest = () => {
     const body = reqText.trim();
     if (!body) return;
-    return act(async () => { await api(`/api/ideas/${id}/requests`, { method: "POST", body: JSON.stringify({ body }) }); setReqText(""); });
+    setReqText("");
+    run(async () => {
+      const { request } = await api(`/api/ideas/${id}/requests`, { method: "POST", body: JSON.stringify({ body }) });
+      patch((d) => ({ requests: [...d.requests, { ...request, mine: true }] }));
+    }, () => setReqText(body));
   };
-  const removeRequest = (reqId) => act(() => api(`/api/ideas/${id}/requests/${reqId}`, { method: "DELETE" }));
-  const setReqState = (reqId, state) => act(() => api(`/api/ideas/${id}/requests/${reqId}`, { method: "PATCH", body: JSON.stringify({ state }) }));
-  const changeStatus = (status) => act(() => api(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }));
-  const join = (role) => act(async () => { await api(`/api/ideas/${id}/members`, { method: "POST", body: JSON.stringify({ role }) }); setShowRoles(false); });
-  const leave = () => { if (confirm("Leave this idea's team?")) return act(() => api(`/api/ideas/${id}/members`, { method: "DELETE" })); };
-  const saveContent = () => act(async () => { await api(`/api/ideas/${id}`, { method: "PATCH", body: JSON.stringify(form) }); setEditing(false); });
+  const removeRequest = (reqId) => {
+    const prev = requests;
+    patch((d) => ({ requests: d.requests.filter((r) => r.id !== reqId) })); // optimistic
+    run(() => api(`/api/ideas/${id}/requests/${reqId}`, { method: "DELETE" }), () => patch({ requests: prev }));
+  };
+  const setReqState = (reqId, state) => {
+    const prev = requests;
+    patch((d) => ({ requests: d.requests.map((r) => (r.id === reqId ? { ...r, state } : r)) })); // optimistic
+    run(() => api(`/api/ideas/${id}/requests/${reqId}`, { method: "PATCH", body: JSON.stringify({ state }) }), () => patch({ requests: prev }));
+  };
+  const changeStatus = (status) => {
+    const prev = idea.status;
+    patch((d) => ({ idea: { ...d.idea, status } })); // optimistic
+    run(async () => { const { project } = await api(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }); patch((d) => ({ idea: { ...d.idea, status: project.status } })); },
+        () => patch((d) => ({ idea: { ...d.idea, status: prev } })));
+  };
+  const join = (role) => {
+    setShowRoles(false);
+    run(async () => {
+      const m = await api(`/api/ideas/${id}/members`, { method: "POST", body: JSON.stringify({ role }) });
+      patch((d) => ({
+        members: [...d.members.filter((x) => x.account_id !== m.account_id), { account_id: m.account_id, name: m.name, role: m.role }],
+        myRole: m.role,
+        canEdit: d.canEdit || m.role === "Project Lead",
+      }));
+    });
+  };
+  const leave = () => {
+    if (!confirm("Leave this idea's team?")) return;
+    const prev = { members, myRole };
+    patch((d) => ({ members: d.members.filter((x) => x.account_id !== meId), myRole: null })); // optimistic
+    run(() => api(`/api/ideas/${id}/members`, { method: "DELETE" }), () => patch(prev));
+  };
+  const saveContent = () => {
+    const next = { ...form };
+    run(async () => {
+      await api(`/api/ideas/${id}`, { method: "PATCH", body: JSON.stringify(next) });
+      patch((d) => ({ idea: { ...d.idea, context: next.context, pain_points: next.pain_points, expected_benefit: next.expected_benefit, target_date: next.target_date } }));
+      setEditing(false);
+    });
+  };
 
   return (
     <Shell name={idea.name}>

@@ -49,7 +49,6 @@ export default function Board() {
   const [projects, setProjects] = useState([]);
   const [listBusy, setListBusy] = useState(true);
   const [listError, setListError] = useState("");
-  const [lastSync, setLastSync] = useState(null);
 
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -65,7 +64,7 @@ export default function Board() {
     setListBusy(true); setListError("");
     try {
       const { projects: p } = await api("/api/projects");
-      setProjects(p); setLastSync(Date.now());
+      setProjects(p);
     } catch (e) { setListError(e.message); } finally { setListBusy(false); }
   }, []);
 
@@ -105,8 +104,6 @@ export default function Board() {
     return c;
   }, [projects]);
 
-  const syncLabel = lastSync ? (() => { const s = Math.round((Date.now() - lastSync) / 1000); return s < 60 ? "updated just now" : `updated ${Math.round(s / 60)}m ago`; })() : "";
-
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <header style={{ background: "var(--navy)", padding: "0 24px", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -115,8 +112,6 @@ export default function Board() {
           <span style={{ color: "#fff", fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16 }}>AI Ideas Hub</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {syncLabel && <span style={{ color: "#8fa3c4", fontSize: 11.5 }}>{syncLabel}</span>}
-          <button onClick={loadList} disabled={listBusy} title="Fetches the project list only" style={{ background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: listBusy ? "wait" : "pointer" }}>{listBusy ? "Syncing…" : "↻ Refresh"}</button>
           <button onClick={() => setShowSubmit(true)} style={{ background: "var(--blue-bright)", border: "none", color: "#fff", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Submit New Idea</button>
           <button onClick={signOut} title="Sign out" style={{ background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Sign out</button>
         </div>
@@ -226,9 +221,8 @@ export default function Board() {
               )}
             </div>
 
-            <div style={{ padding: "12px 20px", borderTop: "1px solid var(--line)", display: "flex", gap: 10 }}>
-              <button onClick={() => { delete detailCache.current[selected.id]; refetchPreview(selected); }} disabled={detailBusy} style={{ flex: 1, background: "#fff", border: "1px solid #dde3ec", color: "#44536b", fontSize: 12.5, fontWeight: 700, padding: "9px 0", borderRadius: 9, cursor: detailBusy ? "wait" : "pointer" }}>↻ Refresh</button>
-              <Link href={`/idea/${selected.id}`} style={{ flex: 1, textAlign: "center", background: "var(--blue)", color: "#fff", fontSize: 12.5, fontWeight: 700, padding: "9px 0", borderRadius: 9, textDecoration: "none" }}>Open full page →</Link>
+            <div style={{ padding: "12px 20px", borderTop: "1px solid var(--line)" }}>
+              <Link href={`/idea/${selected.id}`} style={{ display: "block", textAlign: "center", background: "var(--blue)", color: "#fff", fontSize: 12.5, fontWeight: 700, padding: "10px 0", borderRadius: 9, textDecoration: "none" }}>Open full page →</Link>
             </div>
           </div>
         </div>

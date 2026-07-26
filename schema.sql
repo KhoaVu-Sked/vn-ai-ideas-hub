@@ -97,6 +97,10 @@ alter table ideas add column if not exists initiator_account_id uuid;
 alter table ideas add column if not exists target_date text;
 alter table accounts add column if not exists name text;
 
+-- Drop any old CHECK that pinned status to the previous 4 values (the app
+-- validates the allowed statuses, so we don't re-add a DB-level check).
+alter table ideas drop constraint if exists ideas_status_check;
+
 -- Migrate old 4-status values to the 6-stage lifecycle.
 update ideas set status = 'Submitted'   where status = 'Not started';
 update ideas set status = 'In Progress' where status = 'In progress';
