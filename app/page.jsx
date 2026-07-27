@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, avatarColor } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
+import TagChip from "./TagChip";
 
 // ─────────────────────────────────────────────────────────────
 // AI Ideas Hub — board
@@ -173,9 +174,9 @@ export default function Board() {
               const cached = !!detailCache.current[p.id];
               return (
                 <div key={p.id} onClick={() => router.push(`/idea/${p.id}`)} style={{ ...cardStyle, padding: "14px 16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 9 }}>
-                  <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
                     <Pill bg={m.bg} fg={m.fg}>{p.status}</Pill>
-                    {p.tags.map((t) => { const ts = tagPill(t, tagColors); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
+                    {p.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
                   </div>
                   <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3 }}>{p.name}</div>
                   {p.context && (
@@ -203,9 +204,9 @@ export default function Board() {
           <div onClick={(e) => e.stopPropagation()} style={{ width: "min(440px, 94vw)", background: "#fff", height: "100%", boxShadow: "-12px 0 40px rgba(10,22,44,0.18)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
             <div style={{ padding: "16px 20px 12px", borderBottom: "1px solid var(--line)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   {(() => { const m = STATUS_META[selected.status] || STATUS_META.Submitted; return <Pill bg={m.bg} fg={m.fg}>{selected.status}</Pill>; })()}
-                  {selected.tags.map((t) => { const ts = tagPill(t, tagColors); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
+                  {selected.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
                 </div>
                 <button onClick={() => setSelected(null)} aria-label="Close" style={{ border: "none", background: "#f3f5f9", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "#5a6a82", fontSize: 14, fontWeight: 700 }}>✕</button>
               </div>

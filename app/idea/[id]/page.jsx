@@ -7,6 +7,7 @@ import {
   STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, avatarColor, ROLES, REQUEST_STATE_META,
 } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
+import TagChip from "../../TagChip";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -178,9 +179,9 @@ export default function IdeaPage() {
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 300px", gap: 20, alignItems: "start" }}>
         {/* ── Main column ── */}
         <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "22px 26px" }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
             <Pill bg={sm.bg} fg={sm.fg}>{idea.status}</Pill>
-            {idea.tags.map((t) => { const ts = tagPill(t, tagColors); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
+            {idea.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
           </div>
 
           <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px" }}>{idea.name}</h1>
