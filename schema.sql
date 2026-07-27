@@ -35,10 +35,11 @@ create table if not exists accounts (
 -- (the accounts_email unique index is created in the migration block below, after
 --  ALTER ... ADD COLUMN email — so it works on both fresh and existing databases)
 
--- Tags catalog — admin-managed list of allowed tags.
+-- Tags catalog — admin-managed list of allowed tags (with a display color).
 create table if not exists tags (
   id         uuid primary key default gen_random_uuid(),
   name       text unique not null,
+  color      text,                                    -- hex accent, e.g. #0070cc
   created_at timestamptz not null default now()
 );
 
@@ -125,6 +126,7 @@ alter table ideas add column if not exists target_date text;
 alter table accounts add column if not exists name text;
 alter table accounts add column if not exists email text;
 create unique index if not exists accounts_email_key on accounts (email);
+alter table tags add column if not exists color text;
 
 -- Drop any old CHECK that pinned status to the previous 4 values (the app
 -- validates the allowed statuses, so we don't re-add a DB-level check).
@@ -141,8 +143,14 @@ drop table if exists members;
 
 -- ── Seeds ─────────────────────────────────────────────────────────
 
-insert into tags (name) values ('Work'), ('Personal Development'), ('Family'), ('Home')
+insert into tags (name, color) values
+  ('Work', '#0070cc'), ('Personal Development', '#735dd0'), ('Family', '#e3761c'), ('Home', '#249387')
 on conflict (name) do nothing;
+-- Backfill colors for tags created before the color column existed.
+update tags set color = '#0070cc' where name = 'Work' and color is null;
+update tags set color = '#735dd0' where name = 'Personal Development' and color is null;
+update tags set color = '#e3761c' where name = 'Family' and color is null;
+update tags set color = '#249387' where name = 'Home' and color is null;
 
 -- Admin account (username: skedadmin, email: khoa.vu@skedulo.com).
 -- Hash below is bcrypt('sked123'). Change this password after first login.

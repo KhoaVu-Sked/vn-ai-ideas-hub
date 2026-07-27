@@ -1,14 +1,17 @@
 :root {
-  --navy: #0d1f3c;
-  --blue: #2b52d6;
-  --blue-bright: #2b6ef2;
-  --ink: #14233c;
-  --body: #3a4a63;
-  --muted: #6b7a90;
-  --faint: #98a4b5;
-  --line: #e9edf2;
-  --bg: #f3f5f9;
-  --card: #ffffff;
+  /* Skedulo brand palette (from Brand + Breeze UI design tokens) */
+  --navy: #002755;        /* brand navy — header, dark surfaces */
+  --blue: #0055ff;        /* brand blue — primary actions, accents */
+  --blue-bright: #0b5cff; /* slightly brighter blue for hovers/CTAs */
+  --ink: #0b1e49;         /* headings / titles */
+  --body: #2e3640;        /* body text (charcoal) */
+  --muted: #5e687a;       /* muted text (neutral-700) */
+  --faint: #9aa2b2;       /* faint text (neutral-500) */
+  --line: #e4e7ed;        /* 1px rules / borders (neutral-300) */
+  --bg: #f3f5f9;          /* canvas (neutral-200) */
+  --card: #ffffff;        /* surface */
+  /* Display font alias — components use var(--font-sora) for headings */
+  --font-sora: var(--font-display);
 }
 
 * {

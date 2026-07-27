@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { STATUS_META, tagColor, avatarColor } from "@/lib/statusMeta";
+import { STATUS_META, avatarColor, defaultTagColor } from "@/lib/statusMeta";
 
 async function api(path) {
   const res = await fetch(path);
@@ -79,16 +79,19 @@ export default function DashboardPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <div style={card}>
                 <h2 style={sectionTitle}>Pipeline funnel</h2>
-                {data.funnel.map((f, i) => (
-                  <div key={f.stage} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <div style={{ flex: 1, background: "#eef1f6", borderRadius: 6, height: 26, position: "relative", overflow: "hidden" }}>
-                      <div style={{ width: `${Math.max(f.pct, 6)}%`, height: "100%", background: `hsl(${222 - i * 4}, ${70 - i * 7}%, ${55 + i * 4}%)`, borderRadius: 6, display: "flex", alignItems: "center", paddingLeft: 10 }}>
-                        <span style={{ color: "#fff", fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap" }}>{f.stage} — {f.count}</span>
+                {data.funnel.map((f) => {
+                  const c = STATUS_META[f.status]?.fg || "#3b5bdb";
+                  return (
+                    <div key={f.stage} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <div style={{ flex: 1, background: "#eef1f6", borderRadius: 6, height: 26, position: "relative", overflow: "hidden" }}>
+                        <div style={{ width: `${Math.max(f.pct, 8)}%`, height: "100%", background: c, borderRadius: 6, display: "flex", alignItems: "center", paddingLeft: 10 }}>
+                          <span style={{ color: "#fff", fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap" }}>{f.stage} — {f.count}</span>
+                        </div>
                       </div>
+                      <span style={{ ...muted, width: 40, textAlign: "right" }}>{f.pct}%</span>
                     </div>
-                    <span style={{ ...muted, width: 40, textAlign: "right" }}>{f.pct}%</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div style={card}>
@@ -96,12 +99,12 @@ export default function DashboardPage() {
                 {data.categories.length === 0 && <div style={{ fontSize: 12.5, color: "var(--faint)" }}>No tagged ideas.</div>}
                 {data.categories.map((c) => {
                   const max = Math.max(...data.categories.map((x) => x.count), 1);
-                  const ts = tagColor(c.tag);
+                  const color = c.color || defaultTagColor(c.tag);
                   return (
                     <div key={c.tag} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                       <span style={{ width: 110, fontSize: 12, color: "var(--body)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.tag}</span>
                       <div style={{ flex: 1, background: "#eef1f6", borderRadius: 6, height: 16 }}>
-                        <div style={{ width: `${(c.count / max) * 100}%`, height: "100%", background: ts.fg, borderRadius: 6 }} />
+                        <div style={{ width: `${(c.count / max) * 100}%`, height: "100%", background: color, borderRadius: 6 }} />
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)", width: 20, textAlign: "right" }}>{c.count}</span>
                     </div>

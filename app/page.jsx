@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { STATUS_META, STATUS_ORDER, ALL_STATUSES, tagColor, avatarColor } from "@/lib/statusMeta";
+import { STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, avatarColor } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 
 // ─────────────────────────────────────────────────────────────
@@ -63,6 +63,7 @@ export default function Board() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [mineOnly, setMineOnly] = useState(false);
   const [me, setMe] = useState(null);
+  const [tagColors, setTagColors] = useState({});
 
   const loadList = useCallback(async () => {
     setListBusy(true); setListError("");
@@ -74,6 +75,12 @@ export default function Board() {
 
   useEffect(() => { loadList(); }, [loadList]);
   useEffect(() => { api("/api/auth/me").then((d) => setMe(d.user)).catch(() => {}); }, []);
+  useEffect(() => {
+    api("/api/tags").then(({ tags }) => {
+      const map = {}; (tags || []).forEach((t) => { if (t.color) map[t.name] = t.color; });
+      setTagColors(map);
+    }).catch(() => {});
+  }, []);
 
   const signOut = useCallback(async () => {
     try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; }
@@ -168,12 +175,20 @@ export default function Board() {
                 <div key={p.id} onClick={() => router.push(`/idea/${p.id}`)} style={{ ...cardStyle, padding: "14px 16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 9 }}>
                   <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                     <Pill bg={m.bg} fg={m.fg}>{p.status}</Pill>
-                    {p.tags.map((t) => { const ts = tagColor(t); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
+                    {p.tags.map((t) => { const ts = tagPill(t, tagColors); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
                   </div>
-                  <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3 }}>{p.name}</div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3 }}>{p.name}</div>
+                  {p.context && (
+                    <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.context}</div>
+                  )}
+                  <div style={{ display: "flex", gap: 14, fontSize: 11.5, color: "var(--faint)", fontWeight: 600 }}>
+                    <span title="Likes">♥ {p.counts?.likes ?? 0}</span>
+                    <span title="Requests">✎ {p.counts?.requests ?? 0}</span>
+                    <span title="Members">◍ {p.counts?.members ?? 0}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
                     {p.people.length > 0 ? <Avatars people={p.people} /> : <span style={{ fontSize: 11, color: "var(--faint)" }}>Unassigned</span>}
-                    <button onClick={(e) => { e.stopPropagation(); openPreview(p); }} style={{ border: "1px solid #dde3ec", background: "#fff", color: "#5a6a82", borderRadius: 7, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{cached ? "Preview ✓" : "Preview"}</button>
+                    <button onClick={(e) => { e.stopPropagation(); openPreview(p); }} style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--muted)", borderRadius: 7, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{cached ? "Preview ✓" : "Preview"}</button>
                   </div>
                 </div>
               );
@@ -190,7 +205,7 @@ export default function Board() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {(() => { const m = STATUS_META[selected.status] || STATUS_META.Submitted; return <Pill bg={m.bg} fg={m.fg}>{selected.status}</Pill>; })()}
-                  {selected.tags.map((t) => { const ts = tagColor(t); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
+                  {selected.tags.map((t) => { const ts = tagPill(t, tagColors); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
                 </div>
                 <button onClick={() => setSelected(null)} aria-label="Close" style={{ border: "none", background: "#f3f5f9", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "#5a6a82", fontSize: 14, fontWeight: 700 }}>✕</button>
               </div>
@@ -252,10 +267,11 @@ function SubmitModal({ onClose, onCreated }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  useEffect(() => { api("/api/tags").then(({ tags: t }) => setTagOptions(t)).catch(() => {}); }, []);
+  useEffect(() => { api("/api/tags").then(({ tags: t }) => setTagOptions(t || [])).catch(() => {}); }, []);
+  const tagColorMap = useMemo(() => Object.fromEntries(tagOptions.filter((t) => t.color).map((t) => [t.name, t.color])), [tagOptions]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const toggleTag = (t) => setForm((f) => ({ ...f, tags: f.tags.includes(t) ? f.tags.filter((x) => x !== t) : [...f.tags, t] }));
+  const toggleTag = (name) => setForm((f) => ({ ...f, tags: f.tags.includes(name) ? f.tags.filter((x) => x !== name) : [...f.tags, name] }));
   const addFiles = (list) => {
     const ok = [], bad = [];
     for (const f of Array.from(list || [])) {
@@ -304,8 +320,8 @@ function SubmitModal({ onClose, onCreated }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {tagOptions.length === 0 && <span style={{ fontSize: 12.5, color: "var(--faint)" }}>No tags yet.</span>}
             {tagOptions.map((t) => {
-              const on = form.tags.includes(t); const ts = tagColor(t);
-              return <button key={t} type="button" onClick={() => toggleTag(t)} style={{ border: on ? `1px solid ${ts.fg}` : "1px solid #d5dce6", background: on ? ts.bg : "#fff", color: on ? ts.fg : "#5a6a82", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{on ? "✓ " : ""}{t}</button>;
+              const on = form.tags.includes(t.name); const ts = tagPill(t.name, tagColorMap);
+              return <button key={t.name} type="button" onClick={() => toggleTag(t.name)} style={{ border: on ? `1px solid ${ts.fg}` : "1px solid #d5dce6", background: on ? ts.bg : "#fff", color: on ? ts.fg : "#5a6a82", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{on ? "✓ " : ""}{t.name}</button>;
             })}
           </div>
         </div>

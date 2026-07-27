@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagColor, avatarColor, ROLES, REQUEST_STATE_META,
+  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, avatarColor, ROLES, REQUEST_STATE_META,
 } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 
@@ -32,14 +32,16 @@ function ProgressBar({ status }) {
   return (
     <div style={{ display: "flex", alignItems: "flex-start", marginTop: 8 }}>
       {STATUS_ORDER.map((s, i) => {
-        const done = idx >= 0 && i < idx;
+        const reached = idx >= 0 && i <= idx;
         const current = i === idx;
-        const color = done || current ? "var(--blue)" : "#d3dae6";
+        // Each stage uses its own status color — matching the board pipeline strip.
+        const c = STATUS_META[s]?.fg || "#3b5bdb";
+        const dot = reached ? c : "#d3dae6";
         return (
           <div key={s} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
-            {i > 0 && <div style={{ position: "absolute", top: 9, left: "-50%", width: "100%", height: 3, background: i <= idx ? "var(--blue)" : "#e3e8f0" }} />}
-            <div style={{ width: 20, height: 20, borderRadius: "50%", background: current ? "#fff" : color, border: `3px solid ${color}`, zIndex: 1 }} />
-            <span style={{ fontSize: 11, fontWeight: current ? 700 : 600, color: current ? "var(--blue)" : done ? "var(--body)" : "var(--faint)", marginTop: 6, textAlign: "center" }}>{s}</span>
+            {i > 0 && <div style={{ position: "absolute", top: 9, left: "-50%", width: "100%", height: 3, background: i <= idx ? c : "#e3e8f0" }} />}
+            <div style={{ width: 20, height: 20, borderRadius: "50%", background: current ? "#fff" : dot, border: `3px solid ${dot}`, zIndex: 1 }} />
+            <span style={{ fontSize: 11, fontWeight: current ? 700 : 600, color: reached ? c : "var(--faint)", marginTop: 6, textAlign: "center" }}>{s}</span>
           </div>
         );
       })}
@@ -62,17 +64,19 @@ export default function IdeaPage() {
   const [showRoles, setShowRoles] = useState(false);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
+  const [tagCatalog, setTagCatalog] = useState([]);
 
   const load = useCallback(async () => {
     setBusy(true); setErr("");
     try {
       const d = await api(`/api/ideas/${id}`);
       setData(d);
-      setForm({ context: d.idea.context, pain_points: d.idea.pain_points, expected_benefit: d.idea.expected_benefit, target_date: d.idea.target_date || "" });
+      setForm({ context: d.idea.context, pain_points: d.idea.pain_points, expected_benefit: d.idea.expected_benefit, target_date: d.idea.target_date || "", tags: d.idea.tags || [] });
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { api("/api/tags").then(({ tags }) => setTagCatalog(tags || [])).catch(() => {}); }, []);
 
   // Merge into local state (obj or updater); run an action with optional revert.
   const patch = (upd) => setData((d) => ({ ...d, ...(typeof upd === "function" ? upd(d) : upd) }));
@@ -85,6 +89,8 @@ export default function IdeaPage() {
   const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRole, canEdit, meId } = data;
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
   const hasLead = members.some((m) => m.role === "Project Lead");
+  const tagColors = Object.fromEntries(tagCatalog.filter((t) => t.color).map((t) => [t.name, t.color]));
+  const toggleFormTag = (name) => setForm((f) => ({ ...f, tags: (f.tags || []).includes(name) ? f.tags.filter((x) => x !== name) : [...(f.tags || []), name] }));
 
   const toggleLike = () => {
     patch({ likedByMe: !likedByMe, likeCount: likeCount + (likedByMe ? -1 : 1) }); // optimistic
@@ -139,10 +145,10 @@ export default function IdeaPage() {
     run(() => api(`/api/ideas/${id}/members`, { method: "DELETE" }), () => patch(prev));
   };
   const saveContent = () => {
-    const next = { ...form };
+    const next = { ...form, tags: form.tags || [] };
     run(async () => {
       await api(`/api/ideas/${id}`, { method: "PATCH", body: JSON.stringify(next) });
-      patch((d) => ({ idea: { ...d.idea, context: next.context, pain_points: next.pain_points, expected_benefit: next.expected_benefit, target_date: next.target_date } }));
+      patch((d) => ({ idea: { ...d.idea, context: next.context, pain_points: next.pain_points, expected_benefit: next.expected_benefit, target_date: next.target_date, tags: next.tags } }));
       setEditing(false);
     });
   };
@@ -174,7 +180,7 @@ export default function IdeaPage() {
         <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "22px 26px" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             <Pill bg={sm.bg} fg={sm.fg}>{idea.status}</Pill>
-            {idea.tags.map((t) => { const ts = tagColor(t); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
+            {idea.tags.map((t) => { const ts = tagPill(t, tagColors); return <Pill key={t} bg={ts.bg} fg={ts.fg}>{t}</Pill>; })}
           </div>
 
           <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px" }}>{idea.name}</h1>
@@ -214,12 +220,20 @@ export default function IdeaPage() {
               ) : (
                 <button onClick={() => setEditing(true)} style={btnBase}>Edit content</button>
               )}
-              {editing && <button onClick={() => { setEditing(false); setForm({ context: idea.context, pain_points: idea.pain_points, expected_benefit: idea.expected_benefit, target_date: idea.target_date || "" }); }} style={{ ...btnBase, marginLeft: 8 }}>Cancel</button>}
+              {editing && <button onClick={() => { setEditing(false); setForm({ context: idea.context, pain_points: idea.pain_points, expected_benefit: idea.expected_benefit, target_date: idea.target_date || "", tags: idea.tags || [] }); }} style={{ ...btnBase, marginLeft: 8 }}>Cancel</button>}
             </div>
           )}
 
           {editing ? (
             <div style={{ marginTop: 8 }}>
+              <div style={sectionLabel}>Tags</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {tagCatalog.length === 0 && <span style={{ fontSize: 12.5, color: "var(--faint)" }}>No tags in the catalog.</span>}
+                {tagCatalog.map((t) => {
+                  const on = (form.tags || []).includes(t.name); const ts = tagPill(t.name, tagColors);
+                  return <button key={t.name} type="button" onClick={() => toggleFormTag(t.name)} style={{ border: on ? `1px solid ${ts.fg}` : "1px solid #d5dce6", background: on ? ts.bg : "#fff", color: on ? ts.fg : "#5a6a82", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{on ? "✓ " : ""}{t.name}</button>;
+                })}
+              </div>
               {[["Context", "context"], ["Pain points", "pain_points"], ["Expected benefit", "expected_benefit"]].map(([label, key]) => (
                 <div key={key}>
                   <div style={sectionLabel}>{label}</div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { tagColor } from "@/lib/statusMeta";
+import { tagPill, defaultTagColor } from "@/lib/statusMeta";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -47,6 +47,7 @@ export default function ManagePage() {
 
   const addTag = () => { const n = newTag.trim(); if (!n) return; run(async () => { const { tags: t } = await api("/api/tags", { method: "POST", body: JSON.stringify({ name: n }) }); setTags(t); setNewTag(""); }); };
   const delTag = (name) => { if (!confirm(`Delete tag "${name}"? It will be removed from any ideas using it.`)) return; run(async () => { const { tags: t } = await api("/api/tags", { method: "DELETE", body: JSON.stringify({ name }) }); setTags(t); }); };
+  const setColor = (name, color) => run(async () => { const { tags: t } = await api("/api/tags", { method: "PATCH", body: JSON.stringify({ name, color }) }); setTags(t); });
 
   const setAcct = (id, k, v) => setAccounts((as) => as.map((a) => (a.id === id ? { ...a, [k]: v } : a)));
   const saveAcct = (a) => run(async () => { const { account } = await api(`/api/accounts/${a.id}`, { method: "PATCH", body: JSON.stringify({ username: a.username, email: a.email, name: a.name, role: a.role }) }); setAccounts((as) => as.map((x) => (x.id === a.id ? { ...x, ...account } : x))); });
@@ -89,12 +90,16 @@ export default function ManagePage() {
             <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
               <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 12px" }}>Tags</h2>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                {tags.map((t) => { const ts = tagColor(t); return (
-                  <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: ts.bg, color: ts.fg, borderRadius: 999, padding: "4px 6px 4px 12px", fontSize: 12, fontWeight: 700 }}>
-                    {t}
-                    <button onClick={() => delTag(t)} title="Delete tag" style={{ border: "none", background: "rgba(0,0,0,0.08)", color: ts.fg, borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✕</button>
-                  </span>
-                ); })}
+                {tags.map((t) => {
+                  const color = t.color || defaultTagColor(t.name); const ts = tagPill(t.name, { [t.name]: color });
+                  return (
+                    <span key={t.name} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: ts.bg, color: ts.fg, borderRadius: 999, padding: "4px 8px", fontSize: 12, fontWeight: 700 }}>
+                      <input type="color" value={color} onChange={(e) => setColor(t.name, e.target.value)} title="Tag color" style={{ width: 20, height: 20, border: "none", background: "none", padding: 0, cursor: "pointer", borderRadius: "50%" }} />
+                      {t.name}
+                      <button onClick={() => delTag(t.name)} title="Delete tag" style={{ border: "none", background: "rgba(0,0,0,0.08)", color: ts.fg, borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✕</button>
+                    </span>
+                  );
+                })}
                 {tags.length === 0 && <span style={{ fontSize: 12.5, color: "var(--faint)" }}>No tags.</span>}
               </div>
               <div style={{ display: "flex", gap: 8, maxWidth: 340 }}>
