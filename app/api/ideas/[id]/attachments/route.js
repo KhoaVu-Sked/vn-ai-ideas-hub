@@ -13,8 +13,10 @@ export async function POST(request, { params }) {
     if (!file || typeof file === "string") return Response.json({ error: "No file provided." }, { status: 400 });
     const invalid = validateUpload({ name: file.name, type: file.type, size: file.size });
     if (invalid) return Response.json({ error: invalid }, { status: 400 });
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      return Response.json({ error: "File uploads aren't configured (missing BLOB_READ_WRITE_TOKEN)." }, { status: 400 });
+    // OIDC-connected stores expose BLOB_STORE_ID (no static token); the SDK
+    // authenticates via OIDC. A static BLOB_READ_WRITE_TOKEN also works (local).
+    if (!process.env.BLOB_STORE_ID && !process.env.BLOB_READ_WRITE_TOKEN) {
+      return Response.json({ error: "File uploads aren't configured — connect a Vercel Blob store to this project." }, { status: 400 });
     }
 
     const blob = await put(`ideas/${id}/${file.name}`, file, { access: "public", addRandomSuffix: true });
