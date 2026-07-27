@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { STATUS_META, STATUS_ORDER, ALL_STATUSES, tagColor, avatarColor } from "@/lib/statusMeta";
+import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 
 // ─────────────────────────────────────────────────────────────
 // AI Ideas Hub — board
@@ -247,6 +248,7 @@ const TIME_FRAMES = ["Sprint (2–4 weeks)", "Quarter (8–12 weeks)", "Half-yea
 function SubmitModal({ onClose, onCreated }) {
   const [tagOptions, setTagOptions] = useState([]);
   const [form, setForm] = useState({ name: "", tags: [], context: "", pain_points: "", expected_benefit: "", target_date: "" });
+  const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -254,12 +256,31 @@ function SubmitModal({ onClose, onCreated }) {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const toggleTag = (t) => setForm((f) => ({ ...f, tags: f.tags.includes(t) ? f.tags.filter((x) => x !== t) : [...f.tags, t] }));
+  const addFiles = (list) => {
+    const ok = [], bad = [];
+    for (const f of Array.from(list || [])) {
+      const v = validateUpload({ name: f.name, type: f.type, size: f.size });
+      if (v) bad.push(`${f.name} — ${v}`); else ok.push(f);
+    }
+    if (bad.length) setErr(bad.join(" ")); else setErr("");
+    setFiles((fs) => [...fs, ...ok]);
+  };
+  const removeFile = (i) => setFiles((fs) => fs.filter((_, idx) => idx !== i));
 
   const submit = async () => {
     if (!form.name.trim()) { setErr("Give the idea a name first."); return; }
     setBusy(true); setErr("");
-    try { await api("/api/projects", { method: "POST", body: JSON.stringify({ ...form, name: form.name.trim() }) }); await onCreated(); }
-    catch (e) { setErr(e.message); setBusy(false); }
+    try {
+      const { project } = await api("/api/projects", { method: "POST", body: JSON.stringify({ ...form, name: form.name.trim() }) });
+      const failed = [];
+      for (const f of files) {
+        const fd = new FormData(); fd.append("file", f);
+        const res = await fetch(`/api/ideas/${project.id}/attachments`, { method: "POST", body: fd });
+        if (!res.ok) failed.push(f.name);
+      }
+      if (failed.length) alert(`Idea created, but these files didn't upload: ${failed.join(", ")}. You can add them from the idea page.`);
+      await onCreated();
+    } catch (e) { setErr(e.message); setBusy(false); }
   };
 
   const label = { fontSize: 12, fontWeight: 600, color: "#5a6a82", display: "block", marginBottom: 6 };
@@ -302,12 +323,30 @@ function SubmitModal({ onClose, onCreated }) {
           <textarea value={form.expected_benefit} onChange={(e) => set("expected_benefit", e.target.value)} rows={3} placeholder="What improves, and how would you measure it?" style={area} />
         </div>
 
-        <div style={{ marginBottom: 18 }}>
+        <div style={{ marginBottom: 14 }}>
           <label style={label}>Expected time frame</label>
           <select value={form.target_date} onChange={(e) => set("target_date", e.target.value)} style={{ ...field, background: "#fff" }}>
             <option value="">Not sure yet</option>
             {TIME_FRAMES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={label}>Attachments</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+            {files.map((f, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", border: "1px solid #e9edf2", borderRadius: 8, padding: "6px 10px" }}>
+                <span style={{ fontSize: 13 }}>📎</span>
+                <span style={{ flex: 1, fontSize: 12.5, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                <button type="button" onClick={() => removeFile(i)} style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>
+              </div>
+            ))}
+          </div>
+          <label style={{ display: "inline-block", border: "1px solid #d5dce6", borderRadius: 8, padding: "7px 12px", fontSize: 12.5, fontWeight: 700, color: "#44536b", cursor: "pointer" }}>
+            + Add files
+            <input type="file" multiple accept={ACCEPT_ATTR} onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
+          </label>
+          <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>Word, Excel, PDF, or images · max 5 MB each.</div>
         </div>
 
         {err && <div style={{ fontSize: 12.5, color: "#e03131", marginBottom: 12 }}>{err}</div>}

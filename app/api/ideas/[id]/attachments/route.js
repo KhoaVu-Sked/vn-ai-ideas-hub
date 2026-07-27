@@ -1,0 +1,28 @@
+import { put } from "@vercel/blob";
+import { addAttachment, jsonError } from "@/lib/db";
+import { requireUser } from "@/lib/guard";
+import { validateUpload } from "@/lib/upload";
+
+// POST /api/ideas/:id/attachments (multipart, field "file") → upload to Vercel Blob
+export async function POST(request, { params }) {
+  try {
+    const user = await requireUser();
+    const { id } = await params;
+    const form = await request.formData();
+    const file = form.get("file");
+    if (!file || typeof file === "string") return Response.json({ error: "No file provided." }, { status: 400 });
+    const invalid = validateUpload({ name: file.name, type: file.type, size: file.size });
+    if (invalid) return Response.json({ error: invalid }, { status: 400 });
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return Response.json({ error: "File uploads aren't configured (missing BLOB_READ_WRITE_TOKEN)." }, { status: 400 });
+    }
+
+    const blob = await put(`ideas/${id}/${file.name}`, file, { access: "public", addRandomSuffix: true });
+    const attachment = await addAttachment(id, user.uid, {
+      filename: file.name, url: blob.url, size: file.size, content_type: file.type,
+    });
+    return Response.json({ attachment }, { status: 201 });
+  } catch (e) {
+    return jsonError(e, "Could not upload the file.");
+  }
+}

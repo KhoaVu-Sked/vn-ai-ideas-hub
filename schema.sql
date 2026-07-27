@@ -83,6 +83,19 @@ create table if not exists follows (
   primary key (idea_id, account_id)
 );
 
+-- File attachments on an idea (stored in Vercel Blob; we keep the URL + metadata).
+create table if not exists attachments (
+  id           uuid primary key default gen_random_uuid(),
+  idea_id      uuid not null references ideas(id) on delete cascade,
+  account_id   uuid not null references accounts(id) on delete cascade,
+  filename     text not null,
+  url          text not null,
+  size         bigint not null default 0,
+  content_type text,
+  created_at   timestamptz not null default now()
+);
+create index if not exists attachments_idea_id_idx on attachments (idea_id);
+
 -- Admin to-do list (shared across admins). Free-text checklist, not tied to ideas.
 create table if not exists tasks (
   id         uuid primary key default gen_random_uuid(),

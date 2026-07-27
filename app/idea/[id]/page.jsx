@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   STATUS_META, STATUS_ORDER, ALL_STATUSES, tagColor, avatarColor, ROLES, REQUEST_STATE_META,
 } from "@/lib/statusMeta";
+import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -48,6 +49,7 @@ function ProgressBar({ status }) {
 
 const btnBase = { border: "1px solid #d5dce6", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#fff", color: "#3a4a63" };
 const sectionLabel = { fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.6, textTransform: "uppercase", margin: "18px 0 6px" };
+const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 export default function IdeaPage() {
   const { id } = useParams();
@@ -80,8 +82,9 @@ export default function IdeaPage() {
   if (err) return <Shell><div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>{err} <button onClick={load} style={{ ...btnBase, marginLeft: 8 }}>Retry</button></div></Shell>;
   if (!data) return null;
 
-  const { idea, members, requests, likeCount, likedByMe, followedByMe, myRole, canEdit, meId } = data;
+  const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRole, canEdit, meId } = data;
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
+  const hasLead = members.some((m) => m.role === "Project Lead");
 
   const toggleLike = () => {
     patch({ likedByMe: !likedByMe, likeCount: likeCount + (likedByMe ? -1 : 1) }); // optimistic
@@ -142,6 +145,24 @@ export default function IdeaPage() {
       patch((d) => ({ idea: { ...d.idea, context: next.context, pain_points: next.pain_points, expected_benefit: next.expected_benefit, target_date: next.target_date } }));
       setEditing(false);
     });
+  };
+  const uploadFile = (file) => {
+    if (!file) return;
+    const bad = validateUpload({ name: file.name, type: file.type, size: file.size });
+    if (bad) { setActionErr(bad); return; }
+    const fd = new FormData();
+    fd.append("file", file);
+    run(async () => {
+      const res = await fetch(`/api/ideas/${id}/attachments`, { method: "POST", body: fd });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
+      patch((d) => ({ attachments: [...d.attachments, body.attachment] }));
+    });
+  };
+  const removeAttachment = (attId) => {
+    const prev = attachments;
+    patch((d) => ({ attachments: d.attachments.filter((a) => a.id !== attId) })); // optimistic
+    run(() => api(`/api/ideas/${id}/attachments/${attId}`, { method: "DELETE" }), () => patch({ attachments: prev }));
   };
 
   return (
@@ -217,6 +238,25 @@ export default function IdeaPage() {
             ))
           )}
 
+          {/* Attachments */}
+          <div style={{ ...sectionLabel, marginTop: 26 }}>Attachments ({attachments.length})</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {attachments.map((a) => (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ fontSize: 14 }}>📎</span>
+                <a href={a.url} target="_blank" rel="noreferrer" style={{ flex: 1, fontSize: 13, color: "var(--blue)", fontWeight: 600, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.filename}</a>
+                <span style={{ fontSize: 11, color: "var(--faint)" }}>{fmtSize(a.size)}</span>
+                {(a.mine || canEdit) && <button onClick={() => removeAttachment(a.id)} title="Remove" style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>}
+              </div>
+            ))}
+            {attachments.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No files yet.</div>}
+          </div>
+          <label style={{ ...btnBase, display: "inline-block", marginTop: 10, cursor: "pointer" }}>
+            + Upload file
+            <input type="file" accept={ACCEPT_ATTR} onChange={(e) => { uploadFile(e.target.files?.[0]); e.target.value = ""; }} style={{ display: "none" }} />
+          </label>
+          <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>Word, Excel, PDF, or images · max 5 MB each.</div>
+
           {/* Requests & input */}
           <div style={{ ...sectionLabel, marginTop: 26 }}>Requests &amp; input ({requests.length})</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -279,7 +319,7 @@ export default function IdeaPage() {
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 22, width: 320, boxShadow: "0 20px 60px rgba(10,22,44,0.3)" }}>
             <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 12 }}>Join the team as…</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {ROLES.map((role) => (
+              {ROLES.filter((role) => role !== "Project Lead" || !hasLead).map((role) => (
                 <button key={role} onClick={() => join(role)} style={{ ...btnBase, textAlign: "left" }}>{role}</button>
               ))}
             </div>
