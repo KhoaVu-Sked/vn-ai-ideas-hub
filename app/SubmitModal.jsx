@@ -12,12 +12,11 @@ async function api(path, init) {
   return body;
 }
 
-const TIME_FRAMES = ["Sprint (2–4 weeks)", "Quarter (8–12 weeks)", "Half-year"];
-
 // onCreated(project) is called after the idea (and any files) are created.
 export default function SubmitModal({ onClose, onCreated }) {
   const [tagOptions, setTagOptions] = useState([]);
   const [fields, setFields] = useState([]);
+  const [timeFrames, setTimeFrames] = useState([]);
   const [form, setForm] = useState({ name: "", tags: [], context: "", pain_points: "", expected_benefit: "", target_date: "", extra: {} });
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -25,6 +24,7 @@ export default function SubmitModal({ onClose, onCreated }) {
 
   useEffect(() => { api("/api/tags").then(({ tags: t }) => setTagOptions(t || [])).catch(() => {}); }, []);
   useEffect(() => { api("/api/form-fields").then(({ fields: f }) => setFields((f || []).filter((x) => !x.archived))).catch(() => {}); }, []);
+  useEffect(() => { api("/api/time-frames").then(({ timeFrames: t }) => setTimeFrames(t || [])).catch(() => {}); }, []);
   const tagColorMap = useMemo(() => Object.fromEntries(tagOptions.filter((t) => t.color).map((t) => [t.name, t.color])), [tagOptions]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -94,7 +94,7 @@ export default function SubmitModal({ onClose, onCreated }) {
           <label style={label}>Expected time frame</label>
           <select value={form.target_date} onChange={(e) => set("target_date", e.target.value)} style={{ ...field, background: "#fff" }}>
             <option value="">Not sure yet</option>
-            {TIME_FRAMES.map((t) => <option key={t} value={t}>{t}</option>)}
+            {timeFrames.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
 

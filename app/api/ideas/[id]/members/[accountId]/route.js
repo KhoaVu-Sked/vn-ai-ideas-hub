@@ -1,14 +1,14 @@
-import { setMemberRole, removeMember, jsonError } from "@/lib/db";
+import { setMemberRoles, removeMember, jsonError } from "@/lib/db";
 import { requireAdmin } from "@/lib/guard";
 
-// PATCH /api/ideas/:id/members/:accountId { role } → change a member's role.
-// Admin only. Assigning the lead role transfers it (old lead → Observer).
+// PATCH /api/ideas/:id/members/:accountId { roles: [...] } → set a member's
+// roles. Admin only. Granting the lead transfers it from whoever held it.
 export async function PATCH(request, { params }) {
   try {
     await requireAdmin();
     const { id, accountId } = await params;
-    const { role } = await request.json();
-    return Response.json(await setMemberRole(id, accountId, role));
+    const { roles, role } = await request.json();
+    return Response.json(await setMemberRoles(id, accountId, roles ?? role));
   } catch (e) {
     return jsonError(e, "Could not update the role.");
   }

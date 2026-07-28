@@ -32,21 +32,31 @@ function Avatar({ name, i = 0, size = 34 }) {
   );
 }
 
+// Neutral grey track: reached stages are filled, unreached are hollow outlines.
+// The final stage (launch) is a smaller light-blue dot.
 function ProgressBar({ status }) {
   const idx = STATUS_ORDER.indexOf(status);
+  const GREY = "#8d95a5";
+  const GREY_LINE = "#dadee6";
+  const LIGHT_BLUE = "#33a3ff"; // Breeze blue-500
   return (
     <div style={{ display: "flex", alignItems: "flex-start", marginTop: 8 }}>
       {STATUS_ORDER.map((s, i) => {
         const reached = idx >= 0 && i <= idx;
         const current = i === idx;
-        // Each stage uses its own status color — matching the board pipeline strip.
-        const c = STATUS_META[s]?.fg || "#3b5bdb";
-        const dot = reached ? c : "#d3dae6";
+        const last = i === STATUS_ORDER.length - 1;
+        const color = last ? LIGHT_BLUE : GREY;
+        const size = last ? 12 : 18;
         return (
           <div key={s} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
-            {i > 0 && <div style={{ position: "absolute", top: 9, left: "-50%", width: "100%", height: 3, background: i <= idx ? c : "#e3e8f0" }} />}
-            <div style={{ width: 20, height: 20, borderRadius: "50%", background: current ? "#fff" : dot, border: `3px solid ${dot}`, zIndex: 1 }} />
-            <span style={{ fontSize: 11, fontWeight: current ? 700 : 600, color: reached ? c : "var(--faint)", marginTop: 6, textAlign: "center" }}>{s}</span>
+            {i > 0 && <div style={{ position: "absolute", top: 9, left: "-50%", width: "100%", height: 2, background: i <= idx ? GREY : GREY_LINE }} />}
+            <div style={{
+              width: size, height: size, marginTop: last ? 3 : 0, borderRadius: "50%",
+              background: reached ? color : "#fff",
+              border: `2px solid ${reached ? color : GREY_LINE}`,
+              zIndex: 1,
+            }} />
+            <span style={{ fontSize: 11, fontWeight: current ? 700 : 600, color: reached ? (last ? LIGHT_BLUE : "var(--body)") : "var(--faint)", marginTop: 6, textAlign: "center" }}>{s}</span>
           </div>
         );
       })}
@@ -67,6 +77,7 @@ export default function IdeaPage() {
   const [actionErr, setActionErr] = useState("");
   const [reqText, setReqText] = useState("");
   const [showRoles, setShowRoles] = useState(false);
+  const [pickedRoles, setPickedRoles] = useState([]);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [tagCatalog, setTagCatalog] = useState([]);
@@ -94,10 +105,10 @@ export default function IdeaPage() {
   if (err) return <Shell><div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>{err} <button onClick={load} style={{ ...btnBase, marginLeft: 8 }}>Retry</button></div></Shell>;
   if (!data) return null;
 
-  const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRole, canEdit, meId, isAdmin, deleteRequested, deleteReason } = data;
-  const isLead = myRole === LEAD_ROLE;
+  const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRoles, canEdit, meId, isAdmin, deleteRequested, deleteReason } = data;
+  const isLead = (myRoles || []).includes(LEAD_ROLE);
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
-  const hasLead = members.some((m) => m.role === LEAD_ROLE);
+  const hasLead = members.some((m) => (m.roles || []).includes(LEAD_ROLE));
   const tagColors = Object.fromEntries(tagCatalog.filter((t) => t.color).map((t) => [t.name, t.color]));
   const toggleFormTag = (name) => setForm((f) => ({ ...f, tags: (f.tags || []).includes(name) ? f.tags.filter((x) => x !== name) : [...(f.tags || []), name] }));
   const setExtra = (key, v) => setForm((f) => ({ ...f, extra: { ...(f.extra || {}), [key]: v } }));
@@ -140,41 +151,41 @@ export default function IdeaPage() {
     run(async () => { const { project } = await api(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }); patch((d) => ({ idea: { ...d.idea, status: project.status } })); },
         () => patch((d) => ({ idea: { ...d.idea, status: prev } })));
   };
-  const join = (role) => {
+  const join = (roles) => {
     setShowRoles(false);
     run(async () => {
-      const m = await api(`/api/ideas/${id}/members`, { method: "POST", body: JSON.stringify({ role }) });
+      const m = await api(`/api/ideas/${id}/members`, { method: "POST", body: JSON.stringify({ roles }) });
       patch((d) => ({
-        members: [...d.members.filter((x) => x.account_id !== m.account_id), { account_id: m.account_id, name: m.name, role: m.role }],
-        myRole: m.role,
-        canEdit: d.canEdit || m.role === LEAD_ROLE,
+        members: [...d.members.filter((x) => x.account_id !== m.account_id), { account_id: m.account_id, name: m.name, roles: m.roles }],
+        myRoles: m.roles,
+        canEdit: d.canEdit || m.roles.includes(LEAD_ROLE),
       }));
     });
   };
   const leave = () => {
     if (!confirm("Leave this idea's team?")) return;
-    const prev = { members, myRole };
-    patch((d) => ({ members: d.members.filter((x) => x.account_id !== meId), myRole: null })); // optimistic
+    const prev = { members, myRoles };
+    patch((d) => ({ members: d.members.filter((x) => x.account_id !== meId), myRoles: [] })); // optimistic
     run(() => api(`/api/ideas/${id}/members`, { method: "DELETE" }), () => patch(prev));
   };
   // Admin: change any member's role (assigning the lead transfers it).
-  const changeMemberRole = (accountId, role) => {
+  const changeMemberRoles = (accountId, roles) => {
     const prev = members;
     patch((d) => ({
       members: d.members.map((m) => {
-        if (m.account_id === accountId) return { ...m, role };
+        if (m.account_id === accountId) return { ...m, roles };
         // Mirror the server's lead transfer.
-        if (role === LEAD_ROLE && m.role === LEAD_ROLE) return { ...m, role: "Observer" };
+        if (roles.includes(LEAD_ROLE) && (m.roles || []).includes(LEAD_ROLE)) return { ...m, roles: m.roles.filter((r) => r !== LEAD_ROLE) };
         return m;
       }),
-      myRole: accountId === meId ? role : d.myRole,
+      myRoles: accountId === meId ? roles : d.myRoles,
     }));
-    run(() => api(`/api/ideas/${id}/members/${accountId}`, { method: "PATCH", body: JSON.stringify({ role }) }), () => patch({ members: prev }));
+    run(() => api(`/api/ideas/${id}/members/${accountId}`, { method: "PATCH", body: JSON.stringify({ roles }) }), () => patch({ members: prev }));
   };
   const removeMember = (m) => {
     if (!confirm(`Remove ${m.name} from this idea's team?`)) return;
     const prev = members;
-    patch((d) => ({ members: d.members.filter((x) => x.account_id !== m.account_id), myRole: m.account_id === meId ? null : d.myRole }));
+    patch((d) => ({ members: d.members.filter((x) => x.account_id !== m.account_id), myRoles: m.account_id === meId ? [] : d.myRoles }));
     run(() => api(`/api/ideas/${id}/members/${m.account_id}`, { method: "DELETE" }), () => patch({ members: prev }));
   };
   const saveContent = () => {
@@ -254,8 +265,8 @@ export default function IdeaPage() {
               {likedByMe ? "♥" : "♡"} Like · {likeCount}
             </button>
             <button onClick={() => document.getElementById("req-box")?.focus()} style={{ ...btnBase, color: "var(--blue)", borderColor: "#c9d4f5" }}>+ Add request</button>
-            {myRole ? (
-              <button onClick={leave} style={{ ...btnBase, color: "#e03131", borderColor: "#f5c9c9" }}>Leave team ({myRole})</button>
+            {(myRoles || []).length > 0 ? (
+              <button onClick={leave} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Leave team</button>
             ) : (
               <button onClick={() => setShowRoles(true)} style={{ ...btnBase, color: "var(--blue)", borderColor: "#c9d4f5" }}>» Join the team</button>
             )}
@@ -396,11 +407,22 @@ export default function IdeaPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{m.name}</div>
                     {isAdmin ? (
-                      <select value={m.role} onChange={(e) => changeMemberRole(m.account_id, e.target.value)} title="Change role" style={{ marginTop: 3, width: "100%", fontSize: 11.5, color: "var(--muted)", border: "1px solid var(--line)", borderRadius: 6, padding: "2px 4px", background: "#fff", cursor: "pointer" }}>
-                        {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                      </select>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                        {ROLES.map((r) => {
+                          const on = (m.roles || []).includes(r);
+                          const disabled = r === LEAD_ROLE && !on && hasLead;
+                          return (
+                            <button
+                              key={r}
+                              title={disabled ? "Another member is already the lead — assign it to transfer" : r}
+                              onClick={() => changeMemberRoles(m.account_id, on ? (m.roles || []).filter((x) => x !== r) : [...(m.roles || []), r])}
+                              style={{ border: on ? "1px solid var(--blue)" : "1px solid var(--line)", background: on ? "#e6f4ff" : "#fff", color: on ? "var(--blue)" : "var(--muted)", borderRadius: 999, padding: "2px 8px", fontSize: 10.5, fontWeight: 700, cursor: "pointer" }}
+                            >{on ? "✓ " : ""}{r}</button>
+                          );
+                        })}
+                      </div>
                     ) : (
-                      <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{m.role}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{(m.roles || []).join(" · ") || "—"}</div>
                     )}
                   </div>
                   {isAdmin && <button onClick={() => removeMember(m)} title="Remove from team" style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>}
@@ -416,11 +438,23 @@ export default function IdeaPage() {
       {showRoles && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setShowRoles(false)}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 22, width: 320, boxShadow: "0 20px 60px rgba(10,22,44,0.3)" }}>
-            <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 12 }}>Join the team as…</div>
+            <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 4 }}>Join the team as…</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>Pick one or more roles.</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {ROLES.filter((role) => role !== LEAD_ROLE || !hasLead).map((role) => (
-                <button key={role} onClick={() => join(role)} style={{ ...btnBase, textAlign: "left" }}>{role}</button>
-              ))}
+              {ROLES.filter((role) => role !== LEAD_ROLE || !hasLead).map((role) => {
+                const on = pickedRoles.includes(role);
+                return (
+                  <button
+                    key={role}
+                    onClick={() => setPickedRoles((rs) => (on ? rs.filter((r) => r !== role) : [...rs, role]))}
+                    style={{ ...btnBase, textAlign: "left", borderColor: on ? "var(--blue)" : "#d5dce6", background: on ? "#e6f4ff" : "#fff", color: on ? "var(--blue)" : "#3a4a63" }}
+                  >{on ? "✓ " : ""}{role}</button>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+              <button onClick={() => { setShowRoles(false); setPickedRoles([]); }} style={btnBase}>Cancel</button>
+              <button onClick={() => { join(pickedRoles); setPickedRoles([]); }} disabled={pickedRoles.length === 0} style={{ ...btnBase, background: pickedRoles.length ? "var(--blue)" : "#b9c6e6", color: "#fff", border: "none" }}>Join</button>
             </div>
           </div>
         </div>

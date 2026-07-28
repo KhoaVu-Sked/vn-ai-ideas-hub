@@ -66,14 +66,24 @@ create table if not exists idea_members (
   id         uuid primary key default gen_random_uuid(),
   idea_id    uuid not null references ideas(id) on delete cascade,
   account_id uuid not null references accounts(id) on delete cascade,
-  role       text not null default 'Observer',
+  role       text,                                  -- legacy single role (unused)
+  roles      text[] not null default '{}',          -- a member can hold several roles
   created_at timestamptz not null default now(),
   unique (idea_id, account_id)
 );
 create index if not exists idea_members_idea_id_idx on idea_members (idea_id);
--- At most one lead ("Initiator / Project Lead") per idea.
+-- At most one lead ("Initiator / Project Lead") per idea. (Recreated in the
+-- migration block below, since the index NAME predates this predicate.)
 create unique index if not exists idea_members_one_lead
-  on idea_members (idea_id) where role = 'Initiator / Project Lead';
+  on idea_members (idea_id) where roles @> array['Initiator / Project Lead'];
+
+-- Expected time frame options for the submit form (admin-managed).
+create table if not exists time_frames (
+  id         uuid primary key default gen_random_uuid(),
+  name       text unique not null,
+  position   integer not null default 0,
+  created_at timestamptz not null default now()
+);
 
 -- Likes — one per person per idea (toggle).
 create table if not exists likes (
@@ -179,8 +189,14 @@ with pick as (
 update idea_members set role = 'Initiator / Project Lead' where id in (select id from pick);
 -- …any remaining ones would collide with an existing lead, so they become Observers.
 update idea_members set role = 'Observer' where role = 'Initiator / Idea Lead';
+
+-- Multiple roles per member: copy the legacy single role into the array.
+alter table idea_members add column if not exists roles text[] not null default '{}';
+update idea_members set roles = array[role] where cardinality(roles) = 0 and role is not null;
+alter table idea_members alter column role drop not null;
+drop index if exists idea_members_one_lead;
 create unique index if not exists idea_members_one_lead
-  on idea_members (idea_id) where role = 'Initiator / Project Lead';
+  on idea_members (idea_id) where roles @> array['Initiator / Project Lead'];
 
 -- Drop any old CHECK that pinned status to the previous 4 values (the app
 -- validates the allowed statuses, so we don't re-add a DB-level check).
@@ -196,6 +212,10 @@ alter table ideas alter column status set default 'Submitted';
 drop table if exists members;
 
 -- ── Seeds ─────────────────────────────────────────────────────────
+
+insert into time_frames (name, position) values
+  ('1-2 weeks', 1), ('3-4 weeks', 2), ('4-8 weeks', 3), ('1 quarter', 4)
+on conflict (name) do nothing;
 
 insert into tags (name, color) values
   ('Work', '#0070cc'), ('Personal Development', '#735dd0'), ('Family', '#e3761c'), ('Home', '#249387')
