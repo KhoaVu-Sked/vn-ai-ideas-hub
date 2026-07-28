@@ -152,6 +152,14 @@ a {
   50% { background: var(--header-blue); }
 }
 
+/* ── Scroll performance ──
+   The fixed feedback button carries a large soft shadow; without its own
+   compositor layer the browser repaints that region on every scroll frame. */
+.fab-layer { will-change: transform; transform: translateZ(0); }
+
+/* Off-screen idea cards skip layout/paint until they scroll into view. */
+.idea-card { content-visibility: auto; contain-intrinsic-size: 190px; }
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

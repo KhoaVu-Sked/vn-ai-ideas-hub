@@ -160,7 +160,7 @@ function Board() {
               const m = STATUS_META[p.status] || STATUS_META.Submitted;
               const cached = !!detailCache.current[p.id];
               return (
-                <div key={p.id} onClick={() => router.push(`/idea/${p.id}`)} style={{ ...cardStyle, padding: "14px 16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 9 }}>
+                <div key={p.id} className="idea-card" onClick={() => router.push(`/idea/${p.id}`)} style={{ ...cardStyle, padding: "14px 16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 9 }}>
                   <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
                     <Pill bg={m.bg} fg={m.fg}>{p.status}</Pill>
                     {p.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}

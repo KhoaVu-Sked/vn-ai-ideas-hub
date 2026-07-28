@@ -28,8 +28,15 @@ export default function SessionTimer() {
     lastRefresh.current = Date.now();
 
     // Activity resets the idle clock — but not once the warning is up (the user
-    // must explicitly choose Stay).
-    const onActivity = () => { if (!warnRef.current) lastActivity.current = Date.now(); };
+    // must explicitly choose Stay). Throttled: mousemove/scroll fire hundreds of
+    // times a second and we only need ~1s resolution on a 25-minute timer.
+    let lastSeen = 0;
+    const onActivity = () => {
+      const now = Date.now();
+      if (now - lastSeen < 1000) return;
+      lastSeen = now;
+      if (!warnRef.current) lastActivity.current = now;
+    };
     const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"];
     events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
 

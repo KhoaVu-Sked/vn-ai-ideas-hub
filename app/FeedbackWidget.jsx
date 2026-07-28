@@ -32,7 +32,7 @@ export default function FeedbackWidget() {
   };
 
   return (
-    <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 90 }}>
+    <div className="fab-layer" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 90 }}>
       {open && (
         <div style={{ position: "absolute", bottom: 54, right: 0, width: 300, background: "#fff", border: "1px solid var(--line)", borderRadius: 14, boxShadow: "0 12px 32px rgba(11,30,73,0.18)", padding: 16 }}>
           {sent ? (
