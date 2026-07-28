@@ -20,7 +20,7 @@ export async function POST() {
         <p>This is a test from <b>AI Ideas Hub</b>.</p>
         <p>If you're reading it, notifications are wired up correctly — members and followers will get emails on status changes, new requests, and new team members.</p>
       </div>`,
-      bcc: [acct.email],
+      to: [acct.email],
     });
     if (result.ok) return Response.json({ ok: true, sentTo: acct.email, via: result.via });
     return Response.json({ error: result.error || result.reason || "Send failed." }, { status: 500 });
