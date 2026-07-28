@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, avatarColor, ROLES, REQUEST_STATE_META,
+  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, avatarColor, ROLES, LEAD_ROLE, REQUEST_STATE_META,
 } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import TagChip from "../../TagChip";
@@ -95,9 +95,9 @@ export default function IdeaPage() {
   if (!data) return null;
 
   const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRole, canEdit, meId, isAdmin, deleteRequested, deleteReason } = data;
-  const isLead = myRole === "Project Lead";
+  const isLead = myRole === LEAD_ROLE;
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
-  const hasLead = members.some((m) => m.role === "Project Lead");
+  const hasLead = members.some((m) => m.role === LEAD_ROLE);
   const tagColors = Object.fromEntries(tagCatalog.filter((t) => t.color).map((t) => [t.name, t.color]));
   const toggleFormTag = (name) => setForm((f) => ({ ...f, tags: (f.tags || []).includes(name) ? f.tags.filter((x) => x !== name) : [...(f.tags || []), name] }));
   const setExtra = (key, v) => setForm((f) => ({ ...f, extra: { ...(f.extra || {}), [key]: v } }));
@@ -147,7 +147,7 @@ export default function IdeaPage() {
       patch((d) => ({
         members: [...d.members.filter((x) => x.account_id !== m.account_id), { account_id: m.account_id, name: m.name, role: m.role }],
         myRole: m.role,
-        canEdit: d.canEdit || m.role === "Project Lead",
+        canEdit: d.canEdit || m.role === LEAD_ROLE,
       }));
     });
   };
@@ -156,6 +156,26 @@ export default function IdeaPage() {
     const prev = { members, myRole };
     patch((d) => ({ members: d.members.filter((x) => x.account_id !== meId), myRole: null })); // optimistic
     run(() => api(`/api/ideas/${id}/members`, { method: "DELETE" }), () => patch(prev));
+  };
+  // Admin: change any member's role (assigning the lead transfers it).
+  const changeMemberRole = (accountId, role) => {
+    const prev = members;
+    patch((d) => ({
+      members: d.members.map((m) => {
+        if (m.account_id === accountId) return { ...m, role };
+        // Mirror the server's lead transfer.
+        if (role === LEAD_ROLE && m.role === LEAD_ROLE) return { ...m, role: "Observer" };
+        return m;
+      }),
+      myRole: accountId === meId ? role : d.myRole,
+    }));
+    run(() => api(`/api/ideas/${id}/members/${accountId}`, { method: "PATCH", body: JSON.stringify({ role }) }), () => patch({ members: prev }));
+  };
+  const removeMember = (m) => {
+    if (!confirm(`Remove ${m.name} from this idea's team?`)) return;
+    const prev = members;
+    patch((d) => ({ members: d.members.filter((x) => x.account_id !== m.account_id), myRole: m.account_id === meId ? null : d.myRole }));
+    run(() => api(`/api/ideas/${id}/members/${m.account_id}`, { method: "DELETE" }), () => patch({ members: prev }));
   };
   const saveContent = () => {
     const next = { ...form, tags: form.tags || [], extra: form.extra || {} };
@@ -373,14 +393,22 @@ export default function IdeaPage() {
               {members.map((m, i) => (
                 <div key={m.account_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <Avatar name={m.name} i={i} />
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{m.name}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{m.role}</div>
+                    {isAdmin ? (
+                      <select value={m.role} onChange={(e) => changeMemberRole(m.account_id, e.target.value)} title="Change role" style={{ marginTop: 3, width: "100%", fontSize: 11.5, color: "var(--muted)", border: "1px solid var(--line)", borderRadius: 6, padding: "2px 4px", background: "#fff", cursor: "pointer" }}>
+                        {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    ) : (
+                      <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{m.role}</div>
+                    )}
                   </div>
+                  {isAdmin && <button onClick={() => removeMember(m)} title="Remove from team" style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>}
                 </div>
               ))}
               {members.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No team yet.</div>}
             </div>
+            {isAdmin && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Admin: change a role, or set someone as {LEAD_ROLE} to transfer the lead.</div>}
           </div>
         </div>
       </div>
@@ -390,7 +418,7 @@ export default function IdeaPage() {
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 22, width: 320, boxShadow: "0 20px 60px rgba(10,22,44,0.3)" }}>
             <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 12 }}>Join the team as…</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {ROLES.filter((role) => role !== "Project Lead" || !hasLead).map((role) => (
+              {ROLES.filter((role) => role !== LEAD_ROLE || !hasLead).map((role) => (
                 <button key={role} onClick={() => join(role)} style={{ ...btnBase, textAlign: "left" }}>{role}</button>
               ))}
             </div>

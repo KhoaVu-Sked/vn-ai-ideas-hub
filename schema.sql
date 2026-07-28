@@ -71,9 +71,9 @@ create table if not exists idea_members (
   unique (idea_id, account_id)
 );
 create index if not exists idea_members_idea_id_idx on idea_members (idea_id);
--- At most one Project Lead per idea.
+-- At most one lead ("Initiator / Project Lead") per idea.
 create unique index if not exists idea_members_one_lead
-  on idea_members (idea_id) where role = 'Project Lead';
+  on idea_members (idea_id) where role = 'Initiator / Project Lead';
 
 -- Likes — one per person per idea (toggle).
 create table if not exists likes (
@@ -161,6 +161,26 @@ alter table ideas add column if not exists extra jsonb not null default '{}'::js
 alter table ideas add column if not exists delete_requested boolean not null default false;
 alter table ideas add column if not exists delete_reason text;
 alter table ideas add column if not exists delete_requested_by uuid;
+
+-- Merge "Project Lead" + "Initiator / Idea Lead" into "Initiator / Project Lead".
+-- The old index has the same NAME but the old predicate, so `if not exists`
+-- above skips it on an existing DB — drop and recreate it here.
+drop index if exists idea_members_one_lead;
+update idea_members set role = 'Initiator / Project Lead' where role = 'Project Lead';
+-- Old initiators become the lead only where the idea has none yet — at most ONE
+-- per idea (the earliest joiner), so we can't create two leads.
+with pick as (
+  select distinct on (idea_id) id
+  from idea_members
+  where role = 'Initiator / Idea Lead'
+    and idea_id not in (select idea_id from idea_members where role = 'Initiator / Project Lead')
+  order by idea_id, created_at
+)
+update idea_members set role = 'Initiator / Project Lead' where id in (select id from pick);
+-- …any remaining ones would collide with an existing lead, so they become Observers.
+update idea_members set role = 'Observer' where role = 'Initiator / Idea Lead';
+create unique index if not exists idea_members_one_lead
+  on idea_members (idea_id) where role = 'Initiator / Project Lead';
 
 -- Drop any old CHECK that pinned status to the previous 4 values (the app
 -- validates the allowed statuses, so we don't re-add a DB-level check).

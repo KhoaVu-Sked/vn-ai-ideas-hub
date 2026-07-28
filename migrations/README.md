@@ -19,3 +19,4 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `002_feedback.sql` — add the `feedback` table for the feedback widget.
 - `003_form_fields.sql` — add `form_fields` + `ideas.extra` for the admin form builder.
 - `004_idea_deletion.sql` — add `ideas.delete_requested/reason/by` for delete requests.
+- `005_merge_lead_roles.sql` — merge the two lead roles into `Initiator / Project Lead`.

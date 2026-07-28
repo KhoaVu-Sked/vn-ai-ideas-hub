@@ -61,22 +61,22 @@ insert into ideas (seq, name, status, tags, initiator_account_id, target_date, c
 -- keep the sequence ahead of the explicit seq values we inserted
 select setval(pg_get_serial_sequence('ideas', 'seq'), (select max(seq) from ideas));
 
--- 5) Teams (one Project Lead per idea).
+-- 5) Teams (one Initiator / Project Lead per idea).
 insert into idea_members (idea_id, account_id, role)
 select i.id, a.id, v.role
 from (values
-  ('AI Ticket Triage Assistant', 'trung', 'Project Lead'),
-  ('AI Ticket Triage Assistant', 'thao',  'Initiator / Idea Lead'),
+  ('AI Ticket Triage Assistant', 'trung', 'Initiator / Project Lead'),
+  ('AI Ticket Triage Assistant', 'thao',  'Tester'),
   ('AI Ticket Triage Assistant', 'thu',   'AI Design'),
   ('AI Ticket Triage Assistant', 'haanh', 'Form / UX Design'),
   ('AI Ticket Triage Assistant', 'quang', 'Observer'),
-  ('Knowledge Base Answer Bot',        'thu',   'Project Lead'),
-  ('Auto-draft Release Notes',         'haanh', 'Project Lead'),
-  ('Sentiment Triage for Escalations', 'thao',  'Project Lead'),
+  ('Knowledge Base Answer Bot',        'thu',   'Initiator / Project Lead'),
+  ('Auto-draft Release Notes',         'haanh', 'Initiator / Project Lead'),
+  ('Sentiment Triage for Escalations', 'thao',  'Initiator / Project Lead'),
   ('Sentiment Triage for Escalations', 'thu',   'AI Design'),
-  ('Onboarding Checklist Generator',   'quang', 'Project Lead'),
-  ('Meeting Notes Summarizer',         'trung', 'Project Lead'),
-  ('Shift Handover Digest',            'thao',  'Project Lead')
+  ('Onboarding Checklist Generator',   'quang', 'Initiator / Project Lead'),
+  ('Meeting Notes Summarizer',         'trung', 'Initiator / Project Lead'),
+  ('Shift Handover Digest',            'thao',  'Initiator / Project Lead')
 ) as v(idea_name, username, role)
 join ideas i on i.name = v.idea_name
 join accounts a on a.username = v.username

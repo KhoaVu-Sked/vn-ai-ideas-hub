@@ -1,5 +1,5 @@
 import { del } from "@vercel/blob";
-import { getIdea, updateContent, isProjectLead, deleteIdea, jsonError } from "@/lib/db";
+import { getIdea, updateContent, isProjectLead, deleteIdea, LEAD_ROLE, jsonError } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
 
 // GET /api/ideas/:id → full detail for the /idea/[id] page
@@ -11,7 +11,7 @@ export async function GET(_request, { params }) {
     data.meId = user.uid;
     data.isAdmin = user.role === "admin";
     // Whether the viewer may edit content / change status.
-    data.canEdit = data.isAdmin || data.myRole === "Project Lead";
+    data.canEdit = data.isAdmin || data.myRole === LEAD_ROLE;
     return Response.json(data);
   } catch (e) {
     return jsonError(e, "Could not load this idea.");
@@ -19,7 +19,7 @@ export async function GET(_request, { params }) {
 }
 
 // PATCH /api/ideas/:id { context, pain_points, expected_benefit, target_date }
-// → edit core content (Project Lead or admin only)
+// → edit core content (idea lead or admin only)
 export async function PATCH(request, { params }) {
   try {
     const user = await requireUser();
