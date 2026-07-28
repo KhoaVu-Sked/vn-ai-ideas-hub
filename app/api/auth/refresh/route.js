@@ -7,7 +7,7 @@ import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
 export async function POST() {
   try {
     const user = await requireUser();
-    const token = await signSession({ uid: user.uid, username: user.username, role: user.role });
+    const token = await signSession({ uid: user.uid, username: user.username, name: user.name, role: user.role });
     const res = NextResponse.json({ ok: true });
     res.cookies.set(COOKIE_NAME, token, cookieOptions);
     return res;

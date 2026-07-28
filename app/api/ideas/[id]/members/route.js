@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { joinTeam, leaveTeam, jsonError } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
-import { notifyIdeaEvent } from "@/lib/notify";
+import { ideaEvent } from "@/lib/notify";
 
 // POST /api/ideas/:id/members { roles: [...] } → join the team
 export async function POST(request, { params }) {
@@ -11,7 +11,12 @@ export async function POST(request, { params }) {
     const { roles, role } = await request.json();
     const result = await joinTeam(id, user.uid, roles ?? role);
     const base = new URL(request.url).origin;
-    after(() => notifyIdeaEvent(id, { actorId: user.uid, kind: "member", detail: (result.roles || []).join(", "), base }));
+    const who = user.name || user.username;
+    const rolesText = (result.roles || []).join(", ");
+    after(() => ideaEvent(id, {
+      actorId: user.uid, actor: who, kind: "member", detail: rolesText, base,
+      auditAction: `joined a team as ${rolesText}`,
+    }));
     return Response.json(result, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not join the team.");

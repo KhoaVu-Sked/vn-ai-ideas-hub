@@ -1,5 +1,7 @@
 import { requestIdeaDeletion, clearDeleteRequest, isProjectLead, jsonError } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
+import { after } from "next/server";
+import { adminEvent } from "@/lib/notify";
 
 // POST /api/ideas/:id/delete-request { reason } → project lead asks admin to delete
 export async function POST(request, { params }) {
@@ -12,6 +14,17 @@ export async function POST(request, { params }) {
     }
     const { reason } = await request.json();
     await requestIdeaDeletion(id, user.uid, reason);
+    const base = new URL(request.url).origin;
+    const who = user.name || user.username;
+    after(() => adminEvent({
+      actorId: user.uid, actor: who, entity: "idea", entityId: id,
+      auditAction: "requested deletion of an idea",
+      subject: "Idea deletion requested",
+      heading: "Deletion requested",
+      intro: `<b>${who}</b> asked an admin to delete an idea.`,
+      quote: reason || "",
+      ctaPath: `/idea/${id}`, base,
+    }));
     return Response.json({ ok: true }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not send the request.");

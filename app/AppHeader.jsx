@@ -63,6 +63,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
         <Link href="/" className="hdr-nav">Board</Link>
         {admin && <Link href="/dashboard" className="hdr-nav">Dashboard</Link>}
         {admin && <Link href="/tasks" className="hdr-nav">Tasks</Link>}
+        {admin && <Link href="/activity" className="hdr-nav">Activity</Link>}
         {admin && (
           <div style={{ position: "relative" }} onMouseEnter={() => setOpenMenu("manage")} onMouseLeave={() => setOpenMenu((m) => (m === "manage" ? null : m))}>
             <Link href="/manage" className="hdr-nav">Manage <span className="hdr-nav__caret">▼</span></Link>
