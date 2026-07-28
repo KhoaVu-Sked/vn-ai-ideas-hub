@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { tagPill, defaultTagColor } from "@/lib/statusMeta";
-import HeaderRight from "../HeaderRight";
+import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 
 async function api(path, init) {
@@ -104,16 +104,7 @@ function ManagePage() {
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
-      <header style={{ background: "var(--navy)", padding: "0 24px", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--blue)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, fontFamily: "var(--font-sora)" }}>AI</div>
-            <span style={{ color: "#fff", fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16 }}>AI Ideas Hub</span>
-          </Link>
-          <span style={{ color: "#8fa3c4", fontSize: 13 }}>Manage</span>
-        </div>
-        <HeaderRight />
-      </header>
+      <AppHeader crumb="Manage" />
 
       <main style={{ maxWidth: 960, margin: "0 auto", padding: "24px 22px 0" }}>
         {me === undefined ? (

@@ -1,6 +1,7 @@
 :root {
   /* Skedulo brand palette (from Brand + Breeze UI design tokens) */
-  --navy: #002755;        /* brand navy — header, dark surfaces */
+  --navy: #002755;        /* brand navy — dark surfaces */
+  --header-blue: #007ee6; /* product top bar (Breeze blue-700) */
   --blue: #0055ff;        /* brand blue — primary actions, accents */
   --blue-bright: #0b5cff; /* slightly brighter blue for hovers/CTAs */
   --ink: #0b1e49;         /* headings / titles */
@@ -43,31 +44,84 @@ a {
   color: inherit;
 }
 
-/* ── Header nav buttons (on the navy header) ── */
-.hdr-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #d7e0f0; border-radius: 8px; padding: 6px 12px;
-  font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none;
-  transition: background 120ms, color 120ms, border-color 120ms;
+/* ── App header — modelled on the Skedulo product top bar ── */
+.app-header {
+  background: var(--header-blue);
+  height: 56px; padding: 0 16px;
+  display: flex; align-items: center; gap: 6px;
 }
-.hdr-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
-.hdr-btn--danger { color: #ff9d95; border-color: rgba(255, 120, 110, 0.35); background: transparent; }
-.hdr-btn--danger:hover { background: #d53c30; color: #fff; border-color: transparent; }
-.hdr-cta {
-  background: var(--blue); border: none; color: #fff; border-radius: 8px;
-  padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+.app-header__brand {
+  display: flex; align-items: center; gap: 10px; text-decoration: none;
+  padding-right: 8px; color: #fff;
+}
+.app-header__mark {
+  width: 26px; height: 26px; border-radius: 7px; background: rgba(255, 255, 255, 0.22);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display), system-ui, sans-serif; font-weight: 800; font-size: 11.5px; color: #fff;
+}
+.app-header__name {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 700; font-size: 16px; color: #fff; white-space: nowrap;
+}
+.app-header__crumb { color: rgba(255, 255, 255, 0.72); font-size: 13px; white-space: nowrap; }
+.app-header__spacer { flex: 1; }
+
+/* Plain-text nav items with an optional caret */
+.hdr-nav {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: transparent; border: none; color: #fff; border-radius: 6px;
+  padding: 7px 10px; font-size: 13.5px; font-weight: 500; cursor: pointer;
+  text-decoration: none; white-space: nowrap;
   transition: background 120ms;
 }
-.hdr-cta:hover { background: var(--blue-bright); }
+.hdr-nav:hover { background: rgba(255, 255, 255, 0.16); }
+.hdr-nav__caret { font-size: 9px; opacity: 0.85; }
+
+/* Inline search */
+.hdr-search {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(255, 255, 255, 0.18); border-radius: 6px; padding: 0 10px; height: 34px;
+  transition: background 120ms;
+}
+.hdr-search:focus-within { background: rgba(255, 255, 255, 0.28); }
+.hdr-search input {
+  background: transparent; border: none; outline: none; color: #fff;
+  font-size: 13.5px; width: 190px;
+}
+.hdr-search input::placeholder { color: rgba(255, 255, 255, 0.75); }
+.hdr-search__icon { color: rgba(255, 255, 255, 0.9); display: flex; }
+.hdr-search__clear {
+  background: none; border: none; color: rgba(255, 255, 255, 0.9);
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+}
+
+/* Square white "+" action */
+.hdr-plus {
+  width: 34px; height: 34px; border-radius: 6px; background: #fff; border: none;
+  color: var(--header-blue); font-size: 20px; font-weight: 400; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: opacity 120ms;
+}
+.hdr-plus:hover { opacity: 0.9; }
+
+/* Avatar + its menu */
+.hdr-avatar {
+  width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(0, 0, 0, 0.22); color: #fff;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.3px;
+  display: flex; align-items: center; justify-content: center;
+}
+.hdr-avatar:hover { background: rgba(0, 0, 0, 0.32); }
+.hdr-menu__danger { color: #d53c30 !important; font-weight: 700 !important; }
+.hdr-menu__danger:hover { background: #fbecea !important; color: #b3251a !important; }
 
 /* ── Hover dropdown menu ── */
 .hdr-menu {
-  position: absolute; top: 100%; right: 0; margin-top: 6px; background: #fff;
+  position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff;
   border: 1px solid var(--line); border-radius: 10px;
   box-shadow: 0 12px 32px rgba(11, 30, 73, 0.18); padding: 6px; min-width: 178px; z-index: 60;
 }
+.hdr-menu--right { left: auto; right: 0; }
 .hdr-menu a {
   display: block; padding: 8px 10px; font-size: 12.5px; color: var(--body);
   text-decoration: none; border-radius: 6px; white-space: nowrap; font-weight: 600;

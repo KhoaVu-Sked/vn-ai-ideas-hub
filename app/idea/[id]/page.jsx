@@ -9,7 +9,7 @@ import {
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import TagChip from "../../TagChip";
 import FieldInput from "../../FieldInput";
-import HeaderRight from "../../HeaderRight";
+import AppHeader from "../../AppHeader";
 import SubmitModal from "../../SubmitModal";
 import Loading from "../../Loading";
 
@@ -432,19 +432,7 @@ export default function IdeaPage() {
 function Shell({ name, onNewIdea, children }) {
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
-      <header style={{ background: "var(--navy)", padding: "0 24px", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--blue)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, fontFamily: "var(--font-sora)" }}>AI</div>
-            <span style={{ color: "#fff", fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16 }}>AI Ideas Hub</span>
-          </Link>
-          <span style={{ color: "#8fa3c4", fontSize: 13 }}>
-            <Link href="/" style={{ color: "#8fa3c4", textDecoration: "none" }}>Board</Link>
-            {name ? ` › ${name}` : ""}
-          </span>
-        </div>
-        <HeaderRight onNewIdea={onNewIdea} />
-      </header>
+      <AppHeader crumb={name} onNewIdea={onNewIdea} />
       <main style={{ maxWidth: 1060, margin: "0 auto", padding: "20px 22px 0" }}>{children}</main>
     </div>
   );

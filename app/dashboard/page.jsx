@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { STATUS_META, avatarColor, defaultTagColor } from "@/lib/statusMeta";
-import HeaderRight from "../HeaderRight";
+import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 
 async function api(path) {
@@ -39,21 +39,7 @@ export default function DashboardPage() {
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
-      <header style={{ background: "var(--navy)", padding: "0 24px", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--blue)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, fontFamily: "var(--font-sora)" }}>AI</div>
-            <span style={{ color: "#fff", fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16 }}>AI Ideas Hub — Leader Dashboard</span>
-          </Link>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <select value={period} onChange={(e) => setPeriod(e.target.value)} className="hdr-btn" style={{ cursor: "pointer" }}>
-            <option value="all">All time</option>
-            <option value="quarter">This quarter</option>
-          </select>
-          <HeaderRight />
-        </div>
-      </header>
+      <AppHeader crumb="Leader Dashboard" />
 
       <main style={{ maxWidth: 1080, margin: "0 auto", padding: "20px 22px 0" }}>
         {me === null ? (
@@ -64,6 +50,13 @@ export default function DashboardPage() {
           <Loading label="Loading dashboard" />
         ) : (
           <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 12 }}>
+              <select value={period} onChange={(e) => setPeriod(e.target.value)} style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--body)", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                <option value="all">All time</option>
+                <option value="quarter">This quarter</option>
+              </select>
+            </div>
+
             {/* KPI tiles */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 16 }}>
               <Kpi label="Total ideas" value={data.kpi.total} sub={<span style={{ color: "#2f9e44", fontWeight: 700 }}>▲ +{data.kpi.newThisQuarter} this quarter</span>} />

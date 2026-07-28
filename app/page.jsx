@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { STATUS_META, STATUS_ORDER, ALL_STATUSES, avatarColor } from "@/lib/statusMeta";
 import TagChip from "./TagChip";
-import HeaderRight from "./HeaderRight";
+import AppHeader from "./AppHeader";
 import SubmitModal from "./SubmitModal";
 import Loading from "./Loading";
 
@@ -88,6 +88,7 @@ function Board() {
     }).catch(() => {});
   }, []);
   useEffect(() => { if (searchParams.get("submit") === "1") setShowSubmit(true); }, [searchParams]);
+  useEffect(() => { const q = searchParams.get("q"); if (q) setSearch(q); }, [searchParams]);
 
   // Preview drawer — light detail, cache-first.
   const openPreview = useCallback(async (p) => {
@@ -122,13 +123,7 @@ function Board() {
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
-      <header style={{ background: "var(--navy)", padding: "0 24px", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--blue)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, fontFamily: "var(--font-sora)" }}>AI</div>
-          <span style={{ color: "#fff", fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16 }}>AI Ideas Hub</span>
-        </div>
-        <HeaderRight onNewIdea={() => setShowSubmit(true)} />
-      </header>
+      <AppHeader onNewIdea={() => setShowSubmit(true)} search={search} onSearch={setSearch} />
 
       <main style={{ maxWidth: 1060, margin: "0 auto", padding: "20px 22px 0" }}>
         {listError && (
@@ -138,7 +133,6 @@ function Board() {
         )}
 
         <div style={{ ...cardStyle, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search ideas…" style={{ border: "1px solid #dde3ec", borderRadius: 8, padding: "7px 12px", fontSize: 12.5, width: 190, outline: "none" }} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ border: "1px solid #dde3ec", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, background: "#f8fafc", fontWeight: 600, color: "#3a4a63" }}>
             <option value="All">Status: All</option>
             {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
