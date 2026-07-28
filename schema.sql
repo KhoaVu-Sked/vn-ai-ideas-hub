@@ -18,10 +18,25 @@ create table if not exists ideas (
   context               text,
   pain_points           text,
   expected_benefit      text,
+  extra                 jsonb not null default '{}'::jsonb,   -- admin-defined custom fields
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );
 create index if not exists ideas_updated_at_idx on ideas (updated_at desc);
+
+-- Admin-configurable extra fields for the Submit form. Deleting a field ARCHIVES
+-- it (archived = true) — existing answers in ideas.extra are kept, never dropped.
+create table if not exists form_fields (
+  id         uuid primary key default gen_random_uuid(),
+  key        text unique not null,                 -- immutable JSONB key (relabel-safe)
+  label      text not null,
+  type       text not null default 'text',         -- text | textarea | number | select
+  options    text[] not null default '{}',         -- for select
+  required   boolean not null default false,
+  position   integer not null default 0,
+  archived   boolean not null default false,
+  created_at timestamptz not null default now()
+);
 
 create table if not exists accounts (
   id            uuid primary key default gen_random_uuid(),
@@ -108,6 +123,18 @@ create table if not exists tasks (
 );
 create index if not exists tasks_created_at_idx on tasks (created_at desc);
 
+-- Feedback — any signed-in user can submit; admins review. Kept if the account
+-- is later deleted (account_id set null).
+create table if not exists feedback (
+  id         uuid primary key default gen_random_uuid(),
+  account_id uuid references accounts(id) on delete set null,
+  body       text not null,
+  page       text,
+  status     text not null default 'open',   -- open | resolved
+  created_at timestamptz not null default now()
+);
+create index if not exists feedback_created_at_idx on feedback (created_at desc);
+
 -- ── Migration for existing databases (no-ops on a fresh one) ───────
 
 do $$ begin
@@ -127,6 +154,7 @@ alter table accounts add column if not exists name text;
 alter table accounts add column if not exists email text;
 create unique index if not exists accounts_email_key on accounts (email);
 alter table tags add column if not exists color text;
+alter table ideas add column if not exists extra jsonb not null default '{}'::jsonb;
 
 -- Drop any old CHECK that pinned status to the previous 4 values (the app
 -- validates the allowed statuses, so we don't re-add a DB-level check).

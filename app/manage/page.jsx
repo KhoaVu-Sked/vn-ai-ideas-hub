@@ -22,7 +22,12 @@ export default function ManagePage() {
   const [newTag, setNewTag] = useState("");
   const [accounts, setAccounts] = useState([]);
   const [creating, setCreating] = useState({ username: "", email: "", name: "", password: "", role: "member" });
+  const [feedback, setFeedback] = useState([]);
+  const [fields, setFields] = useState([]);
+  const [newField, setNewField] = useState({ label: "", type: "text", options: "", required: false });
   const [err, setErr] = useState("");
+
+  const withText = (fs) => (fs || []).filter((x) => !x.archived).map((x) => ({ ...x, optionsText: (x.options || []).join(", ") }));
 
   const load = useCallback(async () => {
     setErr("");
@@ -31,6 +36,10 @@ export default function ManagePage() {
       setTags(t);
       const { accounts: a } = await api("/api/accounts");
       setAccounts(a);
+      const { feedback: fb } = await api("/api/feedback");
+      setFeedback(fb);
+      const { fields: ff } = await api("/api/form-fields");
+      setFields(withText(ff));
     } catch (e) { setErr(e.message); }
   }, []);
 
@@ -58,6 +67,22 @@ export default function ManagePage() {
     setAccounts((as) => [...as, account]);
     setCreating({ username: "", email: "", name: "", password: "", role: "member" });
   });
+
+  const setFbStatus = (id, status) => run(async () => { await api(`/api/feedback/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }); setFeedback((fs) => fs.map((f) => (f.id === id ? { ...f, status } : f))); });
+  const delFb = (id) => { if (!confirm("Delete this feedback?")) return; run(async () => { await api(`/api/feedback/${id}`, { method: "DELETE" }); setFeedback((fs) => fs.filter((f) => f.id !== id)); }); };
+
+  const setF = (id, k, v) => setFields((fs) => fs.map((x) => (x.id === id ? { ...x, [k]: v } : x)));
+  const addField = () => { const l = newField.label.trim(); if (!l) return; run(async () => {
+    const opts = newField.type === "select" ? newField.options.split(",").map((s) => s.trim()).filter(Boolean) : [];
+    const { fields: ff } = await api("/api/form-fields", { method: "POST", body: JSON.stringify({ label: l, type: newField.type, required: newField.required, options: opts }) });
+    setFields(withText(ff)); setNewField({ label: "", type: "text", options: "", required: false });
+  }); };
+  const saveField = (f) => run(async () => {
+    const opts = f.type === "select" ? (f.optionsText || "").split(",").map((s) => s.trim()).filter(Boolean) : [];
+    const { fields: ff } = await api(`/api/form-fields/${f.id}`, { method: "PATCH", body: JSON.stringify({ label: f.label, type: f.type, required: f.required, options: opts }) });
+    setFields(withText(ff));
+  });
+  const delField = (f) => { if (!confirm(`Remove field "${f.label}"? It disappears from the form; existing answers on ideas are kept.`)) return; run(async () => { const { fields: ff } = await api(`/api/form-fields/${f.id}`, { method: "DELETE" }); setFields(withText(ff)); }); };
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
@@ -105,6 +130,41 @@ export default function ManagePage() {
               <div style={{ display: "flex", gap: 8, maxWidth: 340 }}>
                 <input value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTag()} placeholder="New tag name" style={field} />
                 <button onClick={addTag} style={primary}>Add</button>
+              </div>
+            </section>
+
+            {/* Submit form fields */}
+            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
+              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 4px" }}>Submit form fields</h2>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>Extra fields on the New Idea form (after the standard ones). Removing a field just hides it — existing answers on ideas are kept.</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {fields.map((f) => (
+                  <div key={f.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                    <input value={f.label} onChange={(e) => setF(f.id, "label", e.target.value)} placeholder="Label" style={{ ...field, width: 170 }} />
+                    <select value={f.type} onChange={(e) => setF(f.id, "type", e.target.value)} style={{ ...field, width: 120 }}>
+                      <option value="text">Short text</option><option value="textarea">Long text</option><option value="number">Number</option><option value="select">Dropdown</option>
+                    </select>
+                    {f.type === "select" && <input value={f.optionsText} onChange={(e) => setF(f.id, "optionsText", e.target.value)} placeholder="Option A, Option B" style={{ ...field, width: 180 }} />}
+                    <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", alignItems: "center", gap: 4 }}><input type="checkbox" checked={f.required} onChange={(e) => setF(f.id, "required", e.target.checked)} /> required</label>
+                    <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                      <button onClick={() => saveField(f)} style={primary}>Save</button>
+                      <button onClick={() => delField(f)} style={{ ...btn, color: "#d53c30", borderColor: "#f5c9c9" }}>Delete</button>
+                    </span>
+                  </div>
+                ))}
+                {fields.length === 0 && <div style={{ fontSize: 12.5, color: "var(--faint)" }}>No custom fields — the form shows the standard fields only.</div>}
+              </div>
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)", marginBottom: 8 }}>Add a field</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <input value={newField.label} onChange={(e) => setNewField({ ...newField, label: e.target.value })} placeholder="Label" style={{ ...field, width: 170 }} />
+                  <select value={newField.type} onChange={(e) => setNewField({ ...newField, type: e.target.value })} style={{ ...field, width: 120 }}>
+                    <option value="text">Short text</option><option value="textarea">Long text</option><option value="number">Number</option><option value="select">Dropdown</option>
+                  </select>
+                  {newField.type === "select" && <input value={newField.options} onChange={(e) => setNewField({ ...newField, options: e.target.value })} placeholder="Option A, Option B" style={{ ...field, width: 180 }} />}
+                  <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", alignItems: "center", gap: 4 }}><input type="checkbox" checked={newField.required} onChange={(e) => setNewField({ ...newField, required: e.target.checked })} /> required</label>
+                  <button onClick={addField} style={primary}>Add field</button>
+                </div>
               </div>
             </section>
 
@@ -161,6 +221,32 @@ export default function ManagePage() {
                   <button onClick={createAcct} style={primary}>Create</button>
                 </div>
               </div>
+            </section>
+
+            {/* Feedback */}
+            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px", marginTop: 20 }}>
+              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 12px" }}>Feedback {feedback.length > 0 && <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>({feedback.filter((f) => f.status === "open").length} open)</span>}</h2>
+              {feedback.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No feedback yet.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {feedback.map((f) => (
+                    <div key={f.id} style={{ background: f.status === "resolved" ? "#f6f8fb" : "#fff", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px", opacity: f.status === "resolved" ? 0.7 : 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{f.submitter}</span>
+                        <span style={{ fontSize: 11, color: "var(--faint)" }}>{f.date}</span>
+                        {f.page && <span style={{ fontSize: 11, color: "var(--muted)", background: "var(--bg)", borderRadius: 5, padding: "1px 6px" }}>{f.page}</span>}
+                        {f.status === "resolved" && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#469b58", background: "#ebf6ed", borderRadius: 999, padding: "1px 8px" }}>resolved</span>}
+                        <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                          <button onClick={() => setFbStatus(f.id, f.status === "resolved" ? "open" : "resolved")} style={{ ...btn, fontSize: 11.5 }}>{f.status === "resolved" ? "Reopen" : "Resolve"}</button>
+                          <button onClick={() => delFb(f.id)} style={{ ...btn, fontSize: 11.5, color: "#d53c30", borderColor: "#f5c9c9" }}>Delete</button>
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{f.body}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           </>
         )}

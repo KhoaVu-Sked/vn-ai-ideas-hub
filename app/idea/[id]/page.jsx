@@ -8,6 +8,7 @@ import {
 } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import TagChip from "../../TagChip";
+import FieldInput from "../../FieldInput";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -66,18 +67,20 @@ export default function IdeaPage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [tagCatalog, setTagCatalog] = useState([]);
+  const [formFields, setFormFields] = useState([]);
 
   const load = useCallback(async () => {
     setBusy(true); setErr("");
     try {
       const d = await api(`/api/ideas/${id}`);
       setData(d);
-      setForm({ context: d.idea.context, pain_points: d.idea.pain_points, expected_benefit: d.idea.expected_benefit, target_date: d.idea.target_date || "", tags: d.idea.tags || [] });
+      setForm({ context: d.idea.context, pain_points: d.idea.pain_points, expected_benefit: d.idea.expected_benefit, target_date: d.idea.target_date || "", tags: d.idea.tags || [], extra: d.idea.extra || {} });
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api("/api/tags").then(({ tags }) => setTagCatalog(tags || [])).catch(() => {}); }, []);
+  useEffect(() => { api("/api/form-fields").then(({ fields }) => setFormFields(fields || [])).catch(() => {}); }, []);
 
   // Merge into local state (obj or updater); run an action with optional revert.
   const patch = (upd) => setData((d) => ({ ...d, ...(typeof upd === "function" ? upd(d) : upd) }));
@@ -92,6 +95,10 @@ export default function IdeaPage() {
   const hasLead = members.some((m) => m.role === "Project Lead");
   const tagColors = Object.fromEntries(tagCatalog.filter((t) => t.color).map((t) => [t.name, t.color]));
   const toggleFormTag = (name) => setForm((f) => ({ ...f, tags: (f.tags || []).includes(name) ? f.tags.filter((x) => x !== name) : [...(f.tags || []), name] }));
+  const setExtra = (key, v) => setForm((f) => ({ ...f, extra: { ...(f.extra || {}), [key]: v } }));
+  const activeFields = formFields.filter((f) => !f.archived);
+  // Custom-field answers to display: active fields + any archived field that has a value.
+  const shownFields = formFields.filter((f) => !f.archived || (idea.extra && String(idea.extra[f.key] ?? "").trim()));
 
   const toggleLike = () => {
     patch({ likedByMe: !likedByMe, likeCount: likeCount + (likedByMe ? -1 : 1) }); // optimistic
@@ -146,10 +153,10 @@ export default function IdeaPage() {
     run(() => api(`/api/ideas/${id}/members`, { method: "DELETE" }), () => patch(prev));
   };
   const saveContent = () => {
-    const next = { ...form, tags: form.tags || [] };
+    const next = { ...form, tags: form.tags || [], extra: form.extra || {} };
     run(async () => {
       await api(`/api/ideas/${id}`, { method: "PATCH", body: JSON.stringify(next) });
-      patch((d) => ({ idea: { ...d.idea, context: next.context, pain_points: next.pain_points, expected_benefit: next.expected_benefit, target_date: next.target_date, tags: next.tags } }));
+      patch((d) => ({ idea: { ...d.idea, context: next.context, pain_points: next.pain_points, expected_benefit: next.expected_benefit, target_date: next.target_date, tags: next.tags, extra: { ...(d.idea.extra || {}), ...next.extra } } }));
       setEditing(false);
     });
   };
@@ -221,7 +228,7 @@ export default function IdeaPage() {
               ) : (
                 <button onClick={() => setEditing(true)} style={btnBase}>Edit content</button>
               )}
-              {editing && <button onClick={() => { setEditing(false); setForm({ context: idea.context, pain_points: idea.pain_points, expected_benefit: idea.expected_benefit, target_date: idea.target_date || "", tags: idea.tags || [] }); }} style={{ ...btnBase, marginLeft: 8 }}>Cancel</button>}
+              {editing && <button onClick={() => { setEditing(false); setForm({ context: idea.context, pain_points: idea.pain_points, expected_benefit: idea.expected_benefit, target_date: idea.target_date || "", tags: idea.tags || [], extra: idea.extra || {} }); }} style={{ ...btnBase, marginLeft: 8 }}>Cancel</button>}
             </div>
           )}
 
@@ -243,14 +250,32 @@ export default function IdeaPage() {
               ))}
               <div style={sectionLabel}>Target date</div>
               <input value={form.target_date || ""} onChange={(e) => setForm({ ...form, target_date: e.target.value })} placeholder="e.g. end of Q3" style={{ width: "100%", border: "1px solid #dde3ec", borderRadius: 8, padding: "8px 12px", fontSize: 13 }} />
+              {activeFields.map((f) => (
+                <div key={f.key}>
+                  <div style={sectionLabel}>{f.label}{f.required ? " *" : ""}</div>
+                  <FieldInput field={f} value={(form.extra || {})[f.key]} onChange={(v) => setExtra(f.key, v)} />
+                </div>
+              ))}
             </div>
           ) : (
-            [["Context", idea.context], ["Pain points", idea.pain_points], ["Expected benefit", idea.expected_benefit]].map(([label, text]) => (
-              <div key={label} style={{ background: "#f8fafc", border: "1px solid var(--line)", borderLeft: "3px solid var(--blue)", borderRadius: 10, padding: "12px 16px", marginTop: 12 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
-                <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>{text?.trim() || <span style={{ color: "var(--faint)" }}>—</span>}</p>
-              </div>
-            ))
+            <>
+              {[["Context", idea.context], ["Pain points", idea.pain_points], ["Expected benefit", idea.expected_benefit]].map(([label, text]) => (
+                <div key={label} style={{ background: "#f8fafc", border: "1px solid var(--line)", borderLeft: "3px solid var(--blue)", borderRadius: 10, padding: "12px 16px", marginTop: 12 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+                  <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>{text?.trim() || <span style={{ color: "var(--faint)" }}>—</span>}</p>
+                </div>
+              ))}
+              {shownFields.map((f) => {
+                const val = String((idea.extra || {})[f.key] ?? "").trim();
+                const accent = f.archived ? "var(--faint)" : "var(--blue)";
+                return (
+                  <div key={f.key} style={{ background: "#f8fafc", border: "1px solid var(--line)", borderLeft: `3px solid ${accent}`, borderRadius: 10, padding: "12px 16px", marginTop: 12 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: accent, letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 6 }}>{f.label}{f.archived ? " (archived)" : ""}</div>
+                    <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>{val || <span style={{ color: "var(--faint)" }}>—</span>}</p>
+                  </div>
+                );
+              })}
+            </>
           )}
 
           {/* Attachments */}

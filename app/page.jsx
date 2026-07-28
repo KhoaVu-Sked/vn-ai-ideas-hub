@@ -6,6 +6,7 @@ import Link from "next/link";
 import { STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, avatarColor } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import TagChip from "./TagChip";
+import FieldInput from "./FieldInput";
 
 // ─────────────────────────────────────────────────────────────
 // AI Ideas Hub — board
@@ -263,15 +264,18 @@ const TIME_FRAMES = ["Sprint (2–4 weeks)", "Quarter (8–12 weeks)", "Half-yea
 
 function SubmitModal({ onClose, onCreated }) {
   const [tagOptions, setTagOptions] = useState([]);
-  const [form, setForm] = useState({ name: "", tags: [], context: "", pain_points: "", expected_benefit: "", target_date: "" });
+  const [fields, setFields] = useState([]);
+  const [form, setForm] = useState({ name: "", tags: [], context: "", pain_points: "", expected_benefit: "", target_date: "", extra: {} });
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => { api("/api/tags").then(({ tags: t }) => setTagOptions(t || [])).catch(() => {}); }, []);
+  useEffect(() => { api("/api/form-fields").then(({ fields: f }) => setFields((f || []).filter((x) => !x.archived))).catch(() => {}); }, []);
   const tagColorMap = useMemo(() => Object.fromEntries(tagOptions.filter((t) => t.color).map((t) => [t.name, t.color])), [tagOptions]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setExtra = (key, v) => setForm((f) => ({ ...f, extra: { ...f.extra, [key]: v } }));
   const toggleTag = (name) => setForm((f) => ({ ...f, tags: f.tags.includes(name) ? f.tags.filter((x) => x !== name) : [...f.tags, name] }));
   const addFiles = (list) => {
     const ok = [], bad = [];
@@ -286,6 +290,8 @@ function SubmitModal({ onClose, onCreated }) {
 
   const submit = async () => {
     if (!form.name.trim()) { setErr("Give the idea a name first."); return; }
+    const missing = fields.find((f) => f.required && !String(form.extra[f.key] ?? "").trim());
+    if (missing) { setErr(`"${missing.label}" is required.`); return; }
     setBusy(true); setErr("");
     try {
       const { project } = await api("/api/projects", { method: "POST", body: JSON.stringify({ ...form, name: form.name.trim() }) });
@@ -347,6 +353,13 @@ function SubmitModal({ onClose, onCreated }) {
             {TIME_FRAMES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
+
+        {fields.map((f) => (
+          <div key={f.key} style={{ marginBottom: 14 }}>
+            <label style={label}>{f.label}{f.required ? req : null}</label>
+            <FieldInput field={f} value={form.extra[f.key]} onChange={(v) => setExtra(f.key, v)} />
+          </div>
+        ))}
 
         <div style={{ marginBottom: 18 }}>
           <label style={label}>Attachments</label>

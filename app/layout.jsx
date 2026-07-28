@@ -1,6 +1,7 @@
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 import SessionTimer from "./SessionTimer";
+import FeedbackWidget from "./FeedbackWidget";
 
 // Skedulo brand type: Manrope (display/headings) + Inter (body/UI).
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -17,6 +18,7 @@ export default function RootLayout({ children }) {
       <body className={`${inter.variable} ${manrope.variable}`}>
         {children}
         <SessionTimer />
+        <FeedbackWidget />
       </body>
     </html>
   );
