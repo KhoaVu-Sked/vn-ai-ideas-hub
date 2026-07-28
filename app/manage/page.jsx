@@ -52,6 +52,7 @@ function ManagePage() {
   const [err, setErr] = useState("");
   const [toast, setToast] = useState("");
   const [audit, setAudit] = useState([]);
+  const [sampleKind, setSampleKind] = useState("test");
   const [auditDays, setAuditDays] = useState(14);
   const [dirty, setDirty] = useState({});
 
@@ -132,8 +133,8 @@ function ManagePage() {
   const moveField = (f, move) => run(async () => { const { fields: ff } = await api(`/api/form-fields/${f.id}`, { method: "PATCH", body: JSON.stringify({ move }) }); setFields(withText(ff)); });
 
   const sendTestEmail = () => run(async () => {
-    const r = await api("/api/mail-test", { method: "POST" });
-    setToast(`Test email sent to ${r.sentTo} (via ${r.via}).`);
+    const r = await api("/api/mail-test", { method: "POST", body: JSON.stringify({ kind: sampleKind }) });
+    setToast(`Sent ${r.count} email${r.count === 1 ? "" : "s"} to ${r.sentTo}.`);
     setTimeout(() => setToast(""), 4000);
   });
 
@@ -426,8 +427,29 @@ function ManagePage() {
                 Sending is configured with environment variables in Vercel (<code>SMTP_USER</code> + <code>SMTP_PASS</code>, or <code>RESEND_API_KEY</code>)
                 — if none are set, the app simply doesn&apos;t send.
               </div>
-              <button onClick={sendTestEmail} style={{ ...primary, padding: "9px 18px" }}>Send test email to me</button>
-              <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 8 }}>Goes to the address on your account. Accounts without an email are skipped when notifying.</div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)", margin: "6px 0 8px" }}>Preview a notification</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <select value={sampleKind} onChange={(e) => setSampleKind(e.target.value)} style={{ ...field, width: 280 }}>
+                  <option value="test">Plain test — is email working?</option>
+                  <optgroup label="Members &amp; followers">
+                    <option value="status">Status change (Pilot → Launched)</option>
+                    <option value="request">New request / comment</option>
+                    <option value="member">New team member</option>
+                    <option value="content">Idea content edited</option>
+                  </optgroup>
+                  <optgroup label="Admins">
+                    <option value="new-idea">New idea submitted</option>
+                    <option value="feedback">New feedback</option>
+                    <option value="deletion">Idea deletion requested</option>
+                  </optgroup>
+                  <option value="all">Every sample (8 emails)</option>
+                </select>
+                <button onClick={sendTestEmail} style={{ ...primary, padding: "9px 18px" }}>Send to me</button>
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.6 }}>
+                Samples are built with the same code as real notifications, so they look exactly like what the team receives —
+                subject lines are tagged <b>[sample]</b>. Sends only to the address on your account.
+              </div>
             </section>
             )}
           </>
