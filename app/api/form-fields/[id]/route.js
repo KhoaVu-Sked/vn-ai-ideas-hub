@@ -17,7 +17,7 @@ export async function PATCH(request, { params }) {
       after(() => adminEvent({
         actorId: admin.uid, actor: who, entity: "form_field", entityId: id,
         auditAction: `reordered a form field (${body.move})`,
-        subject: "[AI Ideas Hub] Submit form reordered",
+        subject: "AI Ideas Hub submit form reordered",
         heading: "Submit form changed",
         intro: `<b>${who}</b> reordered the New Idea form.`,
         ctaPath: "/manage?section=fields", base,
@@ -28,7 +28,7 @@ export async function PATCH(request, { params }) {
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "form_field", entityId: id,
       auditAction: `edited the form field "${body.label || ""}"`,
-      subject: "[AI Ideas Hub] Submit form changed",
+      subject: "AI Ideas Hub submit form changed",
       heading: "Submit form changed",
       intro: `<b>${who}</b> edited the field <b>${body.label || ""}</b>.`,
       ctaPath: "/manage?section=fields", base,
@@ -49,7 +49,7 @@ export async function DELETE(_request, { params }) {
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "form_field", entityId: id,
       auditAction: "removed a form field (answers kept)",
-      subject: "[AI Ideas Hub] Submit form changed",
+      subject: "AI Ideas Hub submit form changed",
       heading: "Submit form changed",
       intro: `<b>${who}</b> removed a field from the New Idea form. Existing answers are kept.`,
       ctaPath: "/manage?section=fields",

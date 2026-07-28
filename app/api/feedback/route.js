@@ -25,7 +25,7 @@ export async function POST(request) {
     after(() => adminEvent({
       actorId: user.uid, actor: who, entity: "feedback",
       auditAction: "sent feedback",
-      subject: "[AI Ideas Hub] New feedback",
+      subject: "New feedback on AI Ideas Hub",
       heading: "New feedback",
       intro: `<b>${who}</b> sent feedback${page ? ` from <b>${page}</b>` : ""}.`,
       quote: body,

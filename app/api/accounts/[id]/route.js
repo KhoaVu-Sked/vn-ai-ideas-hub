@@ -21,7 +21,7 @@ export async function PATCH(request, { params }) {
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "account", entityId: id,
       auditAction: `${what} "${account.username}"`,
-      subject: "[AI Ideas Hub] User account changed",
+      subject: "AI Ideas Hub user account changed",
       heading: "User account changed",
       intro: `<b>${who}</b> ${what} <b>${account.username}</b>.`,
       rows: [["Username", account.username], ["Email", account.email || "—"], ["Role", account.role]],
@@ -44,7 +44,7 @@ export async function DELETE(_request, { params }) {
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "account", entityId: id,
       auditAction: "deleted a user account",
-      subject: "[AI Ideas Hub] User account deleted",
+      subject: "AI Ideas Hub user account deleted",
       heading: "User account deleted",
       intro: `<b>${who}</b> deleted a user account.`,
       ctaPath: "/manage?section=users",

@@ -26,7 +26,7 @@ export async function POST(request) {
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "form_field",
       auditAction: `added the form field "${label}"`,
-      subject: "[AI Ideas Hub] Submit form changed",
+      subject: "AI Ideas Hub submit form changed",
       heading: "Submit form changed",
       intro: `<b>${who}</b> added the field <b>${label}</b> to the New Idea form.`,
       ctaPath: "/manage?section=fields", base,

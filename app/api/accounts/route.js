@@ -27,7 +27,7 @@ export async function POST(request) {
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "account", entityId: account.id,
       auditAction: `created the account "${account.username}" (${account.role})`,
-      subject: "[AI Ideas Hub] New user account",
+      subject: "New AI Ideas Hub user account",
       heading: "User account created",
       intro: `<b>${who}</b> created an account for <b>${account.username}</b>.`,
       rows: [["Username", account.username], ["Email", account.email || "—"], ["Role", account.role]],

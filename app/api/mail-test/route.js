@@ -24,31 +24,31 @@ function sample(kind, { link, appBase }) {
     case "content":
       return idea({ kind: "content", actor: "Ha Anh", detail: "Context, Pain points" });
     case "new-idea":
-      return withText("[AI Ideas Hub] New idea: Shift Handover Digest", ({
+      return withText("New idea: Shift Handover Digest", ({
           heading: "New idea submitted",
           intro: "<b>Thao Lai</b> submitted <b>Shift Handover Digest</b>.",
           rows: [["Idea", "Shift Handover Digest"], ["Submitted by", "Thao Lai"], ["Tags", "Work"]],
           ctaLabel: "Open AI Ideas Hub", ctaUrl: link,
-          footer: "You're receiving this because you're an admin of AI Ideas Hub.",
+          footer: "You're receiving this because you're an admin of AI Ideas Hub, Skedulo's internal AI ideas tracker.",
       }));
     case "feedback":
-      return withText("[AI Ideas Hub] New feedback", ({
+      return withText("New feedback on AI Ideas Hub", ({
           heading: "New feedback",
           intro: "<b>Quang Duc</b> sent feedback from <b>/idea/007</b>.",
           quote: "The Preview button is easy to miss on smaller screens — could it be more prominent?",
           ctaLabel: "Open AI Ideas Hub", ctaUrl: `${appBase}/manage?section=feedback`,
-          footer: "You're receiving this because you're an admin of AI Ideas Hub.",
+          footer: "You're receiving this because you're an admin of AI Ideas Hub, Skedulo's internal AI ideas tracker.",
       }));
     case "deletion":
-      return withText("[AI Ideas Hub] Idea deletion requested", ({
+      return withText("Idea deletion requested", ({
           heading: "Deletion requested",
           intro: "<b>Trung Vo</b> asked an admin to delete an idea.",
           quote: "Superseded by the Knowledge Base Answer Bot — no longer needed.",
           ctaLabel: "Open AI Ideas Hub", ctaUrl: link,
-          footer: "You're receiving this because you're an admin of AI Ideas Hub.",
+          footer: "You're receiving this because you're an admin of AI Ideas Hub, Skedulo's internal AI ideas tracker.",
       }));
     default:
-      return withText("[AI Ideas Hub] Test email", ({
+      return withText("AI Ideas Hub email test", ({
           heading: "Email is working",
           intro: "This is a test from <b>AI Ideas Hub</b>. If you're reading it, notifications are wired up correctly.",
           rows: [["Triggers", "Status changes, new requests, new members, content edits"], ["Admins also get", "New ideas, form changes, account changes, feedback, deletion requests"]],

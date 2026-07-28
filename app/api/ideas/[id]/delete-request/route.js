@@ -19,7 +19,7 @@ export async function POST(request, { params }) {
     after(() => adminEvent({
       actorId: user.uid, actor: who, entity: "idea", entityId: id,
       auditAction: "requested deletion of an idea",
-      subject: "[AI Ideas Hub] Idea deletion requested",
+      subject: "Idea deletion requested",
       heading: "Deletion requested",
       intro: `<b>${who}</b> asked an admin to delete an idea.`,
       quote: reason || "",

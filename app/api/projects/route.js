@@ -28,7 +28,7 @@ export async function POST(request) {
     after(() => adminEvent({
       actorId: user.uid, actor: who, entity: "idea", entityId: project.id,
       auditAction: `submitted a new idea "${project.name}"`,
-      subject: `[AI Ideas Hub] New idea: ${project.name}`,
+      subject: `New idea submitted: ${project.name}`,
       heading: "New idea submitted",
       intro: `<b>${who}</b> submitted <b>${project.name}</b>.`,
       rows: [["Idea", project.name], ["Submitted by", who], ["Tags", (project.tags || []).join(", ") || "—"]],
