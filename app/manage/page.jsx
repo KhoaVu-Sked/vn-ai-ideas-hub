@@ -25,6 +25,8 @@ export default function ManagePage() {
   const [feedback, setFeedback] = useState([]);
   const [fields, setFields] = useState([]);
   const [newField, setNewField] = useState({ label: "", type: "text", options: "", required: false });
+  const [deleteRequests, setDeleteRequests] = useState([]);
+  const [view, setView] = useState("tags");
   const [err, setErr] = useState("");
 
   const withText = (fs) => (fs || []).filter((x) => !x.archived).map((x) => ({ ...x, optionsText: (x.options || []).join(", ") }));
@@ -40,6 +42,8 @@ export default function ManagePage() {
       setFeedback(fb);
       const { fields: ff } = await api("/api/form-fields");
       setFields(withText(ff));
+      const { requests: dr } = await api("/api/ideas/delete-requests");
+      setDeleteRequests(dr);
     } catch (e) { setErr(e.message); }
   }, []);
 
@@ -84,6 +88,11 @@ export default function ManagePage() {
   });
   const delField = (f) => { if (!confirm(`Remove field "${f.label}"? It disappears from the form; existing answers on ideas are kept.`)) return; run(async () => { const { fields: ff } = await api(`/api/form-fields/${f.id}`, { method: "DELETE" }); setFields(withText(ff)); }); };
 
+  const dismissReq = (r) => run(async () => { await api(`/api/ideas/${r.id}/delete-request`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); });
+  const deleteIdeaNow = (r) => { if (!confirm(`Delete "${r.name}" permanently? This removes its team, likes, requests, and files.`)) return; run(async () => { await api(`/api/ideas/${r.id}`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); }); };
+  const openFb = feedback.filter((f) => f.status === "open").length;
+  const VIEWS = [["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"], ["feedback", "Feedback"], ["deletions", "Delete requests"]];
+
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <header style={{ background: "var(--navy)", padding: "0 24px", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -111,7 +120,15 @@ export default function ManagePage() {
           <>
             {err && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 16 }}>{err}</div>}
 
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Section</label>
+              <select value={view} onChange={(e) => setView(e.target.value)} style={{ ...field, width: 240, fontWeight: 700, fontSize: 13.5, padding: "9px 12px" }}>
+                {VIEWS.map(([v, l]) => <option key={v} value={v}>{l}{v === "feedback" && openFb > 0 ? ` (${openFb})` : ""}{v === "deletions" && deleteRequests.length > 0 ? ` (${deleteRequests.length})` : ""}</option>)}
+              </select>
+            </div>
+
             {/* Tags */}
+            {view === "tags" && (
             <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
               <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 12px" }}>Tags</h2>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -132,8 +149,10 @@ export default function ManagePage() {
                 <button onClick={addTag} style={primary}>Add</button>
               </div>
             </section>
+            )}
 
             {/* Submit form fields */}
+            {view === "fields" && (
             <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
               <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 4px" }}>Submit form fields</h2>
               <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>Extra fields on the New Idea form (after the standard ones). Removing a field just hides it — existing answers on ideas are kept.</div>
@@ -167,8 +186,10 @@ export default function ManagePage() {
                 </div>
               </div>
             </section>
+            )}
 
             {/* Users */}
+            {view === "users" && (
             <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" }}>
               <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 12px" }}>User accounts</h2>
 
@@ -222,9 +243,11 @@ export default function ManagePage() {
                 </div>
               </div>
             </section>
+            )}
 
             {/* Feedback */}
-            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px", marginTop: 20 }}>
+            {view === "feedback" && (
+            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" }}>
               <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 12px" }}>Feedback {feedback.length > 0 && <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>({feedback.filter((f) => f.status === "open").length} open)</span>}</h2>
               {feedback.length === 0 ? (
                 <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No feedback yet.</div>
@@ -248,6 +271,33 @@ export default function ManagePage() {
                 </div>
               )}
             </section>
+            )}
+
+            {/* Delete requests */}
+            {view === "deletions" && (
+            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" }}>
+              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 12px" }}>Delete requests {deleteRequests.length > 0 && <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>({deleteRequests.length})</span>}</h2>
+              {deleteRequests.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No pending delete requests.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {deleteRequests.map((r) => (
+                    <div key={r.id} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
+                        <Link href={`/idea/${r.id}`} style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", textDecoration: "none" }}>{r.name}</Link>
+                        <span style={{ fontSize: 11, color: "var(--faint)" }}>{r.number} · by {r.requester} · {r.date}</span>
+                        <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                          <button onClick={() => deleteIdeaNow(r)} style={{ ...primary, background: "#d53c30" }}>Delete idea</button>
+                          <button onClick={() => dismissReq(r)} style={btn}>Dismiss</button>
+                        </span>
+                      </div>
+                      {r.reason && <div style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.5 }}>&quot;{r.reason}&quot;</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+            )}
           </>
         )}
       </main>

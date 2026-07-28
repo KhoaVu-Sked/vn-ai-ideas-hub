@@ -1,4 +1,5 @@
-import { getIdea, updateContent, isProjectLead, jsonError } from "@/lib/db";
+import { del } from "@vercel/blob";
+import { getIdea, updateContent, isProjectLead, deleteIdea, jsonError } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
 
 // GET /api/ideas/:id → full detail for the /idea/[id] page
@@ -30,5 +31,21 @@ export async function PATCH(request, { params }) {
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not update the idea.");
+  }
+}
+
+// DELETE /api/ideas/:id → delete the idea (admin only); cleans up its blobs
+export async function DELETE(_request, { params }) {
+  try {
+    const user = await requireUser();
+    if (user.role !== "admin") return Response.json({ error: "Only an admin can delete an idea." }, { status: 403 });
+    const { id } = await params;
+    const { urls } = await deleteIdea(id);
+    if ((process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN) && urls?.length) {
+      for (const u of urls) { try { await del(u); } catch { /* ignore */ } }
+    }
+    return Response.json({ ok: true });
+  } catch (e) {
+    return jsonError(e, "Could not delete the idea.");
   }
 }

@@ -19,6 +19,9 @@ create table if not exists ideas (
   pain_points           text,
   expected_benefit      text,
   extra                 jsonb not null default '{}'::jsonb,   -- admin-defined custom fields
+  delete_requested      boolean not null default false,       -- project lead asked admin to delete
+  delete_reason         text,
+  delete_requested_by   uuid,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );
@@ -155,6 +158,9 @@ alter table accounts add column if not exists email text;
 create unique index if not exists accounts_email_key on accounts (email);
 alter table tags add column if not exists color text;
 alter table ideas add column if not exists extra jsonb not null default '{}'::jsonb;
+alter table ideas add column if not exists delete_requested boolean not null default false;
+alter table ideas add column if not exists delete_reason text;
+alter table ideas add column if not exists delete_requested_by uuid;
 
 -- Drop any old CHECK that pinned status to the previous 4 values (the app
 -- validates the allowed statuses, so we don't re-add a DB-level check).

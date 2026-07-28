@@ -90,7 +90,8 @@ export default function IdeaPage() {
   if (err) return <Shell><div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>{err} <button onClick={load} style={{ ...btnBase, marginLeft: 8 }}>Retry</button></div></Shell>;
   if (!data) return null;
 
-  const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRole, canEdit, meId } = data;
+  const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRole, canEdit, meId, isAdmin, deleteRequested, deleteReason } = data;
+  const isLead = myRole === "Project Lead";
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
   const hasLead = members.some((m) => m.role === "Project Lead");
   const tagColors = Object.fromEntries(tagCatalog.filter((t) => t.color).map((t) => [t.name, t.color]));
@@ -160,6 +161,17 @@ export default function IdeaPage() {
       setEditing(false);
     });
   };
+  const deleteIdea = () => {
+    if (!confirm("Delete this idea permanently? This also removes its team, likes, requests, and files.")) return;
+    run(async () => { await api(`/api/ideas/${id}`, { method: "DELETE" }); router.push("/"); });
+  };
+  const requestDeletion = () => {
+    const reason = prompt("Reason for deletion (optional) — the admin will review:");
+    if (reason === null) return;
+    run(async () => { await api(`/api/ideas/${id}/delete-request`, { method: "POST", body: JSON.stringify({ reason }) }); patch({ deleteRequested: true, deleteReason: reason }); });
+  };
+  const dismissDeletion = () => run(async () => { await api(`/api/ideas/${id}/delete-request`, { method: "DELETE" }); patch({ deleteRequested: false, deleteReason: "" }); });
+
   const uploadFile = (file) => {
     if (!file) return;
     const bad = validateUpload({ name: file.name, type: file.type, size: file.size });
@@ -182,6 +194,18 @@ export default function IdeaPage() {
   return (
     <Shell name={idea.name}>
       {actionErr && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 14 }}>{actionErr}</div>}
+
+      {deleteRequested && (
+        <div style={{ background: "#fff8ec", border: "1px solid #f4c8a4", borderRadius: 10, padding: "10px 14px", fontSize: 12.5, color: "#9f5314", marginBottom: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span>🗑 The project lead requested deletion{deleteReason ? ` — "${deleteReason}"` : ""}.{!isAdmin ? " Pending admin review." : ""}</span>
+          {isAdmin && (
+            <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              <button onClick={deleteIdea} style={{ ...btnBase, background: "#d53c30", color: "#fff", border: "none" }}>Delete idea</button>
+              <button onClick={dismissDeletion} style={btnBase}>Dismiss</button>
+            </span>
+          )}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 300px", gap: 20, alignItems: "start" }}>
         {/* ── Main column ── */}
@@ -218,6 +242,8 @@ export default function IdeaPage() {
                 {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             )}
+            {isAdmin && <button onClick={deleteIdea} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Delete idea</button>}
+            {!isAdmin && isLead && !deleteRequested && <button onClick={requestDeletion} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Request deletion</button>}
           </div>
 
           {/* Content sections */}

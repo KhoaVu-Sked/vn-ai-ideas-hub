@@ -18,3 +18,4 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `001_tag_color.sql` — add `tags.color` for admin-editable tag colours.
 - `002_feedback.sql` — add the `feedback` table for the feedback widget.
 - `003_form_fields.sql` — add `form_fields` + `ideas.extra` for the admin form builder.
+- `004_idea_deletion.sql` — add `ideas.delete_requested/reason/by` for delete requests.
