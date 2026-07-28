@@ -127,13 +127,19 @@ function ManagePage() {
 
   const moveField = (f, move) => run(async () => { const { fields: ff } = await api(`/api/form-fields/${f.id}`, { method: "PATCH", body: JSON.stringify({ move }) }); setFields(withText(ff)); });
 
+  const sendTestEmail = () => run(async () => {
+    const r = await api("/api/mail-test", { method: "POST" });
+    setToast(`Test email sent to ${r.sentTo} (via ${r.via}).`);
+    setTimeout(() => setToast(""), 4000);
+  });
+
   const addTimeFrame = () => { const n = newTimeFrame.trim(); if (!n) return; run(async () => { const { timeFrames: tf } = await api("/api/time-frames", { method: "POST", body: JSON.stringify({ name: n }) }); setTimeFrames(tf); setNewTimeFrame(""); }); };
   const delTimeFrame = (name) => { if (!confirm(`Remove "${name}" from the options? Ideas already using it keep their value.`)) return; run(async () => { const { timeFrames: tf } = await api("/api/time-frames", { method: "DELETE", body: JSON.stringify({ name }) }); setTimeFrames(tf); }); };
 
   const dismissReq = (r) => run(async () => { await api(`/api/ideas/${r.id}/delete-request`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); });
   const deleteIdeaNow = (r) => { if (!confirm(`Delete "${r.name}" permanently? This removes its team, likes, requests, and files.`)) return; run(async () => { await api(`/api/ideas/${r.id}`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); }); };
   const openFb = feedback.filter((f) => f.status === "open").length;
-  const VIEWS = [["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"], ["feedback", "Feedback"], ["deletions", "Delete requests"]];
+  const VIEWS = [["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"], ["feedback", "Feedback"], ["deletions", "Delete requests"], ["email", "Email"]];
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
@@ -380,6 +386,19 @@ function ManagePage() {
                   ))}
                 </div>
               )}
+            </section>
+            )}
+            {/* Email */}
+            {view === "email" && (
+            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" }}>
+              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 4px" }}>Email notifications</h2>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 14, lineHeight: 1.6 }}>
+                Members and followers of an idea are emailed on <b>status changes</b>, <b>new requests</b>, and <b>new team members</b>.
+                Sending is configured with environment variables in Vercel (<code>SMTP_USER</code> + <code>SMTP_PASS</code>, or <code>RESEND_API_KEY</code>)
+                — if none are set, the app simply doesn&apos;t send.
+              </div>
+              <button onClick={sendTestEmail} style={{ ...primary, padding: "9px 18px" }}>Send test email to me</button>
+              <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 8 }}>Goes to the address on your account. Accounts without an email are skipped when notifying.</div>
             </section>
             )}
           </>
