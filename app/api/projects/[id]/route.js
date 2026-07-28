@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { getProject, updateStatus, isProjectLead, jsonError } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
-import { notifyIdeaEvent } from "@/lib/notify";
+import { ideaEvent } from "@/lib/notify";
 
 // GET /api/projects/:id → one project's full detail
 // (fetched only when a card is clicked; the board list never includes this)
@@ -26,7 +26,12 @@ export async function PATCH(request, { params }) {
     const { status } = await request.json();
     const project = await updateStatus(id, status); // validates the status value
     const base = new URL(request.url).origin;
-    after(() => notifyIdeaEvent(id, { actorId: user.uid, kind: "status", detail: status, base }));
+    const who = user.name || user.username;
+    after(() => ideaEvent(id, {
+      actorId: user.uid, actor: who, kind: "status",
+      detail: { from: project.previousStatus, to: project.status }, base,
+      auditAction: `changed status of "${project.name}" from ${project.previousStatus} to ${project.status}`,
+    }));
     return Response.json({ project });
   } catch (e) {
     return jsonError(e, "Could not update the status.");

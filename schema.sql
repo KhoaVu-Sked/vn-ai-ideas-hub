@@ -136,6 +136,18 @@ create table if not exists tasks (
 );
 create index if not exists tasks_created_at_idx on tasks (created_at desc);
 
+-- Audit log — every notable action; rows older than 14 days are pruned on write.
+create table if not exists audit_log (
+  id         uuid primary key default gen_random_uuid(),
+  actor      text,
+  actor_id   uuid,
+  action     text not null,
+  entity     text,
+  entity_id  uuid,
+  created_at timestamptz not null default now()
+);
+create index if not exists audit_log_created_at_idx on audit_log (created_at desc);
+
 -- Feedback — any signed-in user can submit; admins review. Kept if the account
 -- is later deleted (account_id set null).
 create table if not exists feedback (

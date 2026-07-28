@@ -1,5 +1,7 @@
 import { listFormFields, createFormField, jsonError } from "@/lib/db";
 import { requireUser, requireAdmin } from "@/lib/guard";
+import { after } from "next/server";
+import { adminEvent } from "@/lib/notify";
 
 // GET /api/form-fields → all fields incl. archived (any signed-in user).
 // Clients filter archived out of the submit form; the idea page uses archived
@@ -16,9 +18,19 @@ export async function GET() {
 // POST /api/form-fields { label, type, options, required } → add a field (admin)
 export async function POST(request) {
   try {
-    await requireAdmin();
+    const admin = await requireAdmin();
     const { label, type, options, required } = await request.json();
     const fields = await createFormField({ label, type, options, required });
+    const base = new URL(request.url).origin;
+    const who = admin.name || admin.username;
+    after(() => adminEvent({
+      actorId: admin.uid, actor: who, entity: "form_field",
+      auditAction: `added the form field "${label}"`,
+      subject: "[AI Ideas Hub] Submit form changed",
+      heading: "Submit form changed",
+      intro: `<b>${who}</b> added the field <b>${label}</b> to the New Idea form.`,
+      ctaPath: "/manage?section=fields", base,
+    }));
     return Response.json({ fields }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not add the field.");

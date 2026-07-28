@@ -1,6 +1,8 @@
 import { del } from "@vercel/blob";
 import { getIdea, updateContent, isProjectLead, deleteIdea, LEAD_ROLE, jsonError } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
+import { after } from "next/server";
+import { ideaEvent } from "@/lib/notify";
 
 // GET /api/ideas/:id → full detail for the /idea/[id] page
 export async function GET(_request, { params }) {
@@ -27,7 +29,15 @@ export async function PATCH(request, { params }) {
     const allowed = user.role === "admin" || (await isProjectLead(id, user.uid));
     if (!allowed) return Response.json({ error: "Only the project lead can edit this idea." }, { status: 403 });
     const body = await request.json();
-    await updateContent(id, body);
+    const res = await updateContent(id, body);
+    if (res.changed.length) {
+      const base = new URL(request.url).origin;
+      const who = user.name || user.username;
+      after(() => ideaEvent(id, {
+        actorId: user.uid, actor: who, kind: "content", detail: res.changed.join(", "), base,
+        auditAction: `edited ${res.changed.join(", ")} on "${res.name}"`,
+      }));
+    }
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not update the idea.");

@@ -51,6 +51,8 @@ function ManagePage() {
   useEffect(() => { const s = searchParams.get("section"); if (s) setView(s); }, [searchParams]);
   const [err, setErr] = useState("");
   const [toast, setToast] = useState("");
+  const [audit, setAudit] = useState([]);
+  const [auditDays, setAuditDays] = useState(14);
   const [dirty, setDirty] = useState({});
 
   const withText = (fs) => (fs || []).filter((x) => !x.archived).map((x) => ({ ...x, optionsText: (x.options || []).join(", ") }));
@@ -70,6 +72,8 @@ function ManagePage() {
       setTimeFrames(tf);
       const { requests: dr } = await api("/api/ideas/delete-requests");
       setDeleteRequests(dr);
+      const { entries, retentionDays } = await api("/api/audit");
+      setAudit(entries); setAuditDays(retentionDays || 14);
     } catch (e) { setErr(e.message); }
   }, []);
 
@@ -139,7 +143,7 @@ function ManagePage() {
   const dismissReq = (r) => run(async () => { await api(`/api/ideas/${r.id}/delete-request`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); });
   const deleteIdeaNow = (r) => { if (!confirm(`Delete "${r.name}" permanently? This removes its team, likes, requests, and files.`)) return; run(async () => { await api(`/api/ideas/${r.id}`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); }); };
   const openFb = feedback.filter((f) => f.status === "open").length;
-  const VIEWS = [["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"], ["feedback", "Feedback"], ["deletions", "Delete requests"], ["email", "Email"]];
+  const VIEWS = [["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"], ["feedback", "Feedback"], ["deletions", "Delete requests"], ["email", "Email"], ["audit", "Activity log"]];
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
@@ -388,6 +392,31 @@ function ManagePage() {
               )}
             </section>
             )}
+            {/* Activity log */}
+            {view === "audit" && (
+            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
+              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 4px" }}>Activity log</h2>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>
+                Every notable action in the Hub. Entries are kept for {auditDays} days and removed automatically after that.
+              </div>
+              {audit.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: "var(--faint)" }}>No activity recorded yet.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {audit.map((e) => (
+                    <div key={e.id} style={{ display: "flex", gap: 12, alignItems: "baseline", padding: "8px 0", borderTop: "1px solid var(--line)" }}>
+                      <span style={{ fontSize: 11.5, color: "var(--faint)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", minWidth: 132 }}>
+                        {new Date(e.at).toLocaleString()}
+                      </span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap" }}>{e.actor}</span>
+                      <span style={{ fontSize: 12.5, color: "var(--body)" }}>{e.action}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+            )}
+
             {/* Email */}
             {view === "email" && (
             <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" }}>
