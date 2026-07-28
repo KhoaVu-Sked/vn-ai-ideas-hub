@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { STATUS_META, STATUS_ORDER, ALL_STATUSES, avatarColor } from "@/lib/statusMeta";
 import TagChip from "./TagChip";
@@ -54,7 +54,6 @@ export default function BoardPage() {
 }
 
 function Board() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [projects, setProjects] = useState([]);
   const [listBusy, setListBusy] = useState(true);
@@ -160,23 +159,28 @@ function Board() {
               const m = STATUS_META[p.status] || STATUS_META.Submitted;
               const cached = !!detailCache.current[p.id];
               return (
-                <div key={p.id} onClick={() => router.push(`/idea/${p.id}`)} style={{ ...cardStyle, padding: "14px 16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 9 }}>
-                  <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
-                    <Pill bg={m.bg} fg={m.fg}>{p.status}</Pill>
-                    {p.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
-                  </div>
-                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3 }}>{p.name}</div>
-                  {p.context && (
-                    <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.context}</div>
-                  )}
-                  <div style={{ display: "flex", gap: 14, fontSize: 11.5, color: "var(--faint)", fontWeight: 600 }}>
-                    <span title="Likes">♥ {p.counts?.likes ?? 0}</span>
-                    <span title="Requests">✎ {p.counts?.requests ?? 0}</span>
-                    <span title="Members">◍ {p.counts?.members ?? 0}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                // The body is a <Link> so Next prefetches the idea route as the
+                // card scrolls into view — the click then navigates instantly.
+                // Preview sits outside the anchor to keep the markup valid.
+                <div key={p.id} style={{ ...cardStyle, display: "flex", flexDirection: "column" }}>
+                  <Link href={`/idea/${p.id}`} style={{ padding: "14px 16px 10px", display: "flex", flexDirection: "column", gap: 9, textDecoration: "none", flex: 1 }}>
+                    <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+                      <Pill bg={m.bg} fg={m.fg}>{p.status}</Pill>
+                      {p.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
+                    </div>
+                    <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3 }}>{p.name}</div>
+                    {p.context && (
+                      <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.context}</div>
+                    )}
+                    <div style={{ display: "flex", gap: 14, fontSize: 11.5, color: "var(--faint)", fontWeight: 600 }}>
+                      <span title="Likes">♥ {p.counts?.likes ?? 0}</span>
+                      <span title="Requests">✎ {p.counts?.requests ?? 0}</span>
+                      <span title="Members">◍ {p.counts?.members ?? 0}</span>
+                    </div>
+                  </Link>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px 14px" }}>
                     {p.people.length > 0 ? <Avatars people={p.people} /> : <span style={{ fontSize: 11, color: "var(--faint)" }}>Unassigned</span>}
-                    <button onClick={(e) => { e.stopPropagation(); openPreview(p); }} style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--muted)", borderRadius: 7, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{cached ? "Preview ✓" : "Preview"}</button>
+                    <button onClick={() => openPreview(p)} style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--muted)", borderRadius: 7, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{cached ? "Preview ✓" : "Preview"}</button>
                   </div>
                 </div>
               );
