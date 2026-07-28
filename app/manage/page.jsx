@@ -50,6 +50,8 @@ function ManagePage() {
   // Deep-link from the header's hover menu: /manage?section=users
   useEffect(() => { const s = searchParams.get("section"); if (s) setView(s); }, [searchParams]);
   const [err, setErr] = useState("");
+  const [toast, setToast] = useState("");
+  const [dirty, setDirty] = useState({});
 
   const withText = (fs) => (fs || []).filter((x) => !x.archived).map((x) => ({ ...x, optionsText: (x.options || []).join(", ") }));
 
@@ -79,15 +81,27 @@ function ManagePage() {
     }).catch(() => setMe(null));
   }, [load]);
 
-  const run = async (fn) => { setErr(""); try { await fn(); } catch (e) { setErr(e.message); } };
+  const run = async (fn, okMsg) => { setErr(""); try { await fn(); if (okMsg) { setToast(okMsg); setTimeout(() => setToast(""), 2500); } } catch (e) { setErr(e.message); } };
 
   const addTag = () => { const n = newTag.trim(); if (!n) return; run(async () => { const { tags: t } = await api("/api/tags", { method: "POST", body: JSON.stringify({ name: n }) }); setTags(t); setNewTag(""); }); };
   const delTag = (name) => { if (!confirm(`Delete tag "${name}"? It will be removed from any ideas using it.`)) return; run(async () => { const { tags: t } = await api("/api/tags", { method: "DELETE", body: JSON.stringify({ name }) }); setTags(t); }); };
   const setColor = (name, color) => run(async () => { const { tags: t } = await api("/api/tags", { method: "PATCH", body: JSON.stringify({ name, color }) }); setTags(t); });
 
-  const setAcct = (id, k, v) => setAccounts((as) => as.map((a) => (a.id === id ? { ...a, [k]: v } : a)));
-  const saveAcct = (a) => run(async () => { const { account } = await api(`/api/accounts/${a.id}`, { method: "PATCH", body: JSON.stringify({ username: a.username, email: a.email, name: a.name, role: a.role }) }); setAccounts((as) => as.map((x) => (x.id === a.id ? { ...x, ...account } : x))); });
-  const resetPw = (a) => { const pw = prompt(`New password for ${a.username}:`); if (!pw) return; run(() => api(`/api/accounts/${a.id}`, { method: "PATCH", body: JSON.stringify({ username: a.username, email: a.email, name: a.name, role: a.role, password: pw }) })); };
+  const setAcct = (id, k, v) => { setAccounts((as) => as.map((a) => (a.id === id ? { ...a, [k]: v } : a))); setDirty((d) => ({ ...d, [id]: true })); };
+  const saveAllAccounts = () => {
+    const ids = Object.keys(dirty).filter((id) => dirty[id]);
+    if (ids.length === 0) return;
+    run(async () => {
+      for (const id of ids) {
+        const a = accounts.find((x) => x.id === id);
+        if (!a) continue;
+        const { account } = await api(`/api/accounts/${a.id}`, { method: "PATCH", body: JSON.stringify({ username: a.username, email: a.email, name: a.name, role: a.role }) });
+        setAccounts((as) => as.map((x) => (x.id === a.id ? { ...x, ...account } : x)));
+      }
+      setDirty({});
+    }, `Saved ${ids.length} account${ids.length === 1 ? "" : "s"}.`);
+  };
+  const resetPw = (a) => { const pw = prompt(`New password for ${a.username}:`); if (!pw) return; run(() => api(`/api/accounts/${a.id}`, { method: "PATCH", body: JSON.stringify({ username: a.username, email: a.email, name: a.name, role: a.role, password: pw }) }), `Password reset for ${a.username}.`); };
   const delAcct = (a) => { if (!confirm(`Delete account "${a.username}"? This removes their memberships, likes, and requests.`)) return; run(async () => { await api(`/api/accounts/${a.id}`, { method: "DELETE" }); setAccounts((as) => as.filter((x) => x.id !== a.id)); }); };
   const createAcct = () => run(async () => {
     const { account } = await api("/api/accounts", { method: "POST", body: JSON.stringify(creating) });
@@ -108,8 +122,10 @@ function ManagePage() {
     const opts = f.type === "select" ? (f.optionsText || "").split(",").map((s) => s.trim()).filter(Boolean) : [];
     const { fields: ff } = await api(`/api/form-fields/${f.id}`, { method: "PATCH", body: JSON.stringify({ label: f.label, type: f.type, required: f.required, options: opts }) });
     setFields(withText(ff));
-  });
+  }, "Field saved.");
   const delField = (f) => { if (!confirm(`Remove field "${f.label}"? It disappears from the form; existing answers on ideas are kept.`)) return; run(async () => { const { fields: ff } = await api(`/api/form-fields/${f.id}`, { method: "DELETE" }); setFields(withText(ff)); }); };
+
+  const moveField = (f, move) => run(async () => { const { fields: ff } = await api(`/api/form-fields/${f.id}`, { method: "PATCH", body: JSON.stringify({ move }) }); setFields(withText(ff)); });
 
   const addTimeFrame = () => { const n = newTimeFrame.trim(); if (!n) return; run(async () => { const { timeFrames: tf } = await api("/api/time-frames", { method: "POST", body: JSON.stringify({ name: n }) }); setTimeFrames(tf); setNewTimeFrame(""); }); };
   const delTimeFrame = (name) => { if (!confirm(`Remove "${name}" from the options? Ideas already using it keep their value.`)) return; run(async () => { const { timeFrames: tf } = await api("/api/time-frames", { method: "DELETE", body: JSON.stringify({ name }) }); setTimeFrames(tf); }); };
@@ -131,6 +147,7 @@ function ManagePage() {
         ) : (
           <>
             {err && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 16 }}>{err}</div>}
+            {toast && <div style={{ background: "#ebf6ed", border: "1px solid #bde2c5", color: "#2f7a43", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 16, fontWeight: 600 }}>✓ {toast}</div>}
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Section</label>
@@ -206,6 +223,10 @@ function ManagePage() {
                 {fields.map((f) => (
                   <div key={f.id} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <button onClick={() => moveField(f, "up")} title="Move up" style={{ ...btn, padding: "0 6px", fontSize: 10, lineHeight: "14px" }}>▲</button>
+                        <button onClick={() => moveField(f, "down")} title="Move down" style={{ ...btn, padding: "0 6px", fontSize: 10, lineHeight: "14px" }}>▼</button>
+                      </span>
                       <input value={f.label} onChange={(e) => setF(f.id, "label", e.target.value)} placeholder="Label" style={{ ...field, width: 170 }} />
                       <select value={f.type} onChange={(e) => setF(f.id, "type", e.target.value)} style={{ ...field, width: 120 }}>
                         <option value="text">Short text</option><option value="textarea">Long text</option><option value="number">Number</option><option value="select">Dropdown</option>
@@ -274,7 +295,6 @@ function ManagePage() {
                           </select>
                         </td>
                         <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
-                          <button onClick={() => saveAcct(a)} style={{ ...primary, marginRight: 6 }}>Save</button>
                           <button onClick={() => resetPw(a)} style={{ ...btn, marginRight: 6 }}>Reset pw</button>
                           <button onClick={() => delAcct(a)} style={{ ...btn, color: "#e03131", borderColor: "#f5c9c9" }}>Delete</button>
                         </td>
@@ -282,6 +302,13 @@ function ManagePage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+                <button onClick={saveAllAccounts} disabled={Object.values(dirty).every((v) => !v)} style={{ ...primary, opacity: Object.values(dirty).some(Boolean) ? 1 : 0.5, cursor: Object.values(dirty).some(Boolean) ? "pointer" : "default", padding: "8px 18px" }}>Save changes</button>
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                  {Object.values(dirty).some(Boolean) ? `${Object.values(dirty).filter(Boolean).length} row(s) edited` : "No unsaved changes"}
+                </span>
               </div>
 
               {/* Create */}

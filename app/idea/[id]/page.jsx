@@ -46,12 +46,11 @@ function ProgressBar({ status }) {
         const current = i === idx;
         const last = i === STATUS_ORDER.length - 1;
         const color = last ? LIGHT_BLUE : GREY;
-        const size = last ? 12 : 18;
         return (
           <div key={s} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
             {i > 0 && <div style={{ position: "absolute", top: 9, left: "-50%", width: "100%", height: 2, background: i <= idx ? GREY : GREY_LINE }} />}
             <div style={{
-              width: size, height: size, marginTop: last ? 3 : 0, borderRadius: "50%",
+              width: 18, height: 18, borderRadius: "50%",
               background: reached ? color : "#fff",
               border: `2px solid ${reached ? color : GREY_LINE}`,
               zIndex: 1,

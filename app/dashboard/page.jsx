@@ -70,19 +70,24 @@ export default function DashboardPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <div style={card}>
                 <h2 style={sectionTitle}>Pipeline funnel</h2>
-                {data.funnel.map((f) => {
-                  const c = STATUS_META[f.status]?.fg || "#3b5bdb";
-                  return (
-                    <div key={f.stage} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                      <div style={{ flex: 1, background: "#eef1f6", borderRadius: 6, height: 26, position: "relative", overflow: "hidden" }}>
-                        <div style={{ width: `${Math.max(f.pct, 8)}%`, height: "100%", background: c, borderRadius: 6, display: "flex", alignItems: "center", paddingLeft: 10 }}>
-                          <span style={{ color: "#fff", fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap" }}>{f.stage} — {f.count}</span>
+                {(() => {
+                  // Bars scale to the busiest stage; the % is share of all ideas.
+                  const max = Math.max(...data.funnel.map((x) => x.count), 1);
+                  return data.funnel.map((f) => {
+                    const c = STATUS_META[f.status]?.fg || "#3b5bdb";
+                    return (
+                      <div key={f.stage} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                        <span style={{ width: 92, fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{f.stage}</span>
+                        <div style={{ flex: 1, background: "#eef1f6", borderRadius: 6, height: 24, position: "relative", overflow: "hidden" }}>
+                          <div style={{ width: f.count ? `${Math.max((f.count / max) * 100, 8)}%` : 0, height: "100%", background: c, borderRadius: 6, display: "flex", alignItems: "center", paddingLeft: 9 }}>
+                            <span style={{ color: "#fff", fontSize: 11.5, fontWeight: 700 }}>{f.count}</span>
+                          </div>
                         </div>
+                        <span style={{ ...muted, width: 40, textAlign: "right" }}>{f.pct}%</span>
                       </div>
-                      <span style={{ ...muted, width: 40, textAlign: "right" }}>{f.pct}%</span>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
 
               <div style={card}>

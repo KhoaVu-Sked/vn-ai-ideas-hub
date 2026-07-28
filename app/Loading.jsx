@@ -1,8 +1,7 @@
-// Centered loading state: big label + three small dots that pulse in colour.
+// Centered loading state: three small dots that pulse in colour.
 export default function Loading({ label = "Loading" }) {
   return (
-    <div className="loading-wrap">
-      <div className="loading-text">{label}…</div>
+    <div className="loading-wrap" role="status" aria-label={label}>
       <div className="loading-dots" aria-hidden="true">
         <span /><span /><span />
       </div>

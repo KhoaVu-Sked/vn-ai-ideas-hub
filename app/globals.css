@@ -55,9 +55,7 @@ a {
   padding-right: 8px; color: #fff;
 }
 .app-header__mark {
-  width: 26px; height: 26px; border-radius: 7px; background: rgba(255, 255, 255, 0.22);
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-display), system-ui, sans-serif; font-weight: 800; font-size: 11.5px; color: #fff;
 }
 .app-header__name {
   font-family: var(--font-display), system-ui, sans-serif;
@@ -98,7 +96,7 @@ a {
 /* Square white "+" action */
 .hdr-plus {
   width: 34px; height: 34px; border-radius: 6px; background: #fff; border: none;
-  color: var(--header-blue); font-size: 20px; font-weight: 400; line-height: 1;
+  color: var(--header-blue); font-size: 26px; font-weight: 500; line-height: 1;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: opacity 120ms;
 }
@@ -135,8 +133,7 @@ a {
 
 /* ── Big centered loading with a wave ── */
 .loading-wrap {
-  min-height: 72vh; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 26px;
+  min-height: 60vh; display: flex; align-items: center; justify-content: center;
 }
 .loading-text {
   font-family: var(--font-display), system-ui, sans-serif; font-weight: 800;
