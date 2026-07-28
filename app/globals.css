@@ -43,6 +43,60 @@ a {
   color: inherit;
 }
 
+/* ── Header nav buttons (on the navy header) ── */
+.hdr-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #d7e0f0; border-radius: 8px; padding: 6px 12px;
+  font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.hdr-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.hdr-btn--danger { color: #ff9d95; border-color: rgba(255, 120, 110, 0.35); background: transparent; }
+.hdr-btn--danger:hover { background: #d53c30; color: #fff; border-color: transparent; }
+.hdr-cta {
+  background: var(--blue); border: none; color: #fff; border-radius: 8px;
+  padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  transition: background 120ms;
+}
+.hdr-cta:hover { background: var(--blue-bright); }
+
+/* ── Hover dropdown menu ── */
+.hdr-menu {
+  position: absolute; top: 100%; right: 0; margin-top: 6px; background: #fff;
+  border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(11, 30, 73, 0.18); padding: 6px; min-width: 178px; z-index: 60;
+}
+.hdr-menu a {
+  display: block; padding: 8px 10px; font-size: 12.5px; color: var(--body);
+  text-decoration: none; border-radius: 6px; white-space: nowrap; font-weight: 600;
+}
+.hdr-menu a:hover { background: var(--bg); color: var(--ink); }
+
+/* ── Big centered loading with a wave ── */
+.loading-wrap {
+  min-height: 72vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 26px;
+}
+.loading-text {
+  font-family: var(--font-display), system-ui, sans-serif; font-weight: 800;
+  font-size: clamp(34px, 6vw, 66px); color: var(--ink); letter-spacing: -0.02em; text-align: center;
+}
+.loading-wave { display: flex; gap: 8px; align-items: flex-end; height: 46px; }
+.loading-wave span {
+  width: 9px; height: 100%; background: var(--blue); border-radius: 6px;
+  transform-origin: bottom; animation: loadingWave 1s ease-in-out infinite;
+}
+.loading-wave span:nth-child(2) { animation-delay: 0.12s; background: var(--blue-bright); }
+.loading-wave span:nth-child(3) { animation-delay: 0.24s; }
+.loading-wave span:nth-child(4) { animation-delay: 0.36s; background: var(--blue-bright); }
+.loading-wave span:nth-child(5) { animation-delay: 0.48s; }
+@keyframes loadingWave {
+  0%, 100% { transform: scaleY(0.28); opacity: 0.5; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

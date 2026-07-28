@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import HeaderRight from "../HeaderRight";
+import Loading from "../Loading";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -10,7 +12,6 @@ async function api(path, init) {
   return body;
 }
 
-const ghost = { background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "none" };
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
 
 export default function TasksPage() {
@@ -31,7 +32,6 @@ export default function TasksPage() {
     }).catch(() => setMe(null));
   }, [load]);
 
-  const signOut = async () => { try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; } };
   const run = async (fn, revert) => { setErr(""); try { await fn(); } catch (e) { if (revert) revert(); setErr(e.message); } };
 
   const add = () => {
@@ -63,17 +63,12 @@ export default function TasksPage() {
           </Link>
           <span style={{ color: "#8fa3c4", fontSize: 13 }}>Tasks</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href="/" style={ghost}>Home</Link>
-          <Link href="/dashboard" style={ghost}>Dashboard</Link>
-          <Link href="/manage" style={ghost}>Manage</Link>
-          <button onClick={signOut} style={ghost}>Sign out</button>
-        </div>
+        <HeaderRight />
       </header>
 
       <main style={{ maxWidth: 720, margin: "0 auto", padding: "24px 22px 0" }}>
         {me === undefined ? (
-          <div style={{ color: "var(--muted)", padding: 20 }}>Loading…</div>
+          <Loading label="Loading tasks" />
         ) : me === null ? (
           <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>Admins only. <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>
         ) : (

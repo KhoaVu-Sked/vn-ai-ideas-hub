@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { tagPill, defaultTagColor } from "@/lib/statusMeta";
+import HeaderRight from "../HeaderRight";
+import Loading from "../Loading";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -14,9 +17,13 @@ async function api(path, init) {
 const field = { width: "100%", padding: "7px 10px", border: "1px solid #d5dce6", borderRadius: 7, fontSize: 12.5, outline: "none" };
 const btn = { border: "1px solid #d5dce6", background: "#fff", color: "#44536b", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" };
 const primary = { ...btn, background: "var(--blue)", color: "#fff", border: "none" };
-const ghost = { background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "none" };
 
-export default function ManagePage() {
+// useSearchParams() needs a Suspense boundary during prerender.
+export default function ManagePageWrapper() {
+  return <Suspense fallback={<Loading label="Loading" />}><ManagePage /></Suspense>;
+}
+
+function ManagePage() {
   const [me, setMe] = useState(undefined); // undefined=loading, null=not admin
   const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState("");
@@ -26,7 +33,10 @@ export default function ManagePage() {
   const [fields, setFields] = useState([]);
   const [newField, setNewField] = useState({ label: "", type: "text", options: "", required: false });
   const [deleteRequests, setDeleteRequests] = useState([]);
+  const searchParams = useSearchParams();
   const [view, setView] = useState("tags");
+  // Deep-link from the header's hover menu: /manage?section=users
+  useEffect(() => { const s = searchParams.get("section"); if (s) setView(s); }, [searchParams]);
   const [err, setErr] = useState("");
 
   const withText = (fs) => (fs || []).filter((x) => !x.archived).map((x) => ({ ...x, optionsText: (x.options || []).join(", ") }));
@@ -55,7 +65,6 @@ export default function ManagePage() {
     }).catch(() => setMe(null));
   }, [load]);
 
-  const signOut = async () => { try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; } };
   const run = async (fn) => { setErr(""); try { await fn(); } catch (e) { setErr(e.message); } };
 
   const addTag = () => { const n = newTag.trim(); if (!n) return; run(async () => { const { tags: t } = await api("/api/tags", { method: "POST", body: JSON.stringify({ name: n }) }); setTags(t); setNewTag(""); }); };
@@ -103,17 +112,12 @@ export default function ManagePage() {
           </Link>
           <span style={{ color: "#8fa3c4", fontSize: 13 }}>Manage</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href="/" style={ghost}>Home</Link>
-          <Link href="/dashboard" style={ghost}>Dashboard</Link>
-          <Link href="/tasks" style={ghost}>Tasks</Link>
-          <button onClick={signOut} style={ghost}>Sign out</button>
-        </div>
+        <HeaderRight />
       </header>
 
       <main style={{ maxWidth: 960, margin: "0 auto", padding: "24px 22px 0" }}>
         {me === undefined ? (
-          <div style={{ color: "var(--muted)", padding: 20 }}>Loading…</div>
+          <Loading label="Loading" />
         ) : me === null ? (
           <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>Admins only. <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>
         ) : (

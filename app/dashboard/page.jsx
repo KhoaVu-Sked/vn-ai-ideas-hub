@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { STATUS_META, avatarColor, defaultTagColor } from "@/lib/statusMeta";
+import HeaderRight from "../HeaderRight";
+import Loading from "../Loading";
 
 async function api(path) {
   const res = await fetch(path);
@@ -34,7 +36,6 @@ export default function DashboardPage() {
     }).catch(() => setMe(null));
   }, [load, period]);
 
-  const signOut = async () => { try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; } };
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
@@ -46,14 +47,11 @@ export default function DashboardPage() {
           </Link>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <select value={period} onChange={(e) => setPeriod(e.target.value)} style={{ ...ghost, cursor: "pointer" }}>
+          <select value={period} onChange={(e) => setPeriod(e.target.value)} className="hdr-btn" style={{ cursor: "pointer" }}>
             <option value="all">All time</option>
             <option value="quarter">This quarter</option>
           </select>
-          <Link href="/" style={ghost}>Home</Link>
-          <Link href="/tasks" style={ghost}>Tasks</Link>
-          <Link href="/manage" style={ghost}>Manage</Link>
-          <button onClick={signOut} style={ghost}>Sign out</button>
+          <HeaderRight />
         </div>
       </header>
 
@@ -63,7 +61,7 @@ export default function DashboardPage() {
         ) : err ? (
           <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>{err} <button onClick={() => load(period)} style={{ ...ghost, color: "#c92a2a", borderColor: "#f5c9c9" }}>Retry</button></div>
         ) : !data ? (
-          <div style={{ color: "var(--muted)", padding: 30 }}>Loading dashboard…</div>
+          <Loading label="Loading dashboard" />
         ) : (
           <>
             {/* KPI tiles */}

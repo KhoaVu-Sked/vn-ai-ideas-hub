@@ -9,6 +9,9 @@ import {
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import TagChip from "../../TagChip";
 import FieldInput from "../../FieldInput";
+import HeaderRight from "../../HeaderRight";
+import SubmitModal from "../../SubmitModal";
+import Loading from "../../Loading";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -68,6 +71,7 @@ export default function IdeaPage() {
   const [form, setForm] = useState({});
   const [tagCatalog, setTagCatalog] = useState([]);
   const [formFields, setFormFields] = useState([]);
+  const [showSubmit, setShowSubmit] = useState(false);
 
   const load = useCallback(async () => {
     setBusy(true); setErr("");
@@ -86,7 +90,7 @@ export default function IdeaPage() {
   const patch = (upd) => setData((d) => ({ ...d, ...(typeof upd === "function" ? upd(d) : upd) }));
   const run = async (fn, revert) => { setActionErr(""); try { await fn(); } catch (e) { if (revert) revert(); setActionErr(e.message); } };
 
-  if (busy && !data) return <Shell><div style={{ color: "var(--muted)", padding: 40 }}>Loading idea…</div></Shell>;
+  if (busy && !data) return <Shell><Loading label="Loading idea" /></Shell>;
   if (err) return <Shell><div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>{err} <button onClick={load} style={{ ...btnBase, marginLeft: 8 }}>Retry</button></div></Shell>;
   if (!data) return null;
 
@@ -192,7 +196,8 @@ export default function IdeaPage() {
   };
 
   return (
-    <Shell name={idea.name}>
+    <Shell name={idea.name} onNewIdea={() => setShowSubmit(true)}>
+      {showSubmit && <SubmitModal onClose={() => setShowSubmit(false)} onCreated={(project) => router.push(`/idea/${project.id}`)} />}
       {actionErr && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 14 }}>{actionErr}</div>}
 
       {deleteRequested && (
@@ -396,11 +401,7 @@ export default function IdeaPage() {
   );
 }
 
-function Shell({ name, children }) {
-  const ghost = { background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "none" };
-  const signOut = async () => {
-    try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; }
-  };
+function Shell({ name, onNewIdea, children }) {
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <header style={{ background: "var(--navy)", padding: "0 24px", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -414,10 +415,7 @@ function Shell({ name, children }) {
             {name ? ` › ${name}` : ""}
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href="/" style={ghost}>Home</Link>
-          <button onClick={signOut} style={ghost}>Sign out</button>
-        </div>
+        <HeaderRight onNewIdea={onNewIdea} />
       </header>
       <main style={{ maxWidth: 1060, margin: "0 auto", padding: "20px 22px 0" }}>{children}</main>
     </div>
