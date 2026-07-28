@@ -51,9 +51,6 @@ function ManagePage() {
   useEffect(() => { const s = searchParams.get("section"); if (s) setView(s); }, [searchParams]);
   const [err, setErr] = useState("");
   const [toast, setToast] = useState("");
-  const [audit, setAudit] = useState([]);
-  const [sampleKind, setSampleKind] = useState("test");
-  const [auditDays, setAuditDays] = useState(14);
   const [dirty, setDirty] = useState({});
 
   const withText = (fs) => (fs || []).filter((x) => !x.archived).map((x) => ({ ...x, optionsText: (x.options || []).join(", ") }));
@@ -73,8 +70,6 @@ function ManagePage() {
       setTimeFrames(tf);
       const { requests: dr } = await api("/api/ideas/delete-requests");
       setDeleteRequests(dr);
-      const { entries, retentionDays } = await api("/api/audit");
-      setAudit(entries); setAuditDays(retentionDays || 14);
     } catch (e) { setErr(e.message); }
   }, []);
 
@@ -132,19 +127,13 @@ function ManagePage() {
 
   const moveField = (f, move) => run(async () => { const { fields: ff } = await api(`/api/form-fields/${f.id}`, { method: "PATCH", body: JSON.stringify({ move }) }); setFields(withText(ff)); });
 
-  const sendTestEmail = () => run(async () => {
-    const r = await api("/api/mail-test", { method: "POST", body: JSON.stringify({ kind: sampleKind }) });
-    setToast(`Sent ${r.count} email${r.count === 1 ? "" : "s"} to ${r.sentTo}.`);
-    setTimeout(() => setToast(""), 4000);
-  });
-
   const addTimeFrame = () => { const n = newTimeFrame.trim(); if (!n) return; run(async () => { const { timeFrames: tf } = await api("/api/time-frames", { method: "POST", body: JSON.stringify({ name: n }) }); setTimeFrames(tf); setNewTimeFrame(""); }); };
   const delTimeFrame = (name) => { if (!confirm(`Remove "${name}" from the options? Ideas already using it keep their value.`)) return; run(async () => { const { timeFrames: tf } = await api("/api/time-frames", { method: "DELETE", body: JSON.stringify({ name }) }); setTimeFrames(tf); }); };
 
   const dismissReq = (r) => run(async () => { await api(`/api/ideas/${r.id}/delete-request`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); });
   const deleteIdeaNow = (r) => { if (!confirm(`Delete "${r.name}" permanently? This removes its team, likes, requests, and files.`)) return; run(async () => { await api(`/api/ideas/${r.id}`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); }); };
   const openFb = feedback.filter((f) => f.status === "open").length;
-  const VIEWS = [["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"], ["feedback", "Feedback"], ["deletions", "Delete requests"], ["email", "Email"], ["audit", "Activity log"]];
+  const VIEWS = [["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"], ["feedback", "Feedback"], ["deletions", "Delete requests"]];
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
@@ -391,65 +380,6 @@ function ManagePage() {
                   ))}
                 </div>
               )}
-            </section>
-            )}
-            {/* Activity log */}
-            {view === "audit" && (
-            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
-              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 4px" }}>Activity log</h2>
-              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>
-                Every notable action in the Hub. Entries are kept for {auditDays} days and removed automatically after that.
-              </div>
-              {audit.length === 0 ? (
-                <div style={{ fontSize: 12.5, color: "var(--faint)" }}>No activity recorded yet.</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {audit.map((e) => (
-                    <div key={e.id} style={{ display: "flex", gap: 12, alignItems: "baseline", padding: "8px 0", borderTop: "1px solid var(--line)" }}>
-                      <span style={{ fontSize: 11.5, color: "var(--faint)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", minWidth: 132 }}>
-                        {new Date(e.at).toLocaleString()}
-                      </span>
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap" }}>{e.actor}</span>
-                      <span style={{ fontSize: 12.5, color: "var(--body)" }}>{e.action}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-            )}
-
-            {/* Email */}
-            {view === "email" && (
-            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" }}>
-              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 4px" }}>Email notifications</h2>
-              <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 14, lineHeight: 1.6 }}>
-                Members and followers of an idea are emailed on <b>status changes</b>, <b>new requests</b>, and <b>new team members</b>.
-                Sending is configured with environment variables in Vercel (<code>SMTP_USER</code> + <code>SMTP_PASS</code>, or <code>RESEND_API_KEY</code>)
-                — if none are set, the app simply doesn&apos;t send.
-              </div>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)", margin: "6px 0 8px" }}>Preview a notification</div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <select value={sampleKind} onChange={(e) => setSampleKind(e.target.value)} style={{ ...field, width: 280 }}>
-                  <option value="test">Plain test — is email working?</option>
-                  <optgroup label="Members &amp; followers">
-                    <option value="status">Status change (Pilot → Launched)</option>
-                    <option value="request">New request / comment</option>
-                    <option value="member">New team member</option>
-                    <option value="content">Idea content edited</option>
-                  </optgroup>
-                  <optgroup label="Admins">
-                    <option value="new-idea">New idea submitted</option>
-                    <option value="feedback">New feedback</option>
-                    <option value="deletion">Idea deletion requested</option>
-                  </optgroup>
-                  <option value="all">Every sample (8 emails)</option>
-                </select>
-                <button onClick={sendTestEmail} style={{ ...primary, padding: "9px 18px" }}>Send to me</button>
-              </div>
-              <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.6 }}>
-                Samples are built with the same code as real notifications, so they look exactly like what the team receives —
-                subject lines are tagged <b>[sample]</b>. Sends only to the address on your account.
-              </div>
             </section>
             )}
           </>
