@@ -157,8 +157,10 @@ a {
    compositor layer the browser repaints that region on every scroll frame. */
 .fab-layer { will-change: transform; transform: translateZ(0); }
 
-/* Off-screen idea cards skip layout/paint until they scroll into view. */
-.idea-card { content-visibility: auto; contain-intrinsic-size: 190px; }
+/* NOTE: content-visibility was tried here and removed. Cards are ~220px, so a
+   guessed contain-intrinsic-size resized every card as it scrolled in, shifting
+   the scroll height mid-scroll. At board scale (tens of cards) it costs more
+   than it saves. */
 
 @media (prefers-reduced-motion: reduce) {
   * {
