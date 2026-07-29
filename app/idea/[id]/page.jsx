@@ -115,8 +115,11 @@ export default function IdeaPage() {
   if (err) return <Shell><div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>{err} <button onClick={load} style={{ ...btnBase, marginLeft: 8 }}>Retry</button></div></Shell>;
   if (!data) return null;
 
-  const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRoles, canEdit, meId, isAdmin, deleteRequested, deleteReason } = data;
+  const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRoles, meId, isAdmin, deleteRequested, deleteReason } = data;
   const isLead = (myRoles || []).includes(LEAD_ROLE);
+  // Derived, not read from the payload — joining, leaving or a role change
+  // must flip this immediately.
+  const canEdit = isAdmin || isLead;
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
   const hasLead = members.some((m) => (m.roles || []).includes(LEAD_ROLE));
   const tagColors = Object.fromEntries(tagCatalog.filter((t) => t.color).map((t) => [t.name, t.color]));
@@ -168,7 +171,6 @@ export default function IdeaPage() {
       patch((d) => ({
         members: [...d.members.filter((x) => x.account_id !== m.account_id), { account_id: m.account_id, name: m.name, roles: m.roles }],
         myRoles: m.roles,
-        canEdit: d.canEdit || m.roles.includes(LEAD_ROLE),
       }));
     });
   };

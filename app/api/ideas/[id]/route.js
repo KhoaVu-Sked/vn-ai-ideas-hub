@@ -13,7 +13,7 @@ export async function GET(_request, { params }) {
     data.meId = user.uid;
     data.isAdmin = user.role === "admin";
     // Whether the viewer may edit content / change status.
-    data.canEdit = data.isAdmin || data.myRole === LEAD_ROLE;
+    data.canEdit = data.isAdmin || (data.myRoles || []).includes(LEAD_ROLE);
     return Response.json(data);
   } catch (e) {
     return jsonError(e, "Could not load this idea.");
