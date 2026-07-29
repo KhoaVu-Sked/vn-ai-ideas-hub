@@ -1,6 +1,6 @@
 "use client";
 
-import { avatarColor, initialsOf } from "@/lib/statusMeta";
+import { avatarColor, initialsOf, avatarSrc } from "@/lib/statusMeta";
 
 // One avatar for the whole app: uploaded image if there is one, otherwise
 // initials on the person's chosen colour.
@@ -18,13 +18,11 @@ export default function Avatar({ person, size = 34, title }) {
     overflow: "hidden",
   };
 
-  if (p.id && p.avatar_url) {
+  const src = avatarSrc(p);
+  if (src) {
     return (
       // The blob is private, so it streams through a login-gated route.
-      <img
-        src={`/api/avatars/${p.id}`} alt={label} title={title || label} width={size} height={size}
-        style={{ ...base, objectFit: "cover" }}
-      />
+      <img src={src} alt={label} title={title || label} width={size} height={size} style={{ ...base, objectFit: "cover" }} />
     );
   }
   return (

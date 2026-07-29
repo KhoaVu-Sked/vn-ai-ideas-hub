@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
+import { useSession } from "../SessionProvider";
 import useRevalidateOnFocus from "../useRevalidateOnFocus";
 
 async function api(path, init) {
@@ -16,7 +17,9 @@ async function api(path, init) {
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
 
 export default function TasksPage() {
-  const [me, setMe] = useState(undefined);
+  const { user } = useSession();
+  // undefined while the session loads, null for a non-admin.
+  const me = user === undefined ? undefined : (user?.role === "admin" ? user : null);
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState("");
   const [err, setErr] = useState("");
@@ -27,12 +30,7 @@ export default function TasksPage() {
     try { const { tasks: t } = await api("/api/tasks"); setTasks(t); } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
 
-  useEffect(() => {
-    api("/api/auth/me").then((d) => {
-      if (d.user?.role !== "admin") { setMe(null); return; }
-      setMe(d.user); load();
-    }).catch(() => setMe(null));
-  }, [load]);
+  useEffect(() => { if (me) load(); }, [me, load]);
 
   useRevalidateOnFocus(() => { if (me) load(); });
 

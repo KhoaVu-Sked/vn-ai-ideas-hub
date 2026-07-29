@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
-import { AVATAR_COLORS, defaultAvatarColor, initialsOf } from "@/lib/statusMeta";
+import { AVATAR_COLORS, defaultAvatarColor, initialsOf, avatarSrc } from "@/lib/statusMeta";
 import { AVATAR_ACCEPT_ATTR, validateAvatar } from "@/lib/upload";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
+import { useSession } from "../SessionProvider";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: init?.body instanceof FormData ? undefined : { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -29,9 +30,8 @@ export default function ProfilePage() {
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState(null);
-  const [cacheBust, setCacheBust] = useState(0);
   const fileRef = useRef(null);
+  const { refresh: refreshSession } = useSession();
 
   // The browser knows every IANA zone; no need to ship a list.
   const zones = useMemo(() => {
@@ -45,7 +45,6 @@ export default function ProfilePage() {
     try {
       const { profile } = await api("/api/profile");
       setMe(profile);
-      setAvatarUrl(profile.avatar_url || null);
       setForm({
         name: profile.name || profile.username || "",
         avatar_color: profile.avatar_color || "",
@@ -65,6 +64,7 @@ export default function ProfilePage() {
       const { profile } = await api("/api/profile", { method: "PATCH", body: JSON.stringify(form) });
       setMe(profile);
       setSaved(true);
+      refreshSession();          // header name/colour update without a reload
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
 
@@ -77,8 +77,8 @@ export default function ProfilePage() {
       const fd = new FormData();
       fd.append("file", file);
       await api("/api/profile/avatar", { method: "POST", body: fd });
-      setAvatarUrl("set");
-      setCacheBust((n) => n + 1);   // same URL, new image — force a refetch
+      // Reload so we pick up the new blob URL — that's what busts the cache.
+      await Promise.all([load(), refreshSession()]);
     } catch (e) { setErr(e.message); } finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
   };
 
@@ -86,10 +86,11 @@ export default function ProfilePage() {
     setBusy(true); setErr("");
     try {
       await api("/api/profile/avatar", { method: "DELETE" });
-      setAvatarUrl(null);
+      await Promise.all([load(), refreshSession()]);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
 
+  const photo = avatarSrc(me);
   const shownColor = form?.avatar_color || defaultAvatarColor(me?.username || "");
   const initials = initialsOf(form?.name || me?.username || "?");
 
@@ -112,10 +113,9 @@ export default function ProfilePage() {
 
             {/* Avatar */}
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 22 }}>
-              {avatarUrl ? (
+              {photo ? (
                 <img
-                  key={cacheBust}
-                  src={`/api/avatars/${me.id}?v=${cacheBust}`} alt="" width={72} height={72}
+                  src={photo} alt="" width={72} height={72}
                   style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
                 />
               ) : (
@@ -126,9 +126,9 @@ export default function ProfilePage() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button onClick={() => fileRef.current?.click()} disabled={busy} style={btn}>
-                    {avatarUrl ? "Replace photo" : "Upload photo"}
+                    {photo ? "Replace photo" : "Upload photo"}
                   </button>
-                  {avatarUrl && <button onClick={removeAvatar} disabled={busy} style={{ ...btn, color: "#d53c30", borderColor: "#f5c9c9" }}>Remove</button>}
+                  {photo && <button onClick={removeAvatar} disabled={busy} style={{ ...btn, color: "#d53c30", borderColor: "#f5c9c9" }}>Remove</button>}
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 6 }}>PNG, JPG, GIF or WebP · max 2 MB</div>
                 <input ref={fileRef} type="file" accept={AVATAR_ACCEPT_ATTR} onChange={(e) => upload(e.target.files?.[0])} style={{ display: "none" }} />

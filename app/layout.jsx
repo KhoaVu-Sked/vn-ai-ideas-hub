@@ -1,6 +1,7 @@
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 import { APP_NAME } from "@/lib/brand";
+import SessionProvider from "./SessionProvider";
 import SessionTimer from "./SessionTimer";
 import FeedbackWidget from "./FeedbackWidget";
 
@@ -17,9 +18,11 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={`${inter.variable} ${manrope.variable}`}>
-        {children}
-        <SessionTimer />
-        <FeedbackWidget />
+        <SessionProvider>
+          {children}
+          <SessionTimer />
+          <FeedbackWidget />
+        </SessionProvider>
       </body>
     </html>
   );

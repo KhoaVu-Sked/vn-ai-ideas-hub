@@ -6,6 +6,7 @@ import { STATUS_META, defaultTagColor } from "@/lib/statusMeta";
 import Avatar from "../Avatar";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
+import { useSession } from "../SessionProvider";
 
 async function api(path) {
   const res = await fetch(path);
@@ -20,7 +21,8 @@ const muted = { fontSize: 11.5, color: "var(--muted)", fontWeight: 600 };
 const sectionTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: "0 0 14px" };
 
 export default function DashboardPage() {
-  const [me, setMe] = useState(undefined);
+  const { user } = useSession();
+  const me = user === undefined ? undefined : (user?.role === "admin" ? user : null);
   const [period, setPeriod] = useState("all");
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
@@ -30,12 +32,7 @@ export default function DashboardPage() {
     try { setData(await api(`/api/dashboard?period=${p}`)); } catch (e) { setErr(e.message); }
   }, []);
 
-  useEffect(() => {
-    api("/api/auth/me").then((d) => {
-      if (d.user?.role !== "admin") { setMe(null); return; }
-      setMe(d.user); load(period);
-    }).catch(() => setMe(null));
-  }, [load, period]);
+  useEffect(() => { if (me) load(period); }, [me, load, period]);
 
 
   return (

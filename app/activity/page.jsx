@@ -5,6 +5,7 @@ import Link from "next/link";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 import useRevalidateOnFocus from "../useRevalidateOnFocus";
+import { useSession } from "../SessionProvider";
 
 async function api(path) {
   const res = await fetch(path);
@@ -21,7 +22,8 @@ const TYPE_LABEL = { idea: "Ideas", account: "Accounts", form_field: "Form field
 const EMPTY = { actor: "", type: "", from: "", to: "" };
 
 export default function ActivityPage() {
-  const [me, setMe] = useState(undefined);
+  const { user } = useSession();
+  const me = user === undefined ? undefined : (user?.role === "admin" ? user : null);
   const [entries, setEntries] = useState([]);
   const [actors, setActors] = useState([]);
   const [types, setTypes] = useState([]);
@@ -49,13 +51,6 @@ export default function ActivityPage() {
       setDays(d.retentionDays || 14);
     } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, [query]);
-
-  useEffect(() => {
-    api("/api/auth/me").then((d) => {
-      if (d.user?.role !== "admin") { setMe(null); return; }
-      setMe(d.user);
-    }).catch(() => setMe(null));
-  }, []);
 
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });

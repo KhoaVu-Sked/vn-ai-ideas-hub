@@ -6,6 +6,8 @@ import Link from "next/link";
 import SkeduloMark from "./SkeduloMark";
 import { APP_NAME } from "@/lib/brand";
 import { avatarColor, initialsOf } from "@/lib/statusMeta";
+import Avatar from "./Avatar";
+import { useSession } from "./SessionProvider";
 
 const MANAGE_SECTIONS = [
   ["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"],
@@ -18,15 +20,12 @@ const MANAGE_SECTIONS = [
 //   search / onSearch — controlled search box (board passes its own state)
 export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
   const router = useRouter();
-  const [me, setMe] = useState(null);
+  const { user: me } = useSession();
   const [openMenu, setOpenMenu] = useState(null); // 'manage' | 'avatar'
   const [term, setTerm] = useState(search ?? "");
   const avatarRef = useRef(null);
 
   useEffect(() => { if (search !== undefined) setTerm(search); }, [search]);
-  useEffect(() => {
-    fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)).then((d) => d && setMe(d.user)).catch(() => {});
-  }, []);
   // Close the avatar menu on an outside click.
   useEffect(() => {
     const onDoc = (e) => { if (avatarRef.current && !avatarRef.current.contains(e.target)) setOpenMenu((m) => (m === "avatar" ? null : m)); };
@@ -97,9 +96,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
           style={me?.avatar_url ? { padding: 0, overflow: "hidden" } : me ? { background: avatarColor(me) } : undefined}
           onClick={() => setOpenMenu((m) => (m === "avatar" ? null : "avatar"))}
         >
-          {me?.avatar_url
-            ? <img src={`/api/avatars/${me.id}`} alt="" width={34} height={34} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : initialsOf(me?.name || me?.username || "")}
+          {me?.avatar_url ? <Avatar person={me} size={34} /> : initialsOf(me?.name || me?.username || "")}
         </button>
         {openMenu === "avatar" && (
           <div className="hdr-menu hdr-menu--right">

@@ -7,6 +7,7 @@ import { tagPill, defaultTagColor } from "@/lib/statusMeta";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 import useRevalidateOnFocus from "../useRevalidateOnFocus";
+import { useSession } from "../SessionProvider";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -35,7 +36,9 @@ export default function ManagePageWrapper() {
 }
 
 function ManagePage() {
-  const [me, setMe] = useState(undefined); // undefined=loading, null=not admin
+  const { user } = useSession();
+  // undefined while the session loads, null for a non-admin.
+  const me = user === undefined ? undefined : (user?.role === "admin" ? user : null);
   const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState("");
   const [accounts, setAccounts] = useState([]);
@@ -74,13 +77,7 @@ function ManagePage() {
     } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
 
-  useEffect(() => {
-    api("/api/auth/me").then((d) => {
-      if (d.user?.role !== "admin") { setMe(null); return; }
-      setMe(d.user);
-      load();
-    }).catch(() => setMe(null));
-  }, [load]);
+  useEffect(() => { if (me) load(); }, [me, load]);
 
   // Pick up other admins' changes when you come back to the tab.
   useRevalidateOnFocus(() => { if (me) load(); }, { enabled: Object.values(dirty).every((v) => !v) });
