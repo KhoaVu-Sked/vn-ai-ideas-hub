@@ -171,9 +171,9 @@ function Board() {
                       <Pill bg={m.bg} fg={m.fg}>{p.status}</Pill>
                       {p.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
                     </div>
-                    <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3 }}>{p.name}</div>
+                    <div title={p.name} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{p.name}</div>
                     {p.context && (
-                      <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.context}</div>
+                      <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{p.context}</div>
                     )}
                     <div style={{ display: "flex", gap: 14, fontSize: 11.5, color: "var(--faint)", fontWeight: 600 }}>
                       <span title="Likes">♥ {p.counts?.likes ?? 0}</span>
@@ -204,7 +204,7 @@ function Board() {
                 </div>
                 <button onClick={() => setSelected(null)} aria-label="Close" style={{ border: "none", background: "#f3f5f9", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "#5a6a82", fontSize: 14, fontWeight: 700 }}>✕</button>
               </div>
-              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 19, color: "var(--ink)", margin: "10px 0 0", lineHeight: 1.3 }}>{selected.name}</h2>
+              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 19, color: "var(--ink)", margin: "10px 0 0", lineHeight: 1.3, overflowWrap: "anywhere" }}>{selected.name}</h2>
               <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 6 }}>Preview — open the full page to like, request, or join.</div>
             </div>
 

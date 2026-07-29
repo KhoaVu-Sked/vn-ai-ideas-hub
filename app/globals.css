@@ -61,7 +61,7 @@ a {
   font-family: var(--font-display), system-ui, sans-serif;
   font-weight: 700; font-size: 16px; color: #fff; white-space: nowrap;
 }
-.app-header__crumb { color: rgba(255, 255, 255, 0.72); font-size: 13px; white-space: nowrap; }
+.app-header__crumb { color: rgba(255, 255, 255, 0.72); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
 .app-header__spacer { flex: 1; }
 
 /* Plain-text nav items with an optional caret */

@@ -237,7 +237,7 @@ export default function IdeaPage() {
   };
 
   return (
-    <Shell name={idea.name} onNewIdea={() => setShowSubmit(true)}>
+    <Shell onNewIdea={() => setShowSubmit(true)}>
       {showSubmit && <SubmitModal onClose={() => setShowSubmit(false)} onCreated={(project) => router.push(`/idea/${project.id}`)} />}
       {actionErr && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 14 }}>{actionErr}</div>}
 
@@ -261,7 +261,7 @@ export default function IdeaPage() {
             {idea.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
           </div>
 
-          <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px" }}>{idea.name}</h1>
+          <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px", lineHeight: 1.25, overflowWrap: "anywhere" }}>{idea.name}</h1>
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
             {idea.number}
             {idea.initiator ? ` · Initiated by ${idea.initiator}` : ""}
@@ -473,10 +473,10 @@ export default function IdeaPage() {
   );
 }
 
-function Shell({ name, onNewIdea, children }) {
+function Shell({ onNewIdea, children }) {
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
-      <AppHeader crumb={name} onNewIdea={onNewIdea} />
+      <AppHeader onNewIdea={onNewIdea} />
       <main style={{ maxWidth: 1060, margin: "0 auto", padding: "20px 22px 0" }}>{children}</main>
     </div>
   );
