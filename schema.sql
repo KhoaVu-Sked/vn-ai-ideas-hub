@@ -48,6 +48,10 @@ create table if not exists accounts (
   password_hash text not null,
   name          text,                                    -- display name, e.g. "Trung Vo"
   role          text not null default 'member',          -- workspace role: admin | member
+  avatar_color  text,                                    -- chosen on /profile; null → hashed default
+  avatar_url    text,                                    -- private blob, served via /api/avatars/:id
+  region        text,
+  timezone      text,                                    -- IANA zone, e.g. Asia/Ho_Chi_Minh
   created_at    timestamptz not null default now()
 );
 -- (the accounts_email unique index is created in the migration block below, after
@@ -99,8 +103,9 @@ create table if not exists requests (
   idea_id    uuid not null references ideas(id) on delete cascade,
   account_id uuid not null references accounts(id) on delete cascade,
   body       text not null,
-  state      text not null default 'open',   -- open | accepted | under_discussion | declined
-  created_at timestamptz not null default now()
+  state      text not null default 'open',   -- open | accepted | under_discussion | declined | closed
+  created_at timestamptz not null default now(),
+  updated_at timestamptz                     -- set when the author edits the body
 );
 create index if not exists requests_idea_id_idx on requests (idea_id);
 
@@ -210,6 +215,11 @@ alter table ideas add column if not exists extra jsonb not null default '{}'::js
 alter table ideas add column if not exists delete_requested boolean not null default false;
 alter table ideas add column if not exists delete_reason text;
 alter table ideas add column if not exists delete_requested_by uuid;
+alter table accounts add column if not exists avatar_color text;
+alter table accounts add column if not exists avatar_url text;
+alter table accounts add column if not exists region text;
+alter table accounts add column if not exists timezone text;
+alter table requests add column if not exists updated_at timestamptz;
 
 -- Merge "Project Lead" + "Initiator / Idea Lead" into "Initiator / Project Lead".
 -- The old index has the same NAME but the old predicate, so `if not exists`

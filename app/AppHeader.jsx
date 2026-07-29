@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SkeduloMark from "./SkeduloMark";
 import { APP_NAME } from "@/lib/brand";
+import { avatarColor } from "@/lib/statusMeta";
 
 const MANAGE_SECTIONS = [
   ["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"],
@@ -97,14 +98,21 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
       >+</button>
 
       <div ref={avatarRef} style={{ position: "relative" }}>
-        <button className="hdr-avatar" title={me?.username || "Account"} onClick={() => setOpenMenu((m) => (m === "avatar" ? null : "avatar"))}>
-          {initialsOf(me?.username || "")}
+        <button
+          className="hdr-avatar" title={me?.name || me?.username || "Account"}
+          style={me?.avatar_url ? { padding: 0, overflow: "hidden" } : me ? { background: avatarColor(me) } : undefined}
+          onClick={() => setOpenMenu((m) => (m === "avatar" ? null : "avatar"))}
+        >
+          {me?.avatar_url
+            ? <img src={`/api/avatars/${me.id}`} alt="" width={34} height={34} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : initialsOf(me?.name || me?.username || "")}
         </button>
         {openMenu === "avatar" && (
           <div className="hdr-menu hdr-menu--right">
             <div style={{ padding: "6px 10px 8px", fontSize: 12, color: "var(--muted)", borderBottom: "1px solid var(--line)", marginBottom: 4 }}>
               Signed in as <b style={{ color: "var(--ink)" }}>{me?.username}</b>{admin ? " · admin" : ""}
             </div>
+            <Link href="/profile" onClick={() => setOpenMenu(null)}>My profile</Link>
             <a href="#" className="hdr-menu__danger" onClick={(e) => { e.preventDefault(); signOut(); }}>Sign out</a>
           </div>
         )}

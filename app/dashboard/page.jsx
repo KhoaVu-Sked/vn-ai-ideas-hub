@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { STATUS_META, avatarColor, defaultTagColor } from "@/lib/statusMeta";
+import { STATUS_META, defaultTagColor } from "@/lib/statusMeta";
+import Avatar from "../Avatar";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 
@@ -161,7 +162,7 @@ export default function DashboardPage() {
                   const max = Math.max(...data.contributors.map((x) => x.score), 1);
                   return (
                     <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                      <div style={{ width: 30, height: 30, borderRadius: "50%", background: avatarColor(c.name, i), color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{c.name.slice(0, 2).toUpperCase()}</div>
+                      <Avatar person={c} size={30} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{c.name}</div>
                         <div style={{ fontSize: 11, color: "var(--muted)" }}>{c.ideas} idea{c.ideas === 1 ? "" : "s"} · {c.requests} request{c.requests === 1 ? "" : "s"} · {c.teams} team{c.teams === 1 ? "" : "s"}</div>

@@ -51,6 +51,7 @@ npm run dev                  # http://localhost:3000
 - **Seeded admin:** `skedadmin` (role `admin`). Its hash is set by `schema.sql`. **Change this password after first login** — it's weak and was shared in setup.
 - **Add a user:** insert a row with a bcrypt hash. Generate one with `node -e "console.log(require('bcryptjs').hashSync('their-password',10))"`, then `insert into accounts (username, password_hash, role) values ('name','<hash>','member');`.
 - **Self-serve sign-up** at `/register`, restricted to `@skedulo.com`. Two steps: details → 6-digit code emailed to the address. The row lives in `signup_codes` (bcrypt-hashed code, 10-minute expiry, 5 attempts, 60s resend cooldown) and **no `accounts` row is created until the code checks out**, so an unreadable address can't become a login.
+- **My profile** at `/profile` — display name, avatar image, avatar colour, region and timezone. Username, email and role stay admin-only. Avatar colour defaults to a hash of the **username** (stable everywhere); avatars are private blobs streamed through `/api/avatars/:id`.
 - **Forgot password** at `/forgot` — same OTP mechanics via `password_resets`. Accepts a username or an email.
 ## Views
 

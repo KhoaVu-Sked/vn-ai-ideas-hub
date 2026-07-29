@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { STATUS_META, STATUS_ORDER, ALL_STATUSES, avatarColor } from "@/lib/statusMeta";
+import { STATUS_META, STATUS_ORDER, ALL_STATUSES } from "@/lib/statusMeta";
+import Avatar from "./Avatar";
 import TagChip from "./TagChip";
 import AppHeader from "./AppHeader";
 import SubmitModal from "./SubmitModal";
@@ -36,8 +37,8 @@ function Avatars({ people }) {
   return (
     <div style={{ display: "flex", alignItems: "center" }}>
       {shown.map((u, i) => (
-        <div key={u.id} title={u.name} style={{ width: 24, height: 24, borderRadius: "50%", background: avatarColor(u.name, i), color: "#fff", fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #fff", marginLeft: i === 0 ? 0 : -8 }}>
-          {u.name.slice(0, 2).toUpperCase()}
+        <div key={u.id} style={{ marginLeft: i === 0 ? 0 : -8, border: "2px solid #fff", borderRadius: "50%", display: "flex" }}>
+          <Avatar person={u} size={22} />
         </div>
       ))}
       {extra > 0 && (

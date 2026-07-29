@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, avatarColor, ROLES, LEAD_ROLE, REQUEST_STATE_META,
+  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, ROLES, LEAD_ROLE, REQUEST_STATE_META, isClosed,
 } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
+import Avatar from "../../Avatar";
 import TagChip from "../../TagChip";
 import FieldInput from "../../FieldInput";
 import AppHeader from "../../AppHeader";
@@ -23,14 +24,6 @@ async function api(path, init) {
 
 function Pill({ bg, fg, children }) {
   return <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>{children}</span>;
-}
-
-function Avatar({ name, i = 0, size = 34 }) {
-  return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: avatarColor(name, i), color: "#fff", fontSize: size * 0.4, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-      {(name || "?").slice(0, 2).toUpperCase()}
-    </div>
-  );
 }
 
 // Neutral grey track: reached stages are filled, unreached are hollow outlines.
@@ -83,6 +76,7 @@ export default function IdeaPage() {
   const [tagCatalog, setTagCatalog] = useState([]);
   const [formFields, setFormFields] = useState([]);
   const [showSubmit, setShowSubmit] = useState(false);
+  const [editReq, setEditReq] = useState(null);   // { id, body } while rewording a request
 
   const load = useCallback(async () => {
     setBusy(true); setErr("");
@@ -103,7 +97,7 @@ export default function IdeaPage() {
       setData(d);
     } catch { /* leave the current view alone */ }
   }, [id]);
-  useRevalidateOnFocus(refresh, { enabled: !editing && !showSubmit && !showRoles });
+  useRevalidateOnFocus(refresh, { enabled: !editing && !showSubmit && !showRoles && !editReq });
   useEffect(() => { api("/api/tags").then(({ tags }) => setTagCatalog(tags || [])).catch(() => {}); }, []);
   useEffect(() => { api("/api/form-fields").then(({ fields }) => setFormFields(fields || [])).catch(() => {}); }, []);
 
@@ -121,7 +115,8 @@ export default function IdeaPage() {
   // must flip this immediately.
   const canEdit = isAdmin || isLead;
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
-  const hasLead = members.some((m) => (m.roles || []).includes(LEAD_ROLE));
+  const leadMember = members.find((m) => (m.roles || []).includes(LEAD_ROLE)) || null;
+  const hasLead = !!leadMember;
   const tagColors = Object.fromEntries(tagCatalog.filter((t) => t.color).map((t) => [t.name, t.color]));
   const toggleFormTag = (name) => setForm((f) => ({ ...f, tags: (f.tags || []).includes(name) ? f.tags.filter((x) => x !== name) : [...(f.tags || []), name] }));
   const setExtra = (key, v) => setForm((f) => ({ ...f, extra: { ...(f.extra || {}), [key]: v } }));
@@ -208,6 +203,16 @@ export default function IdeaPage() {
       setEditing(false);
     });
   };
+  const saveReqBody = () => {
+    const body = (editReq?.body || "").trim();
+    if (!body) return;
+    const id_ = editReq.id;
+    setEditReq(null);
+    run(async () => {
+      const { request } = await api(`/api/ideas/${id}/requests/${id_}`, { method: "PATCH", body: JSON.stringify({ body }) });
+      patch((d) => ({ requests: d.requests.map((r) => (r.id === id_ ? { ...r, ...request } : r)) }));
+    });
+  };
   const deleteIdea = () => {
     if (!confirm("Delete this idea permanently? This also removes its team, likes, requests, and files.")) return;
     run(async () => { await api(`/api/ideas/${id}`, { method: "DELETE" }); router.push("/"); });
@@ -266,7 +271,9 @@ export default function IdeaPage() {
           <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px", lineHeight: 1.25, overflowWrap: "anywhere" }}>{idea.name}</h1>
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
             {idea.number}
-            {idea.initiator ? ` · Initiated by ${idea.initiator}` : ""}
+            {/* Whoever holds the role now — not who first typed the form. Blank
+                while the role is vacant. */}
+            {leadMember ? ` · Initiated by ${leadMember.name}` : ""}
             {idea.submitted ? ` · Submitted ${idea.submitted}` : ""}
             {idea.target_date ? ` · Target: ${idea.target_date}` : ""}
           </div>
@@ -374,25 +381,60 @@ export default function IdeaPage() {
           {/* Requests & input */}
           <div style={{ ...sectionLabel, marginTop: 26 }}>Requests &amp; input ({requests.length})</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {requests.map((r, i) => {
+            {requests.map((r) => {
               const st = REQUEST_STATE_META[r.state] || REQUEST_STATE_META.open;
+              const closed = isClosed(r.state);
+              const mineToEdit = r.mine || isAdmin;
+              const beingEdited = editReq?.id === r.id;
               return (
-                <div key={r.id} style={{ background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px" }}>
+                <div key={r.id} style={{
+                  background: closed ? "#f1f3f5" : "#f8fafc",
+                  border: `1px solid ${closed ? "#e0e3e8" : "var(--line)"}`,
+                  borderRadius: 10, padding: "10px 14px",
+                  // Closed is "dealt with" — the whole card recedes.
+                  opacity: closed ? 0.65 : 1,
+                }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                    <Avatar name={r.author} i={i} size={24} />
-                    <span className="breakable" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{r.author}</span>
-                    <span style={{ fontSize: 11, color: "var(--faint)" }}>{r.date}</span>
-                    {(r.mine || canEdit) && <button onClick={() => removeRequest(r.id)} title="Remove" style={{ marginLeft: "auto", border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>}
-                  </div>
-                  <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{r.body}</div>
-                  <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
-                    {r.state !== "open" && <Pill bg={st.bg} fg={st.fg}>{st.label}</Pill>}
-                    {canEdit && (
-                      <select value={r.state} onChange={(e) => setReqState(r.id, e.target.value)} style={{ fontSize: 11.5, border: "1px solid #dde3ec", borderRadius: 6, padding: "3px 6px", color: "#5a6a82", background: "#fff" }}>
-                        {Object.entries(REQUEST_STATE_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                      </select>
+                    <Avatar person={r.author} size={24} />
+                    <span className="breakable" style={{ fontSize: 12.5, fontWeight: 700, color: closed ? "var(--muted)" : "var(--ink)" }}>{r.author?.name}</span>
+                    <span style={{ fontSize: 11, color: "var(--faint)" }}>{r.date}{r.edited ? " · edited" : ""}</span>
+                    {mineToEdit && !beingEdited && (
+                      <button onClick={() => setEditReq({ id: r.id, body: r.body })} style={{ marginLeft: "auto", border: "none", background: "none", color: "var(--blue)", cursor: "pointer", fontSize: 11.5, fontWeight: 700 }}>Edit</button>
+                    )}
+                    {(r.mine || canEdit) && (
+                      <button onClick={() => removeRequest(r.id)} title="Remove" style={{ marginLeft: mineToEdit && !beingEdited ? 0 : "auto", border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>
                     )}
                   </div>
+
+                  {beingEdited ? (
+                    <>
+                      <textarea
+                        value={editReq.body} autoFocus rows={3}
+                        onChange={(e) => setEditReq((v) => ({ ...v, body: e.target.value }))}
+                        style={{ width: "100%", border: "1px solid #dde3ec", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "inherit", lineHeight: 1.5, outline: "none", resize: "vertical" }}
+                      />
+                      <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                        <button onClick={saveReqBody} disabled={!editReq.body.trim()} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none", padding: "6px 12px", fontSize: 12 }}>Save</button>
+                        <button onClick={() => setEditReq(null)} style={{ ...btnBase, padding: "6px 12px", fontSize: 12 }}>Cancel</button>
+                        <span style={{ fontSize: 11, color: "var(--faint)" }}>Saving reopens this request.</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="breakable" style={{ fontSize: 13, color: closed ? "var(--muted)" : "var(--body)", lineHeight: 1.5 }}>{r.body}</div>
+                  )}
+
+                  {!beingEdited && (
+                    <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      {r.state !== "open" && <Pill bg={st.bg} fg={st.fg}>{st.label}</Pill>}
+                      {closed
+                        ? canEdit && <button onClick={() => setReqState(r.id, "open")} style={{ ...btnBase, padding: "4px 10px", fontSize: 11.5 }}>Reopen</button>
+                        : canEdit && (
+                          <select value={r.state} onChange={(e) => setReqState(r.id, e.target.value)} style={{ fontSize: 11.5, border: "1px solid #dde3ec", borderRadius: 6, padding: "3px 6px", color: "#5a6a82", background: "#fff" }}>
+                            {Object.entries(REQUEST_STATE_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                          </select>
+                        )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -415,7 +457,7 @@ export default function IdeaPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {members.map((m, i) => (
                 <div key={m.account_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Avatar name={m.name} i={i} />
+                  <Avatar person={m} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{m.name}</div>
                     {isAdmin ? (
