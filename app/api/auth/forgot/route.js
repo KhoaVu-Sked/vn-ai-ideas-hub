@@ -8,6 +8,7 @@ import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { renderEmail, renderEmailText } from "@/lib/emailTemplate";
 import { audit } from "@/lib/notify";
+import { APP_NAME } from "@/lib/brand";
 
 // POST /api/auth/forgot { identifier } → email a 6-digit code.
 //
@@ -41,7 +42,7 @@ export async function POST(request) {
     const base = new URL(request.url).origin;
     after(() => Promise.allSettled([
       sendEmail({
-        subject: `${code} is your AI Ideas Hub reset code`,
+        subject: `${code} is your ${APP_NAME} reset code`,
         to: [account.email],
         html: renderEmail(parts),
         text: renderEmailText(parts),

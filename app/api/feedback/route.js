@@ -2,6 +2,7 @@ import { addFeedback, listFeedback, jsonError } from "@/lib/db";
 import { requireUser, requireAdmin } from "@/lib/guard";
 import { after } from "next/server";
 import { adminEvent } from "@/lib/notify";
+import { APP_NAME } from "@/lib/brand";
 
 // GET /api/feedback → all feedback (admin only)
 export async function GET() {
@@ -25,7 +26,7 @@ export async function POST(request) {
     after(() => adminEvent({
       actorId: user.uid, actor: who, entity: "feedback",
       auditAction: "sent feedback",
-      subject: "New feedback on AI Ideas Hub",
+      subject: `New feedback on ${APP_NAME}`,
       heading: "New feedback",
       intro: `<b>${who}</b> sent feedback${page ? ` from <b>${page}</b>` : ""}.`,
       quote: body,

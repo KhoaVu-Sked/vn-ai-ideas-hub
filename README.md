@@ -1,4 +1,4 @@
-# AI Ideas Hub
+# VN TS - AI Ideas Hub
 
 One home for the team's AI ideas — submit them, follow them on a board, and ship them. Next.js frontend + API routes on Vercel; **Neon Postgres is the data layer** (accessed server-side only).
 

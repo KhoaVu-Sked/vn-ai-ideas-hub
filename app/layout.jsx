@@ -1,5 +1,6 @@
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
+import { APP_NAME } from "@/lib/brand";
 import SessionTimer from "./SessionTimer";
 import FeedbackWidget from "./FeedbackWidget";
 
@@ -8,7 +9,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const manrope = Manrope({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-display" });
 
 export const metadata = {
-  title: "AI Ideas Hub",
+  title: APP_NAME,
   description: "One home for the team's AI ideas — submit, follow, and ship them.",
 };
 

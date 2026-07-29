@@ -7,6 +7,7 @@ import {
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { renderEmail, renderEmailText } from "@/lib/emailTemplate";
+import { APP_NAME } from "@/lib/brand";
 
 const ALLOWED_DOMAIN = "@skedulo.com";
 
@@ -40,12 +41,12 @@ export async function POST(request) {
 
     const parts = {
       heading: "Confirm your email",
-      intro: `Enter this code to finish creating your AI Ideas Hub account. It expires in ${SIGNUP_TTL_MINUTES} minutes.`,
+      intro: `Enter this code to finish creating your ${APP_NAME} account. It expires in ${SIGNUP_TTL_MINUTES} minutes.`,
       code,
       footer: "If you didn't try to sign up, you can ignore this email — no account has been created.",
     };
     after(() => sendEmail({
-      subject: `${code} is your AI Ideas Hub sign-up code`,
+      subject: `${code} is your ${APP_NAME} sign-up code`,
       to: [em],
       html: renderEmail(parts),
       text: renderEmailText(parts),

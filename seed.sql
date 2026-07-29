@@ -1,4 +1,4 @@
--- AI Ideas Hub — sample data seed.
+-- VN TS - AI Ideas Hub — sample data seed.
 --
 -- ⚠️  DESTRUCTIVE: this DELETES every idea and all engagement
 -- (ideas, idea_members, likes, requests, follows) and replaces them with

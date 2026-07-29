@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/guard";
 import { after } from "next/server";
 import { adminEvent } from "@/lib/notify";
 import { hashPassword } from "@/lib/auth";
+import { APP_NAME } from "@/lib/brand";
 
 // PATCH /api/accounts/:id { username, email, name, role, password? }
 // → edit an account / change role / reset password (admin only)
@@ -21,7 +22,7 @@ export async function PATCH(request, { params }) {
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "account", entityId: id,
       auditAction: `${what} "${account.username}"`,
-      subject: "AI Ideas Hub user account changed",
+      subject: `${APP_NAME} user account changed`,
       heading: "User account changed",
       intro: `<b>${who}</b> ${what} <b>${account.username}</b>.`,
       rows: [["Username", account.username], ["Email", account.email || "—"], ["Role", account.role]],
@@ -44,7 +45,7 @@ export async function DELETE(_request, { params }) {
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "account", entityId: id,
       auditAction: "deleted a user account",
-      subject: "AI Ideas Hub user account deleted",
+      subject: `${APP_NAME} user account deleted`,
       heading: "User account deleted",
       intro: `<b>${who}</b> deleted a user account.`,
       ctaPath: "/manage?section=users",

@@ -1,10 +1,10 @@
-# AI Ideas Hub — project context
+# VN TS - AI Ideas Hub — project context
 
-Working context for the AI Ideas Hub. The full requirements live in [`docs/AI_Ideas_Hub_Requirements_v0.1.docx`](docs/AI_Ideas_Hub_Requirements_v0.1.docx) (authored by Trung Vo, 3 Jul 2026); this file is the working brief around it. See the condensed spec and gap analysis at the bottom.
+Working context for the VN TS - AI Ideas Hub. The full requirements live in [`docs/AI_Ideas_Hub_Requirements_v0.1.docx`](docs/AI_Ideas_Hub_Requirements_v0.1.docx) (authored by Trung Vo, 3 Jul 2026); this file is the working brief around it. See the condensed spec and gap analysis at the bottom.
 
 ## Who I am and what this is
 
-I'm Khoa Vu, a Technical Support Engineer at Skedulo (Vietnam, APAC team). I'm leading an internal initiative called the **AI Ideas Hub**: one home for the team's AI ideas so they stop dying in Slack threads. People submit ideas via a short form, follow them on a board (statuses: New → In Progress → On Hold → Launched), and leads see the pipeline without chasing status. It's rolling out as a **beta** to collect feedback.
+I'm Khoa Vu, a Technical Support Engineer at Skedulo (Vietnam, APAC team). I'm leading an internal initiative called the **VN TS - AI Ideas Hub**: one home for the team's AI ideas so they stop dying in Slack threads. People submit ideas via a short form, follow them on a board (statuses: New → In Progress → On Hold → Launched), and leads see the pipeline without chasing status. It's rolling out as a **beta** to collect feedback.
 
 ## Current state
 

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import SkeduloMark from "../SkeduloMark";
+import { APP_NAME } from "@/lib/brand";
 
 export default function LoginPage() {
   return <Suspense fallback={null}><LoginForm /></Suspense>;
@@ -51,7 +52,7 @@ function LoginForm() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: "var(--header-blue)", display: "flex", alignItems: "center", justifyContent: "center" }}><SkeduloMark size={20} /></div>
-          <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)" }}>AI Ideas Hub</span>
+          <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)" }}>{APP_NAME}</span>
         </div>
 
         {resetDone && (

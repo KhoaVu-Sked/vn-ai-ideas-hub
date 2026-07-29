@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/guard";
 import { after } from "next/server";
 import { adminEvent } from "@/lib/notify";
 import { hashPassword } from "@/lib/auth";
+import { APP_NAME } from "@/lib/brand";
 
 // GET /api/accounts → list accounts (admin only)
 export async function GET() {
@@ -27,7 +28,7 @@ export async function POST(request) {
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "account", entityId: account.id,
       auditAction: `created the account "${account.username}" (${account.role})`,
-      subject: "New AI Ideas Hub user account",
+      subject: `New ${APP_NAME} user account`,
       heading: "User account created",
       intro: `<b>${who}</b> created an account for <b>${account.username}</b>.`,
       rows: [["Username", account.username], ["Email", account.email || "—"], ["Role", account.role]],

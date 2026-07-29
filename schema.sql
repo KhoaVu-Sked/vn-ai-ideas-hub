@@ -1,4 +1,4 @@
--- AI Ideas Hub — Neon Postgres schema.
+-- VN TS - AI Ideas Hub — Neon Postgres schema.
 -- Safe to run on a FRESH database or re-run on the EXISTING one (idempotent):
 -- CREATEs use IF NOT EXISTS, and the migration block guards every change.
 -- Run in the Neon SQL editor (dashboard → SQL Editor).

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SkeduloMark from "./SkeduloMark";
+import { APP_NAME } from "@/lib/brand";
 
 const MANAGE_SECTIONS = [
   ["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"],
@@ -55,7 +56,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
     <header className="app-header">
       <Link href="/" className="app-header__brand">
         <span className="app-header__mark"><SkeduloMark size={20} /></span>
-        <span className="app-header__name">AI Ideas Hub</span>
+        <span className="app-header__name">{APP_NAME}</span>
       </Link>
       {crumb && <span className="app-header__crumb">› {crumb}</span>}
 
