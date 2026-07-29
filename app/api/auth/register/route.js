@@ -1,12 +1,19 @@
-import { NextResponse } from "next/server";
-import { createRegisteredAccount, jsonError } from "@/lib/db";
+import { randomInt } from "node:crypto";
+import { after } from "next/server";
+import {
+  accountExistsByEmail, createSignupCode, signupRequestedRecently,
+  SIGNUP_TTL_MINUTES, jsonError,
+} from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
-import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
+import { sendEmail } from "@/lib/mail";
+import { renderEmail, renderEmailText } from "@/lib/emailTemplate";
 
 const ALLOWED_DOMAIN = "@skedulo.com";
 
-// POST /api/auth/register { name, email, password } → self-serve signup,
-// restricted to @skedulo.com emails. Signs the user in on success.
+// POST /api/auth/register { name, email, password } → step 1 of self-serve
+// signup: email a 6-digit code. NO account is created here — that happens in
+// /api/auth/register/verify, so an address nobody can read never becomes a
+// login. Restricted to @skedulo.com.
 export async function POST(request) {
   try {
     const { name, email, password } = await request.json();
@@ -17,14 +24,35 @@ export async function POST(request) {
     if (!name?.trim()) return Response.json({ error: "Your name is required." }, { status: 400 });
     if (!password || password.length < 6) return Response.json({ error: "Password must be at least 6 characters." }, { status: 400 });
 
-    const password_hash = await hashPassword(password);
-    const acct = await createRegisteredAccount({ email: em, name, password_hash });
+    if (await accountExistsByEmail(em)) {
+      return Response.json({ error: "An account with that email already exists — sign in instead." }, { status: 409 });
+    }
+    // A code went out moments ago; don't let this flood someone's inbox.
+    if (await signupRequestedRecently(em)) {
+      return Response.json({ ok: true, expiresInMinutes: SIGNUP_TTL_MINUTES, throttled: true });
+    }
 
-    const token = await signSession({ uid: acct.id, username: acct.username, role: acct.role });
-    const res = NextResponse.json({ user: { username: acct.username, role: acct.role } });
-    res.cookies.set(COOKIE_NAME, token, cookieOptions);
-    return res;
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    // Hash the password now and carry it on the pending row, so the verify step
+    // needs nothing from the browser but the code.
+    const [password_hash, code_hash] = await Promise.all([hashPassword(password), hashPassword(code)]);
+    await createSignupCode({ email: em, name: name.trim(), password_hash, code_hash });
+
+    const parts = {
+      heading: "Confirm your email",
+      intro: `Enter this code to finish creating your AI Ideas Hub account. It expires in ${SIGNUP_TTL_MINUTES} minutes.`,
+      code,
+      footer: "If you didn't try to sign up, you can ignore this email — no account has been created.",
+    };
+    after(() => sendEmail({
+      subject: `${code} is your AI Ideas Hub sign-up code`,
+      to: [em],
+      html: renderEmail(parts),
+      text: renderEmailText(parts),
+    }));
+
+    return Response.json({ ok: true, expiresInMinutes: SIGNUP_TTL_MINUTES });
   } catch (e) {
-    return jsonError(e, "Could not create your account.");
+    return jsonError(e, "Could not start your sign-up.");
   }
 }

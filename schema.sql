@@ -148,6 +148,21 @@ create table if not exists password_resets (
 );
 create index if not exists password_resets_account_idx on password_resets (account_id, created_at desc);
 
+-- Pending signups. The account isn't created until the emailed code is entered,
+-- so an unverified address never becomes a login.
+create table if not exists signup_codes (
+  id            uuid primary key default gen_random_uuid(),
+  email         text not null,
+  name          text,
+  password_hash text not null,
+  code_hash     text not null,
+  expires_at    timestamptz not null,
+  attempts      integer not null default 0,
+  consumed_at   timestamptz,
+  created_at    timestamptz not null default now()
+);
+create index if not exists signup_codes_email_idx on signup_codes (lower(email), created_at desc);
+
 -- Audit log — every notable action; rows older than 14 days are pruned on write.
 create table if not exists audit_log (
   id         uuid primary key default gen_random_uuid(),

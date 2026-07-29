@@ -23,3 +23,4 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `006_roles_array_timeframes.sql` — multiple roles per member + admin-managed time frames.
 - `007_audit_log.sql` — audit log with 14-day retention.
 - `008_password_reset.sql` — OTP codes for the forgot-password flow.
+- `009_signup_codes.sql` — OTP codes for email verification at sign-up.
