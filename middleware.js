@@ -15,6 +15,6 @@ export async function middleware(request) {
 }
 
 export const config = {
-  // Everything except /login, /register, /api/*, Next internals, and the favicon.
-  matcher: ["/((?!login|register|api|_next/static|_next/image|favicon.ico).*)"],
+  // Everything except the auth pages, /api/*, Next internals, and the favicon.
+  matcher: ["/((?!login|register|forgot|api|_next/static|_next/image|favicon.ico).*)"],
 };

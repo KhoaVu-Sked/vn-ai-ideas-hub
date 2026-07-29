@@ -12,7 +12,7 @@ export default function FeedbackWidget() {
   const [err, setErr] = useState("");
 
   // Only for signed-in pages (auth pages have no session yet).
-  if (pathname === "/login" || pathname === "/register") return null;
+  if (["/login", "/register", "/forgot"].includes(pathname)) return null;
 
   const submit = async () => {
     const body = text.trim();

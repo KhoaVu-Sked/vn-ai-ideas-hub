@@ -136,6 +136,18 @@ create table if not exists tasks (
 );
 create index if not exists tasks_created_at_idx on tasks (created_at desc);
 
+-- Password reset codes (OTP). Hashed, expiring, attempt-limited.
+create table if not exists password_resets (
+  id          uuid primary key default gen_random_uuid(),
+  account_id  uuid not null references accounts(id) on delete cascade,
+  code_hash   text not null,
+  expires_at  timestamptz not null,
+  attempts    integer not null default 0,
+  consumed_at timestamptz,
+  created_at  timestamptz not null default now()
+);
+create index if not exists password_resets_account_idx on password_resets (account_id, created_at desc);
+
 -- Audit log — every notable action; rows older than 14 days are pruned on write.
 create table if not exists audit_log (
   id         uuid primary key default gen_random_uuid(),

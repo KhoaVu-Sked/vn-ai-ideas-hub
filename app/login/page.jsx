@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import SkeduloMark from "../SkeduloMark";
 
 export default function LoginPage() {
+  return <Suspense fallback={null}><LoginForm /></Suspense>;
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [resetDone, setResetDone] = useState(false);
+  useEffect(() => { if (searchParams.get("reset") === "1") setResetDone(true); }, [searchParams]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,6 +54,11 @@ export default function LoginPage() {
           <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)" }}>AI Ideas Hub</span>
         </div>
 
+        {resetDone && (
+          <div style={{ background: "#ebf6ed", border: "1px solid #bde2c5", color: "#2f7a43", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
+            ✓ Password updated — sign in with your new password.
+          </div>
+        )}
         <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Username or email</label>
         <input
           value={username}
@@ -74,7 +86,10 @@ export default function LoginPage() {
         >
           {busy ? "Signing in…" : "Sign in"}
         </button>
-        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 14, textAlign: "center" }}>
+        <div style={{ fontSize: 12.5, marginTop: 14, textAlign: "center" }}>
+          <Link href="/forgot" style={{ color: "var(--blue)", fontWeight: 700 }}>Forgot your password?</Link>
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8, textAlign: "center" }}>
           New here? <Link href="/register" style={{ color: "var(--blue)", fontWeight: 700 }}>Create an account</Link>
         </div>
       </form>

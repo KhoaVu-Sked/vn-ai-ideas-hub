@@ -22,3 +22,4 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `005_merge_lead_roles.sql` — merge the two lead roles into `Initiator / Project Lead`.
 - `006_roles_array_timeframes.sql` — multiple roles per member + admin-managed time frames.
 - `007_audit_log.sql` — audit log with 14-day retention.
+- `008_password_reset.sql` — OTP codes for the forgot-password flow.
