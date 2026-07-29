@@ -1,6 +1,6 @@
 "use client";
 
-import { avatarColor } from "@/lib/statusMeta";
+import { avatarColor, initialsOf } from "@/lib/statusMeta";
 
 // One avatar for the whole app: uploaded image if there is one, otherwise
 // initials on the person's chosen colour.
@@ -11,7 +11,7 @@ import { avatarColor } from "@/lib/statusMeta";
 export default function Avatar({ person, size = 34, title }) {
   const p = typeof person === "string" ? { name: person } : (person || {});
   const label = p.name || p.username || "?";
-  const initials = label.slice(0, 2).toUpperCase();
+  const initials = initialsOf(label);
   const base = {
     width: size, height: size, borderRadius: "50%", flexShrink: 0,
     display: "flex", alignItems: "center", justifyContent: "center",

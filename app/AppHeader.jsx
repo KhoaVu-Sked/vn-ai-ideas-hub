@@ -5,18 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SkeduloMark from "./SkeduloMark";
 import { APP_NAME } from "@/lib/brand";
-import { avatarColor } from "@/lib/statusMeta";
+import { avatarColor, initialsOf } from "@/lib/statusMeta";
 
 const MANAGE_SECTIONS = [
   ["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"],
   ["feedback", "Feedback"], ["deletions", "Delete requests"],
 ];
-
-const initialsOf = (s = "") => {
-  const parts = s.trim().split(/[\s._-]+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return (s.slice(0, 2) || "?").toUpperCase();
-};
 
 // App top bar, modelled on the Skedulo product header.
 //   crumb     — optional text after the app name (e.g. an idea's title)

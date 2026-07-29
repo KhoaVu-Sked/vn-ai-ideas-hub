@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
-import { AVATAR_COLORS, defaultAvatarColor } from "@/lib/statusMeta";
+import { AVATAR_COLORS, defaultAvatarColor, initialsOf } from "@/lib/statusMeta";
 import { AVATAR_ACCEPT_ATTR, validateAvatar } from "@/lib/upload";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
@@ -91,7 +91,7 @@ export default function ProfilePage() {
   };
 
   const shownColor = form?.avatar_color || defaultAvatarColor(me?.username || "");
-  const initials = (form?.name || me?.username || "?").slice(0, 2).toUpperCase();
+  const initials = initialsOf(form?.name || me?.username || "?");
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
