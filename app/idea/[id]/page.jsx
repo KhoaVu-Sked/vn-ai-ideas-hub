@@ -12,6 +12,7 @@ import FieldInput from "../../FieldInput";
 import AppHeader from "../../AppHeader";
 import SubmitModal from "../../SubmitModal";
 import Loading from "../../Loading";
+import useRevalidateOnFocus from "../../useRevalidateOnFocus";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -93,6 +94,16 @@ export default function IdeaPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Quietly pull in other people's requests/status changes — no spinner, and
+  // never while a modal or the content editor is open, so nothing typed is lost.
+  const refresh = useCallback(async () => {
+    try {
+      const d = await api(`/api/ideas/${id}`);
+      setData(d);
+    } catch { /* leave the current view alone */ }
+  }, [id]);
+  useRevalidateOnFocus(refresh, { enabled: !editing && !showSubmit && !showRoles });
   useEffect(() => { api("/api/tags").then(({ tags }) => setTagCatalog(tags || [])).catch(() => {}); }, []);
   useEffect(() => { api("/api/form-fields").then(({ fields }) => setFormFields(fields || [])).catch(() => {}); }, []);
 

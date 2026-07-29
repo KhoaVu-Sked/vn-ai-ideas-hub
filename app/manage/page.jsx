@@ -6,6 +6,7 @@ import Link from "next/link";
 import { tagPill, defaultTagColor } from "@/lib/statusMeta";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
+import useRevalidateOnFocus from "../useRevalidateOnFocus";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -52,25 +53,25 @@ function ManagePage() {
   const [err, setErr] = useState("");
   const [toast, setToast] = useState("");
   const [dirty, setDirty] = useState({});
+  const [ready, setReady] = useState(false);   // data loaded — avoids an empty-state flash
 
   const withText = (fs) => (fs || []).filter((x) => !x.archived).map((x) => ({ ...x, optionsText: (x.options || []).join(", ") }));
 
   const load = useCallback(async () => {
     setErr("");
     try {
-      const { tags: t } = await api("/api/tags");
-      setTags(t);
-      const { accounts: a } = await api("/api/accounts");
-      setAccounts(a);
-      const { feedback: fb } = await api("/api/feedback");
-      setFeedback(fb);
-      const { fields: ff } = await api("/api/form-fields");
-      setFields(withText(ff));
-      const { timeFrames: tf } = await api("/api/time-frames");
-      setTimeFrames(tf);
-      const { requests: dr } = await api("/api/ideas/delete-requests");
-      setDeleteRequests(dr);
-    } catch (e) { setErr(e.message); }
+      // One parallel wave — six sequential round trips made this page crawl.
+      const [t, a, fb, ff, tf, dr] = await Promise.all([
+        api("/api/tags"), api("/api/accounts"), api("/api/feedback"),
+        api("/api/form-fields"), api("/api/time-frames"), api("/api/ideas/delete-requests"),
+      ]);
+      setTags(t.tags);
+      setAccounts(a.accounts);
+      setFeedback(fb.feedback);
+      setFields(withText(ff.fields));
+      setTimeFrames(tf.timeFrames);
+      setDeleteRequests(dr.requests);
+    } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
 
   useEffect(() => {
@@ -80,6 +81,9 @@ function ManagePage() {
       load();
     }).catch(() => setMe(null));
   }, [load]);
+
+  // Pick up other admins' changes when you come back to the tab.
+  useRevalidateOnFocus(() => { if (me) load(); }, { enabled: Object.values(dirty).every((v) => !v) });
 
   const run = async (fn, okMsg) => { setErr(""); try { await fn(); if (okMsg) { setToast(okMsg); setTimeout(() => setToast(""), 2500); } } catch (e) { setErr(e.message); } };
 
@@ -140,7 +144,7 @@ function ManagePage() {
       <AppHeader crumb="Manage" />
 
       <main style={{ maxWidth: 960, margin: "0 auto", padding: "24px 22px 0" }}>
-        {me === undefined ? (
+        {me === undefined || (me && !ready) ? (
           <Loading label="Loading" />
         ) : me === null ? (
           <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>Admins only. <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>

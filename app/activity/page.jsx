@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
+import useRevalidateOnFocus from "../useRevalidateOnFocus";
 
 async function api(path) {
   const res = await fetch(path);
@@ -19,13 +20,14 @@ export default function ActivityPage() {
   const [entries, setEntries] = useState([]);
   const [days, setDays] = useState(14);
   const [err, setErr] = useState("");
+  const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
     setErr("");
     try {
       const { entries: e, retentionDays } = await api("/api/audit");
       setEntries(e); setDays(retentionDays || 14);
-    } catch (e) { setErr(e.message); }
+    } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
 
   useEffect(() => {
@@ -35,11 +37,13 @@ export default function ActivityPage() {
     }).catch(() => setMe(null));
   }, [load]);
 
+  useRevalidateOnFocus(() => { if (me) load(); });
+
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <AppHeader crumb="Activity" />
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 22px 0" }}>
-        {me === undefined ? (
+        {me === undefined || (me && !ready) ? (
           <Loading label="Loading activity" />
         ) : me === null ? (
           <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>Admins only. <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>

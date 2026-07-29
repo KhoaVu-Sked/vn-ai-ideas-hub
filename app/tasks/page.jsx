@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
+import useRevalidateOnFocus from "../useRevalidateOnFocus";
 
 async function api(path, init) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -19,10 +20,11 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState("");
   const [err, setErr] = useState("");
+  const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
     setErr("");
-    try { const { tasks: t } = await api("/api/tasks"); setTasks(t); } catch (e) { setErr(e.message); }
+    try { const { tasks: t } = await api("/api/tasks"); setTasks(t); } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
 
   useEffect(() => {
@@ -31,6 +33,8 @@ export default function TasksPage() {
       setMe(d.user); load();
     }).catch(() => setMe(null));
   }, [load]);
+
+  useRevalidateOnFocus(() => { if (me) load(); });
 
   const run = async (fn, revert) => { setErr(""); try { await fn(); } catch (e) { if (revert) revert(); setErr(e.message); } };
 
@@ -58,7 +62,7 @@ export default function TasksPage() {
       <AppHeader crumb="Tasks" />
 
       <main style={{ maxWidth: 720, margin: "0 auto", padding: "24px 22px 0" }}>
-        {me === undefined ? (
+        {me === undefined || (me && !ready) ? (
           <Loading label="Loading tasks" />
         ) : me === null ? (
           <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>Admins only. <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>

@@ -8,6 +8,7 @@ import TagChip from "./TagChip";
 import AppHeader from "./AppHeader";
 import SubmitModal from "./SubmitModal";
 import Loading from "./Loading";
+import useRevalidateOnFocus from "./useRevalidateOnFocus";
 
 // ─────────────────────────────────────────────────────────────
 // AI Ideas Hub — board
@@ -88,6 +89,8 @@ function Board() {
   }, []);
   useEffect(() => { if (searchParams.get("submit") === "1") setShowSubmit(true); }, [searchParams]);
   useEffect(() => { const q = searchParams.get("q"); if (q) setSearch(q); }, [searchParams]);
+  // Someone else may have changed an idea while this tab sat idle.
+  useRevalidateOnFocus(loadList, { enabled: !showSubmit });
 
   // Preview drawer — light detail, cache-first.
   const openPreview = useCallback(async (p) => {
