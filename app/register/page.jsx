@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SkeduloMark from "../SkeduloMark";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [step, setStep] = useState("details");   // details → verify
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -49,8 +47,9 @@ export default function RegisterPage() {
     setBusy(true); setErr("");
     try {
       await post("/api/auth/register/verify", { email: email.trim(), code: code.trim() });
-      router.replace("/");
-      router.refresh();
+      // Full load — see the note in /login: the root-layout session provider
+      // doesn't refetch on a client-side navigation.
+      window.location.href = "/";
     } catch (e) { setErr(e.message); setBusy(false); }
   };
 

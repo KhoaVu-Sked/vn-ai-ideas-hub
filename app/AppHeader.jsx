@@ -96,12 +96,12 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
           style={me?.avatar_url ? { padding: 0, overflow: "hidden" } : me ? { background: avatarColor(me) } : undefined}
           onClick={() => setOpenMenu((m) => (m === "avatar" ? null : "avatar"))}
         >
-          {me?.avatar_url ? <Avatar person={me} size={34} /> : initialsOf(me?.name || me?.username || "")}
+          {me?.avatar_url ? <Avatar person={me} size={34} /> : me ? initialsOf(me.name || me.username) : ""}
         </button>
         {openMenu === "avatar" && (
           <div className="hdr-menu hdr-menu--right">
             <div style={{ padding: "6px 10px 8px", fontSize: 12, color: "var(--muted)", borderBottom: "1px solid var(--line)", marginBottom: 4 }}>
-              Signed in as <b style={{ color: "var(--ink)" }}>{me?.username}</b>{admin ? " · admin" : ""}
+              {me ? <>Signed in as <b style={{ color: "var(--ink)" }}>{me.username}</b>{admin ? " · admin" : ""}</> : "Loading…"}
             </div>
             <Link href="/profile" onClick={() => setOpenMenu(null)}>My profile</Link>
             <a href="#" className="hdr-menu__danger" onClick={(e) => { e.preventDefault(); signOut(); }}>Sign out</a>

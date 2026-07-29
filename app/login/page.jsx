@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import SkeduloMark from "../SkeduloMark";
 import { APP_NAME } from "@/lib/brand";
@@ -11,7 +11,6 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [resetDone, setResetDone] = useState(false);
   useEffect(() => { if (searchParams.get("reset") === "1") setResetDone(true); }, [searchParams]);
@@ -36,8 +35,9 @@ function LoginForm() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `Sign-in failed (${res.status})`);
-      router.replace("/");
-      router.refresh();
+      // Full load, not router.replace: the session provider lives in the root
+      // layout and wouldn't refetch on a client-side navigation.
+      window.location.href = "/";
     } catch (e) {
       setErr(e.message);
       setBusy(false);
