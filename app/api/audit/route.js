@@ -1,12 +1,29 @@
 import { listAuditEntries, AUDIT_RETENTION_DAYS, jsonError } from "@/lib/db";
 import { requireAdmin } from "@/lib/guard";
 
-// GET /api/audit → recent activity (admin only). Entries older than the
-// retention window are pruned automatically whenever a new one is written.
-export async function GET() {
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const clean = (v) => (v && v.trim() ? v.trim() : null);
+const day = (v) => (v && DATE.test(v) ? v : null);
+// Postgres rejects an unknown zone name, so bounce it off Intl first.
+function zone(v) {
+  if (!v) return "UTC";
+  try { new Intl.DateTimeFormat("en", { timeZone: v }); return v; } catch { return "UTC"; }
+}
+
+// GET /api/audit?actor=&type=&from=&to=&tz= → recent activity (admin only).
+// Entries older than the retention window are pruned whenever a new one lands.
+export async function GET(request) {
   try {
     await requireAdmin();
-    return Response.json({ entries: await listAuditEntries(200), retentionDays: AUDIT_RETENTION_DAYS });
+    const p = new URL(request.url).searchParams;
+    const data = await listAuditEntries({
+      actor: clean(p.get("actor")),
+      type: clean(p.get("type")),
+      from: day(p.get("from")),
+      to: day(p.get("to")),
+      tz: zone(p.get("tz")),
+    });
+    return Response.json({ ...data, retentionDays: AUDIT_RETENTION_DAYS });
   } catch (e) {
     return jsonError(e, "Could not load the audit log.");
   }
