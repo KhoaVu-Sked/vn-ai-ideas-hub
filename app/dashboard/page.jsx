@@ -137,7 +137,7 @@ export default function DashboardPage() {
                         const sm = STATUS_META[e.status] || STATUS_META.Submitted;
                         return (
                           <tr key={e.id} style={{ borderTop: "1px solid var(--line)" }}>
-                            <td style={{ padding: "8px", fontWeight: 700, color: "var(--ink)" }}>
+                            <td className="breakable" style={{ padding: "8px", fontWeight: 700, color: "var(--ink)", maxWidth: 260 }}>
                               <Link href={`/idea/${e.id}`} style={{ color: "var(--ink)", textDecoration: "none" }}>{e.name}</Link>
                             </td>
                             <td style={{ padding: "8px" }}><span style={{ color: sm.fg, fontWeight: 700 }}>{e.status}</span></td>

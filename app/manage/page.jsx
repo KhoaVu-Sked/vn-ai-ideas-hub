@@ -168,7 +168,7 @@ function ManagePage() {
                 {tags.map((t) => {
                   const color = t.color || defaultTagColor(t.name); const ts = tagPill(t.name, { [t.name]: color });
                   return (
-                    <span key={t.name} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: ts.bg, color: ts.fg, borderRadius: 999, padding: "4px 8px", fontSize: 12, fontWeight: 700 }}>
+                    <span key={t.name} className="breakable" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: ts.bg, color: ts.fg, borderRadius: 999, padding: "4px 8px", fontSize: 12, fontWeight: 700 }}>
                       <input type="color" value={color} onChange={(e) => setColor(t.name, e.target.value)} title="Tag color" style={{ width: 20, height: 20, border: "none", background: "none", padding: 0, cursor: "pointer", borderRadius: "50%" }} />
                       {t.name}
                       <button onClick={() => delTag(t.name)} title="Delete tag" style={{ border: "none", background: "rgba(0,0,0,0.08)", color: ts.fg, borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✕</button>
@@ -344,7 +344,7 @@ function ManagePage() {
                   {feedback.map((f) => (
                     <div key={f.id} style={{ background: f.status === "resolved" ? "#f6f8fb" : "#fff", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px", opacity: f.status === "resolved" ? 0.7 : 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{f.submitter}</span>
+                        <span className="breakable" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{f.submitter}</span>
                         <span style={{ fontSize: 11, color: "var(--faint)" }}>{f.date}</span>
                         {f.page && <span style={{ fontSize: 11, color: "var(--muted)", background: "var(--bg)", borderRadius: 5, padding: "1px 6px" }}>{f.page}</span>}
                         {f.status === "resolved" && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#469b58", background: "#ebf6ed", borderRadius: 999, padding: "1px 8px" }}>resolved</span>}
@@ -372,7 +372,7 @@ function ManagePage() {
                   {deleteRequests.map((r) => (
                     <div key={r.id} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
-                        <Link href={`/idea/${r.id}`} style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", textDecoration: "none" }}>{r.name}</Link>
+                        <Link href={`/idea/${r.id}`} className="breakable" style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", textDecoration: "none" }}>{r.name}</Link>
                         <span style={{ fontSize: 11, color: "var(--faint)" }}>{r.number} · by {r.requester} · {r.date}</span>
                         <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
                           <button onClick={() => deleteIdeaNow(r)} style={{ ...primary, background: "#d53c30" }}>Delete idea</button>

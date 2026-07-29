@@ -64,8 +64,8 @@ export default function ActivityPage() {
                     <span style={{ fontSize: 11.5, color: "var(--faint)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", minWidth: 140 }}>
                       {new Date(e.at).toLocaleString()}
                     </span>
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap" }}>{e.actor}</span>
-                    <span style={{ fontSize: 12.5, color: "var(--body)" }}>{e.action}</span>
+                    <span className="breakable" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{e.actor}</span>
+                    <span className="breakable" style={{ fontSize: 12.5, color: "var(--body)" }}>{e.action}</span>
                   </div>
                 ))}
               </div>

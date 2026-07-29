@@ -29,7 +29,14 @@ body {
   background: var(--bg);
   color: var(--body);
   font-family: var(--font-inter), system-ui, sans-serif;
+  /* Idea names and comments arrive as free text — one unbroken string must
+     break rather than widen the card it sits in. */
+  overflow-wrap: break-word;
 }
+
+/* break-word leaves min-content intact, so a flex item still pushes its row
+   wide. For free text sitting directly in a flex row, use this. */
+.breakable { min-width: 0; overflow-wrap: anywhere; }
 
 button {
   font-family: inherit;

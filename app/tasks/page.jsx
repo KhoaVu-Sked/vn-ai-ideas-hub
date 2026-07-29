@@ -101,7 +101,7 @@ function Row({ task, onToggle, onRemove }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 8, padding: "9px 12px" }}>
       <input type="checkbox" checked={task.done} onChange={() => onToggle(task)} style={{ width: 16, height: 16, cursor: "pointer" }} />
-      <span style={{ flex: 1, fontSize: 13.5, color: task.done ? "var(--faint)" : "var(--body)", textDecoration: task.done ? "line-through" : "none" }}>{task.title}</span>
+      <span className="breakable" style={{ flex: 1, fontSize: 13.5, color: task.done ? "var(--faint)" : "var(--body)", textDecoration: task.done ? "line-through" : "none" }}>{task.title}</span>
       <span style={{ fontSize: 11, color: "var(--faint)" }}>{task.created}</span>
       <button onClick={() => onRemove(task)} title="Delete" style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>✕</button>
     </div>

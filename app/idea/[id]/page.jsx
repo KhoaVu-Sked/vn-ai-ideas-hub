@@ -380,7 +380,7 @@ export default function IdeaPage() {
                 <div key={r.id} style={{ background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
                     <Avatar name={r.author} i={i} size={24} />
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{r.author}</span>
+                    <span className="breakable" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{r.author}</span>
                     <span style={{ fontSize: 11, color: "var(--faint)" }}>{r.date}</span>
                     {(r.mine || canEdit) && <button onClick={() => removeRequest(r.id)} title="Remove" style={{ marginLeft: "auto", border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>}
                   </div>
