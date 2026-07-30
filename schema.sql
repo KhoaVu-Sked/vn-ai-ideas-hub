@@ -97,17 +97,38 @@ create table if not exists likes (
   primary key (idea_id, account_id)
 );
 
--- Requests / input — task-like items on an idea; author can remove, lead can triage.
+-- Requests — the cards on an idea's Task board. Author can remove, lead triages.
 create table if not exists requests (
-  id         uuid primary key default gen_random_uuid(),
-  idea_id    uuid not null references ideas(id) on delete cascade,
-  account_id uuid not null references accounts(id) on delete cascade,
-  body       text not null,
-  state      text not null default 'open',   -- open | accepted | under_discussion | declined | closed
-  created_at timestamptz not null default now(),
-  updated_at timestamptz                     -- set when the author edits the body
+  id          uuid primary key default gen_random_uuid(),
+  seq         bigserial,                      -- human number → T-007
+  idea_id     uuid not null references ideas(id) on delete cascade,
+  account_id  uuid not null references accounts(id) on delete cascade,
+  title       text,                           -- the only thing the card shows
+  body        text not null,                  -- detail, revealed on open
+  assignee_id uuid references accounts(id) on delete set null,
+  start_date  date,
+  due_date    date,
+  state       text not null default 'pending_approval',
+                       -- pending_approval | accepted | in_progress | done | declined
+  position    integer not null default 0,     -- order within a board column
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz                     -- set when the author edits it
 );
 create index if not exists requests_idea_id_idx on requests (idea_id);
+create index if not exists requests_board_idx on requests (idea_id, state, position);
+
+-- Discussion. request_id null → the idea's Overview thread; set → a task thread.
+create table if not exists comments (
+  id         uuid primary key default gen_random_uuid(),
+  idea_id    uuid not null references ideas(id) on delete cascade,
+  request_id uuid references requests(id) on delete cascade,
+  account_id uuid not null references accounts(id) on delete cascade,
+  body       text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz
+);
+create index if not exists comments_idea_idx    on comments (idea_id, created_at);
+create index if not exists comments_request_idx on comments (request_id, created_at);
 
 -- Follows — notify members on updates (email wiring comes later).
 create table if not exists follows (
@@ -220,6 +241,17 @@ alter table accounts add column if not exists avatar_url text;
 alter table accounts add column if not exists region text;
 alter table accounts add column if not exists timezone text;
 alter table requests add column if not exists updated_at timestamptz;
+alter table requests add column if not exists title text;
+alter table requests add column if not exists assignee_id uuid references accounts(id) on delete set null;
+alter table requests add column if not exists start_date date;
+alter table requests add column if not exists due_date date;
+alter table requests add column if not exists position integer not null default 0;
+alter table requests add column if not exists seq bigserial;
+create index if not exists requests_board_idx on requests (idea_id, state, position);
+update requests set title = case when length(body) > 60 then left(body, 57) || '…' else body end
+  where title is null or title = '';
+update requests set state = 'pending_approval' where state in ('open', 'under_discussion');
+update requests set state = 'done' where state = 'closed';
 
 -- Merge "Project Lead" + "Initiator / Idea Lead" into "Initiator / Project Lead".
 -- The old index has the same NAME but the old predicate, so `if not exists`
