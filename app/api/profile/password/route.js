@@ -1,4 +1,4 @@
-import { after } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getPasswordHash, setAccountPassword, rotateSessionId, jsonError } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { requireUser } from "@/lib/guard";
@@ -32,7 +32,7 @@ export async function PATCH(request) {
       actorId: user.uid, actor: user.name || user.username,
       action: "changed their password", entity: "account", entityId: user.uid,
     }));
-    const res = Response.json({ ok: true, signedOut: true });
+    const res = NextResponse.json({ ok: true, signedOut: true });
     res.cookies.set(COOKIE_NAME, "", { path: "/", maxAge: 0 });
     return res;
   } catch (e) {
