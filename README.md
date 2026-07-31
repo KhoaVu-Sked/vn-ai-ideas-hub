@@ -2,6 +2,19 @@
 
 One home for the team's AI ideas — submit them, follow them on a board, and ship them. Next.js frontend + API routes on Vercel; **Neon Postgres is the data layer** (accessed server-side only).
 
+## 📘 Guides
+
+| Guide | Who it's for | Read |
+|---|---|---|
+| **User Guideline** | Everyone on the team | [PDF](docs/user-guide.pdf) · [HTML](docs/user-guide.html) |
+| **Admin Guideline** | Administrators only | [PDF](docs/admin-guide.pdf) · [HTML](docs/admin-guide.html) |
+
+Both are written against the production build. The HTML versions are self-contained — no fonts, scripts or images to load — so they open straight from a file share or an attachment. Regenerate the PDFs after editing the HTML:
+
+```bash
+npm run docs:pdf
+```
+
 Interaction design (the fetch-scoping that keeps it fast and cheap):
 
 - **Refresh fetches the light project list only** (name, status, tags, people)

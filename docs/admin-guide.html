@@ -254,6 +254,46 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
 .end{margin-top:60px;padding-top:26px;border-top:1px solid var(--line);
   font-size:13px;color:var(--faint)}
+
+/* ── Print / PDF ──────────────────────────────────────────────
+   Backgrounds carry meaning in this document — the navy masthead, the blue
+   app bar, every status pill — so print-color-adjust must keep them. A PDF
+   has no viewer theme either, so the light palette is pinned. */
+@page{size:A4;margin:14mm 14mm 16mm}
+@media print{
+  :root{
+    color-scheme:light;
+    --ink:#0b1e49; --body:#2e3640; --muted:#5e687a; --faint:#5a6478;
+    --line:#d8dee8; --line-soft:#eef1f6; --ground:#ffffff; --surface:#ffffff;
+    --accent:#0055ff; --brand:#007ee6;
+    --good:#1f7a4d; --warn:#9a6300; --bad:#c4342a;
+    --good-bg:#e7f4ec; --warn-bg:#fdf3e0; --bad-bg:#fdecea; --code-bg:#f0f3f8;
+  }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{background:#fff;font-size:10pt;line-height:1.5}
+
+  .mast{padding:22px 24px;border-radius:10px;margin-bottom:8px}
+  .mast h1{font-size:26pt}
+  .mast p{font-size:10.5pt}
+
+  /* One column: the sticky rail has no meaning on paper. */
+  .shell{display:block;max-width:none;padding:0}
+  .toc{position:static;padding:14px 18px;border:1px solid var(--line);
+       border-radius:10px;margin:0 0 6px;break-inside:avoid}
+  .toc ol{columns:2;column-gap:26px}
+  main{padding-top:0}
+
+  /* Keep a heading with its text, and never split a screenshot or a table. */
+  section{break-inside:auto}
+  section + section{margin-top:22px;padding-top:20px}
+  h2,h3,h4{break-after:avoid}
+  .sec-num{break-after:avoid}
+  figure,.tw,.note,.steps > li{break-inside:avoid}
+  figcaption{break-before:avoid}
+  .ui{box-shadow:none}
+  a{text-decoration:none}
+  .end{margin-top:26px}
+}
 </style>
 <header class="mast">
   <div class="mast__in">

@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "docs:pdf": "for f in user-guide admin-guide; do \"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --no-pdf-header-footer --run-all-compositor-stages-before-draw --virtual-time-budget=6000 --print-to-pdf=\"$PWD/docs/$f.pdf\" \"file://$PWD/docs/$f.html\"; done"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
