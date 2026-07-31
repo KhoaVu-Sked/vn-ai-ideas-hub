@@ -52,6 +52,7 @@ create table if not exists accounts (
   avatar_url    text,                                    -- private blob, served via /api/avatars/:id
   region        text,
   timezone      text,                                    -- IANA zone, e.g. Asia/Ho_Chi_Minh
+  session_id    uuid not null default gen_random_uuid(), -- rotates on sign-in; one live session
   created_at    timestamptz not null default now()
 );
 -- (the accounts_email unique index is created in the migration block below, after
@@ -221,6 +222,7 @@ alter table accounts add column if not exists avatar_color text;
 alter table accounts add column if not exists avatar_url text;
 alter table accounts add column if not exists region text;
 alter table accounts add column if not exists timezone text;
+alter table accounts add column if not exists session_id uuid not null default gen_random_uuid();
 alter table requests add column if not exists updated_at timestamptz;
 
 -- Merge "Project Lead" + "Initiator / Idea Lead" into "Initiator / Project Lead".

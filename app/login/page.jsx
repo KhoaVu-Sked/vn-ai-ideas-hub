@@ -13,7 +13,13 @@ export default function LoginPage() {
 function LoginForm() {
   const searchParams = useSearchParams();
   const [resetDone, setResetDone] = useState(false);
-  useEffect(() => { if (searchParams.get("reset") === "1") setResetDone(true); }, [searchParams]);
+  // Why they landed here, when it wasn't their own doing.
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (searchParams.get("reset") === "1") setResetDone(true);
+    if (searchParams.get("changed") === "1") setNotice("Password changed. Sign in with your new one.");
+    else if (searchParams.get("ended") === "1") setNotice("Your session ended — you signed in on another device, or your password changed.");
+  }, [searchParams]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -55,6 +61,11 @@ function LoginForm() {
           <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)" }}>{APP_NAME}</span>
         </div>
 
+        {notice && !resetDone && (
+          <div style={{ background: "#fcf1e8", border: "1px solid #f4c8a4", color: "#9f5314", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
+            {notice}
+          </div>
+        )}
         {resetDone && (
           <div style={{ background: "#ebf6ed", border: "1px solid #bde2c5", color: "#2f7a43", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
             ✓ Password updated — sign in with your new password.

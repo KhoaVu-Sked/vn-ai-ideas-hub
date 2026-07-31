@@ -421,6 +421,9 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <p>The reset screen gives the same confirmation whether or not an account matches what you typed. That is deliberate — it stops the page being used to discover who has an account.</p>
       </div>
 
+      <h3>One session at a time</h3>
+      <p>You can be signed in on <b>one device at a time</b>. Signing in somewhere else ends the earlier session — the first device returns to the sign-in page and says why. Changing your password does the same thing.</p>
+
       <h3>Session timeout</h3>
       <p>You are signed out after <b>30 minutes of inactivity</b>. At 25 minutes a prompt appears so you never lose work without warning.</p>
       <figure>
@@ -892,7 +895,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
             </div>
             <div class="ui-panel" style="margin-top:10px">
               <div class="ui-h" style="font-size:13px;margin-bottom:3px">Change password</div>
-              <p class="ui-meta" style="margin:0 0 11px">Changing it for <b>khoa.vu</b>. You stay signed in on this device.</p>
+              <p class="ui-meta" style="margin:0 0 11px">Changing it for <b>khoa.vu</b>. You&apos;ll be signed out and asked to sign in again.</p>
               <div class="ui-label">Current password</div>
               <div class="ui-input ui-faint" style="display:block;margin-bottom:9px">••••••••</div>
               <div class="ui-label">New password</div>
@@ -918,7 +921,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <h3>Changing your password</h3>
       <p>The <b>Change password</b> panel sits below your profile. Enter your current password, then the new one twice. It always acts on the account you are signed in as — there is no email address to type, so you cannot change the wrong person's password by mistake.</p>
-      <p>You stay signed in on this device afterwards. If you have forgotten your current password, sign out and use <b>Forgot password</b> instead, which sends a code to your registered address.</p>
+      <p>Changing it <b>signs you out everywhere</b>, including this device — you then sign in with the new password. If you have forgotten your current one, sign out and use <b>Forgot password</b> on the sign-in page, which sends a code to your registered address.</p>
     </section>
 
     <!-- 13 ──────────────────────────────────────────────────── -->
@@ -934,6 +937,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
             <tr><td>Who can register</td><td class="num"><b>@skedulo.com</b> addresses only</td></tr>
             <tr><td>Sign-up and reset codes</td><td class="num">6 digits · valid 10 minutes · 5 attempts</td></tr>
             <tr><td>Session timeout</td><td class="num">30 minutes idle · warning at 25</td></tr>
+            <tr><td>Sessions per account</td><td class="num">1 — a new sign-in ends the previous one</td></tr>
             <tr><td>Idea attachment</td><td class="num">5 MB per file · Word, Excel, PDF, images</td></tr>
             <tr><td>Profile photo</td><td class="num">2 MB · PNG, JPG, GIF, WebP</td></tr>
             <tr><td>Project Leads per idea</td><td class="num">1</td></tr>

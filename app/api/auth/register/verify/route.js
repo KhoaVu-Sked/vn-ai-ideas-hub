@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import {
   getLiveSignupCode, recordSignupAttempt, consumeSignupCode,
-  createRegisteredAccount, jsonError,
+  createRegisteredAccount, rotateSessionId, jsonError,
 } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth";
 import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
@@ -41,7 +41,8 @@ export async function POST(request) {
       action: "created an account and verified their email", entity: "account", entityId: acct.id,
     }));
 
-    const token = await signSession({ uid: acct.id, username: acct.username, role: acct.role });
+    const sid = await rotateSessionId(acct.id);
+    const token = await signSession({ uid: acct.id, username: acct.username, role: acct.role, sid });
     const res = NextResponse.json({ user: { username: acct.username, role: acct.role } });
     res.cookies.set(COOKIE_NAME, token, cookieOptions);
     return res;

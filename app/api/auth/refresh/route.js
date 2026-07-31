@@ -7,7 +7,9 @@ import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
 export async function POST() {
   try {
     const user = await requireUser();
-    const token = await signSession({ uid: user.uid, username: user.username, name: user.name, role: user.role });
+    // sid must be carried through — re-signing without it would invalidate
+    // the session on its first slide.
+    const token = await signSession({ uid: user.uid, username: user.username, name: user.name, role: user.role, sid: user.sid });
     const res = NextResponse.json({ ok: true });
     res.cookies.set(COOKIE_NAME, token, cookieOptions);
     return res;

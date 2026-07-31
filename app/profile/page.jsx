@@ -104,7 +104,10 @@ export default function ProfilePage() {
       await api("/api/profile/password", { method: "PATCH", body: JSON.stringify({ current: pw.current, next: pw.next }) });
       setPw({ current: "", next: "", confirm: "" });
       setPwDone(true);
-    } catch (e) { setPwErr(e.message); } finally { setPwBusy(false); }
+      // The new password retires this session too — full load so nothing
+      // client-side keeps using the dead cookie.
+      setTimeout(() => { window.location.href = "/login?changed=1"; }, 1200);
+    } catch (e) { setPwErr(e.message); setPwBusy(false); }
   };
 
   const photo = avatarSrc(me);
@@ -222,7 +225,7 @@ export default function ProfilePage() {
           <form onSubmit={changePassword} style={{ ...card, marginTop: 16 }}>
             <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", margin: "0 0 4px" }}>Change password</h2>
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
-              Changing it for <b style={{ color: "var(--ink)" }}>{me.username}</b>. You stay signed in on this device.
+              Changing it for <b style={{ color: "var(--ink)" }}>{me.username}</b>. You&apos;ll be signed out and asked to sign in again.
             </div>
 
             <div style={label}>Current password</div>
@@ -240,8 +243,7 @@ export default function ProfilePage() {
               <button type="submit" disabled={pwBusy || !pw.current || !pw.next} style={{ ...btn, background: "var(--blue)", color: "#fff", border: "none", cursor: pwBusy ? "wait" : "pointer" }}>
                 {pwBusy ? "Changing…" : "Change password"}
               </button>
-              {pwDone && <span style={{ fontSize: 12.5, color: "#2f9e44", fontWeight: 700 }}>Password changed</span>}
-              <Link href="/forgot" style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)" }}>Forgotten it?</Link>
+              {pwDone && <span style={{ fontSize: 12.5, color: "#2f9e44", fontWeight: 700 }}>Password changed — signing you out…</span>}
             </div>
           </form>
           </>

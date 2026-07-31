@@ -1,7 +1,8 @@
 import { after } from "next/server";
-import { getPasswordHash, setAccountPassword, jsonError } from "@/lib/db";
+import { getPasswordHash, setAccountPassword, rotateSessionId, jsonError } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { requireUser } from "@/lib/guard";
+import { COOKIE_NAME } from "@/lib/session";
 import { audit } from "@/lib/notify";
 
 // PATCH /api/profile/password { current, next } → change your own password.
@@ -24,11 +25,16 @@ export async function PATCH(request) {
     }
 
     await setAccountPassword(user.uid, await hashPassword(next));
+    // A new password should end every session started with the old one — this
+    // device included, so you sign back in and prove you know the new one.
+    await rotateSessionId(user.uid);
     after(() => audit({
       actorId: user.uid, actor: user.name || user.username,
       action: "changed their password", entity: "account", entityId: user.uid,
     }));
-    return Response.json({ ok: true });
+    const res = Response.json({ ok: true, signedOut: true });
+    res.cookies.set(COOKIE_NAME, "", { path: "/", maxAge: 0 });
+    return res;
   } catch (e) {
     return jsonError(e, "Could not change your password.");
   }
