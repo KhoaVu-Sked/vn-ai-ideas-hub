@@ -162,8 +162,7 @@ figcaption b{color:var(--muted);font-weight:600}
   gap:6px;padding:0 13px;color:#fff}
 .ui-logo{display:flex;align-items:center;gap:8px;font-family:var(--display);
   font-weight:700;font-size:14px;padding-right:6px;white-space:nowrap}
-.ui-mark{width:20px;height:20px;border-radius:5px;background:rgba(255,255,255,.28);
-  display:flex;align-items:center;justify-content:center;font-size:11px}
+.ui-mark{display:flex;align-items:center;justify-content:center}
 .ui-nav{display:flex;gap:2px}
 .ui-nav span{padding:6px 9px;border-radius:5px;font-size:12px;font-weight:500;white-space:nowrap}
 .ui-nav .on{background:rgba(255,255,255,.18)}
@@ -229,7 +228,26 @@ figcaption b{color:var(--muted);font-weight:600}
 
 .ui-bars{display:flex;flex-direction:column;gap:6px}
 .ui-bars > div{display:flex;align-items:center;gap:8px;font-size:11px}
-.ui-bars i{height:16px;border-radius:4px;display:block}
+/* Fixed label and count columns, flexible track between them — otherwise the
+   longest label shrinks and its bar starts on a different axis to the rest. */
+.ui-bars > div > span:first-child{width:78px;flex:none;color:var(--u-muted)}
+.ui-bars .trk{flex:1;height:16px;background:#eef1f6;border-radius:4px;overflow:hidden}
+.ui-bars i{display:block;height:100%;border-radius:4px}
+.ui-bars > div > b{width:16px;flex:none;text-align:right;font-size:10.5px;
+  color:var(--u-ink);font-variant-numeric:tabular-nums}
+
+/* Hover menu, positioned against its trigger rather than a guessed offset */
+.ui-nav .ui-menuwrap{position:relative;padding:0}   /* beats .ui-nav span */
+.ui-menu{position:absolute;top:calc(100% + 6px);left:0;background:#fff;
+  border:1px solid var(--u-line);border-radius:9px;padding:5px;width:158px;
+  box-shadow:0 10px 28px rgba(11,30,73,.16);display:flex;flex-direction:column}
+.ui-menu span{padding:6px 9px;font-size:11.5px;font-weight:600;color:var(--u-body);border-radius:5px}
+.ui-menu span.on{background:var(--u-bg)}
+
+/* Table-like rows that must not wrap; the wrapper scrolls if space is tight */
+.ui-tablewrap{overflow-x:auto}
+.ui-tablewrap > div{min-width:560px}
+.ui-tablewrap span{flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
   border-bottom-width:2px;border-radius:5px;padding:1px 6px;background:var(--surface);color:var(--ink)}
@@ -312,24 +330,20 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <figure>
         <div class="ui">
           <div class="ui-bar">
-            <span class="ui-logo"><span class="ui-mark">◈</span>VN TS - AI Ideas Hub</span>
+            <span class="ui-logo"><span class="ui-mark"><svg viewBox="0 0 701 499" width="17" height="12" fill="none" aria-hidden="true"><path d="M589.851 0.367H289.886c-29.512 0-57.814 11.648-78.682 32.382C190.337 53.483 178.613 81.604 178.613 110.926s11.724 57.443 32.591 78.176c20.868 20.734 49.17 32.382 78.682 32.382h299.965c29.511 0 57.814-11.648 78.681-32.382 20.868-20.733 32.591-48.854 32.591-78.176s-11.723-57.443-32.591-78.177C647.665 12.015 619.362.367 589.851.367z" fill="#fff"/><path d="M409.331 277.321h-300c-29.174.515-56.977 12.391-77.425 33.072C11.457 331.074 0 358.906 0 387.897c0 28.992 11.457 56.824 31.906 77.505 20.448 20.681 48.251 32.557 77.425 33.071h300c29.174-.514 56.978-12.39 77.426-33.071 20.449-20.681 31.906-48.513 31.906-77.505 0-28.991-11.457-56.823-31.906-77.504-20.448-20.681-48.252-32.557-77.426-33.072z" fill="#fff"/></svg></span>VN TS - AI Ideas Hub</span>
             <span class="ui-nav">
-              <span class="on">Board</span><span>Dashboard</span><span>Tasks</span><span>Activity</span><span>Manage ▾</span>
+              <span class="on">Board</span><span>Dashboard</span><span>Tasks</span><span>Activity</span>
+              <span class="ui-menuwrap"><span>Manage ▾</span>
+                <span class="ui-menu">
+                  <span>Tags</span><span class="on">Form fields</span><span>User accounts</span><span>Feedback</span><span>Delete requests</span>
+                </span>
+              </span>
             </span>
             <span class="ui-search">⌕ Search ideas</span>
             <span class="ui-plus">+</span>
             <span class="ui-av">KV</span>
           </div>
-          <div class="ui-body" style="height:104px;position:relative">
-            <div style="position:absolute;left:196px;top:0;background:#fff;border:1px solid #e4e7ed;border-radius:9px;
-                        box-shadow:0 10px 28px rgba(11,30,73,.16);padding:5px;width:158px">
-              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640">Tags</div>
-              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640;background:#f3f5f9;border-radius:5px">Form fields</div>
-              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640">User accounts</div>
-              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640">Feedback</div>
-              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640">Delete requests</div>
-            </div>
-          </div>
+          <div class="ui-body" style="height:182px"></div>
         </div>
         <figcaption><b>Admin top bar</b> — with the Manage menu open</figcaption>
       </figure>
@@ -357,12 +371,12 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
               <div class="ui-panel">
                 <div class="ui-h" style="font-size:12.5px;margin-bottom:10px">Pipeline funnel</div>
                 <div class="ui-bars">
-                  <div><span style="width:78px;color:#5e687a">Submitted</span><i style="width:62%;background:#3b5bdb"></i><b style="font-size:10.5px;color:#0b1e49">2</b></div>
-                  <div><span style="width:78px;color:#5e687a">In Review</span><i style="width:34%;background:#b7791f"></i><b style="font-size:10.5px;color:#0b1e49">1</b></div>
-                  <div><span style="width:78px;color:#5e687a">Approved</span><i style="width:6%;background:#147a5a"></i><b style="font-size:10.5px;color:#0b1e49">0</b></div>
-                  <div><span style="width:78px;color:#5e687a">In Progress</span><i style="width:88%;background:#2f9e44"></i><b style="font-size:10.5px;color:#0b1e49">3</b></div>
-                  <div><span style="width:78px;color:#5e687a">Pilot</span><i style="width:34%;background:#7048e8"></i><b style="font-size:10.5px;color:#0b1e49">1</b></div>
-                  <div><span style="width:78px;color:#5e687a">Launched</span><i style="width:62%;background:#2b8a3e"></i><b style="font-size:10.5px;color:#0b1e49">2</b></div>
+                  <div><span>Submitted</span><span class="trk"><i style="width:67%;background:#3b5bdb"></i></span><b>2</b></div>
+                  <div><span>In Review</span><span class="trk"><i style="width:33%;background:#b7791f"></i></span><b>1</b></div>
+                  <div><span>Approved</span><span class="trk"><i style="width:0;background:#147a5a"></i></span><b>0</b></div>
+                  <div><span>In Progress</span><span class="trk"><i style="width:100%;background:#2f9e44"></i></span><b>3</b></div>
+                  <div><span>Pilot</span><span class="trk"><i style="width:33%;background:#7048e8"></i></span><b>1</b></div>
+                  <div><span>Launched</span><span class="trk"><i style="width:67%;background:#2b8a3e"></i></span><b>2</b></div>
                 </div>
               </div>
               <div class="ui-panel">
@@ -441,24 +455,26 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
           <div class="ui-body">
             <div class="ui-panel">
               <div class="ui-h" style="font-size:13px;margin-bottom:11px">User accounts</div>
+              <div class="ui-tablewrap">
               <div style="display:flex;gap:8px;font-size:9.5px;font-weight:700;color:#5e687a;letter-spacing:.06em;text-transform:uppercase;padding-bottom:7px;border-bottom:1px solid #e4e7ed">
-                <span style="width:82px">Username</span><span style="width:132px">Email</span><span style="width:78px">Name</span><span style="width:62px">Role</span><span>Actions</span>
+                <span style="width:82px">Username</span><span style="width:148px">Email</span><span style="width:78px">Name</span><span style="width:76px">Role</span><span>Actions</span>
               </div>
               <div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #eef1f6;font-size:11px">
                 <span class="ui-input" style="width:82px;padding:4px 7px;color:#2e3640">khoa.vu</span>
-                <span class="ui-input" style="width:132px;padding:4px 7px;color:#2e3640">khoa.vu@skedulo.com</span>
+                <span class="ui-input" style="width:148px;padding:4px 7px;color:#2e3640">khoa.vu@skedulo.com</span>
                 <span class="ui-input" style="width:78px;padding:4px 7px;color:#2e3640">Khoa Vu</span>
-                <span class="ui-input" style="width:62px;padding:4px 7px;color:#2e3640">admin ▾</span>
+                <span class="ui-input" style="width:76px;padding:4px 7px;color:#2e3640">admin ▾</span>
                 <span class="ui-btn" style="padding:4px 8px">Reset pw</span>
                 <span class="ui-btn ui-btn--bad" style="padding:4px 8px">Delete</span>
               </div>
               <div style="display:flex;gap:8px;align-items:center;padding:8px 0;font-size:11px">
                 <span class="ui-input" style="width:82px;padding:4px 7px;color:#2e3640">trung.vo</span>
-                <span class="ui-input" style="width:132px;padding:4px 7px;color:#2e3640">trung.vo@skedulo.com</span>
+                <span class="ui-input" style="width:148px;padding:4px 7px;color:#2e3640">trung.vo@skedulo.com</span>
                 <span class="ui-input" style="width:78px;padding:4px 7px;color:#2e3640">Trung Vo</span>
-                <span class="ui-input" style="width:62px;padding:4px 7px;color:#2e3640">member ▾</span>
+                <span class="ui-input" style="width:76px;padding:4px 7px;color:#2e3640">member ▾</span>
                 <span class="ui-btn" style="padding:4px 8px">Reset pw</span>
                 <span class="ui-btn ui-btn--bad" style="padding:4px 8px">Delete</span>
+              </div>
               </div>
             </div>
           </div>
@@ -646,7 +662,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <li><b>The activity log ages out at 14 days.</b> If a decision needs a paper trail beyond that, record it as a request on the idea, where it is kept permanently.</li>
       </ul>
 
-      <p class="end">VN TS - AI Ideas Hub · Admin guideline · Read alongside the user guideline. Written against the production build, 31 July 2026. Screens are reproductions drawn from the application's own design tokens.</p>
+      <p class="end">VN TS - AI Ideas Hub · Admin guideline</p>
     </section>
 
   </main>

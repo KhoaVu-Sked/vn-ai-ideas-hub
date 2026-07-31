@@ -20,8 +20,9 @@ const label = { fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSp
 const field = { width: "100%", margin: "6px 0 16px", padding: "9px 12px", border: "1px solid #d5dce6", borderRadius: 8, fontSize: 13.5, outline: "none", background: "#fff", color: "var(--body)" };
 const btn = { border: "1px solid #d5dce6", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#fff", color: "#3a4a63" };
 
-// Common APAC-first options; the field stays free text so nobody is boxed in.
-const REGIONS = ["Vietnam", "Australia", "New Zealand", "Philippines", "India", "United Kingdom", "United States", "Other"];
+// A closed list — free text produced "VN", "Vietnam" and "vietnam" as three
+// different regions, which makes the field useless for grouping.
+const REGIONS = [["VN", "VN — Vietnam"], ["AU", "AU — Australia"], ["UK", "UK — United Kingdom"], ["US", "US — United States"]];
 
 export default function ProfilePage() {
   const [me, setMe] = useState(undefined);
@@ -161,11 +162,15 @@ export default function ProfilePage() {
             <input value={form.name} onChange={(e) => set("name", e.target.value)} style={field} />
 
             <div style={label}>Region</div>
-            <input
-              value={form.region} onChange={(e) => set("region", e.target.value)}
-              list="profile-regions" placeholder="e.g. Vietnam" style={field}
-            />
-            <datalist id="profile-regions">{REGIONS.map((r) => <option key={r} value={r} />)}</datalist>
+            <select value={form.region} onChange={(e) => set("region", e.target.value)} style={field}>
+              <option value="">Not set</option>
+              {/* Keep whatever an older free-text entry held, so saving the form
+                  doesn't silently wipe it. */}
+              {form.region && !REGIONS.some(([code]) => code === form.region) && (
+                <option value={form.region}>{form.region}</option>
+              )}
+              {REGIONS.map(([code, text]) => <option key={code} value={code}>{text}</option>)}
+            </select>
 
             <div style={label}>Timezone</div>
             <select value={form.timezone} onChange={(e) => set("timezone", e.target.value)} style={field}>

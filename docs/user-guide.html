@@ -162,8 +162,7 @@ figcaption b{color:var(--muted);font-weight:600}
   gap:6px;padding:0 13px;color:#fff}
 .ui-logo{display:flex;align-items:center;gap:8px;font-family:var(--display);
   font-weight:700;font-size:14px;padding-right:6px;white-space:nowrap}
-.ui-mark{width:20px;height:20px;border-radius:5px;background:rgba(255,255,255,.28);
-  display:flex;align-items:center;justify-content:center;font-size:11px}
+.ui-mark{display:flex;align-items:center;justify-content:center}
 .ui-nav{display:flex;gap:2px}
 .ui-nav span{padding:6px 9px;border-radius:5px;font-size:12px;font-weight:500;white-space:nowrap}
 .ui-nav .on{background:rgba(255,255,255,.18)}
@@ -214,8 +213,10 @@ figcaption b{color:var(--muted);font-weight:600}
 .ui-track .done{color:var(--u-body)}
 .ui-track .done i{background:#8d95a5;border-color:#8d95a5}
 .ui-track .done::after{background:#8d95a5}
-.ui-track .last i{background:#33a3ff;border-color:#33a3ff}
-.ui-track .last{color:#33a3ff}
+/* Launched turns light blue only once it has actually been reached — an
+   unreached final stage is a hollow outline like any other. */
+.ui-track .last.done i{background:#33a3ff;border-color:#33a3ff}
+.ui-track .last.done{color:#33a3ff}
 
 /* Modal-on-scrim */
 .ui-scrim{background:#0a162c;padding:20px;display:flex;justify-content:center}
@@ -314,7 +315,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
               <div class="ui-scrim">
                 <div class="ui-modal">
                   <div class="ui-row" style="margin-bottom:5px">
-                    <span class="ui-mark" style="background:#007ee6;width:26px;height:26px;border-radius:6px">◈</span>
+                    <span class="ui-mark" style="background:#007ee6;width:26px;height:26px;border-radius:6px"><svg viewBox="0 0 701 499" width="15" height="11" fill="none" aria-hidden="true"><path d="M589.851 0.367H289.886c-29.512 0-57.814 11.648-78.682 32.382C190.337 53.483 178.613 81.604 178.613 110.926s11.724 57.443 32.591 78.176c20.868 20.734 49.17 32.382 78.682 32.382h299.965c29.511 0 57.814-11.648 78.681-32.382 20.868-20.733 32.591-48.854 32.591-78.176s-11.723-57.443-32.591-78.177C647.665 12.015 619.362.367 589.851.367z" fill="#fff"/><path d="M409.331 277.321h-300c-29.174.515-56.977 12.391-77.425 33.072C11.457 331.074 0 358.906 0 387.897c0 28.992 11.457 56.824 31.906 77.505 20.448 20.681 48.251 32.557 77.425 33.071h300c29.174-.514 56.978-12.39 77.426-33.071 20.449-20.681 31.906-48.513 31.906-77.505 0-28.991-11.457-56.823-31.906-77.504-20.448-20.681-48.252-32.557-77.426-33.072z" fill="#fff"/></svg></span>
                     <span class="ui-h" style="font-size:15px">Create your account</span>
                   </div>
                   <p class="ui-meta" style="margin:0 0 13px">Sign up with your <b>@skedulo.com</b> email. We'll send a code to confirm it's yours.</p>
@@ -343,7 +344,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
               <div class="ui-scrim">
                 <div class="ui-modal">
                   <div class="ui-row" style="margin-bottom:5px">
-                    <span class="ui-mark" style="background:#007ee6;width:26px;height:26px;border-radius:6px">◈</span>
+                    <span class="ui-mark" style="background:#007ee6;width:26px;height:26px;border-radius:6px"><svg viewBox="0 0 701 499" width="15" height="11" fill="none" aria-hidden="true"><path d="M589.851 0.367H289.886c-29.512 0-57.814 11.648-78.682 32.382C190.337 53.483 178.613 81.604 178.613 110.926s11.724 57.443 32.591 78.176c20.868 20.734 49.17 32.382 78.682 32.382h299.965c29.511 0 57.814-11.648 78.681-32.382 20.868-20.733 32.591-48.854 32.591-78.176s-11.723-57.443-32.591-78.177C647.665 12.015 619.362.367 589.851.367z" fill="#fff"/><path d="M409.331 277.321h-300c-29.174.515-56.977 12.391-77.425 33.072C11.457 331.074 0 358.906 0 387.897c0 28.992 11.457 56.824 31.906 77.505 20.448 20.681 48.251 32.557 77.425 33.071h300c29.174-.514 56.978-12.39 77.426-33.071 20.449-20.681 31.906-48.513 31.906-77.505 0-28.991-11.457-56.823-31.906-77.504-20.448-20.681-48.252-32.557-77.426-33.072z" fill="#fff"/></svg></span>
                     <span class="ui-h" style="font-size:15px">Create your account</span>
                   </div>
                   <p class="ui-meta" style="margin:0 0 13px">Enter the 6-digit code we sent to <b>khoa.vu@skedulo.com</b>. It expires in <b>9:42</b>.</p>
@@ -408,7 +409,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <figure>
         <div class="ui">
           <div class="ui-bar">
-            <span class="ui-logo"><span class="ui-mark">◈</span>VN TS - AI Ideas Hub</span>
+            <span class="ui-logo"><span class="ui-mark"><svg viewBox="0 0 701 499" width="17" height="12" fill="none" aria-hidden="true"><path d="M589.851 0.367H289.886c-29.512 0-57.814 11.648-78.682 32.382C190.337 53.483 178.613 81.604 178.613 110.926s11.724 57.443 32.591 78.176c20.868 20.734 49.17 32.382 78.682 32.382h299.965c29.511 0 57.814-11.648 78.681-32.382 20.868-20.733 32.591-48.854 32.591-78.176s-11.723-57.443-32.591-78.177C647.665 12.015 619.362.367 589.851.367z" fill="#fff"/><path d="M409.331 277.321h-300c-29.174.515-56.977 12.391-77.425 33.072C11.457 331.074 0 358.906 0 387.897c0 28.992 11.457 56.824 31.906 77.505 20.448 20.681 48.251 32.557 77.425 33.071h300c29.174-.514 56.978-12.39 77.426-33.071 20.449-20.681 31.906-48.513 31.906-77.505 0-28.991-11.457-56.823-31.906-77.504-20.448-20.681-48.252-32.557-77.426-33.072z" fill="#fff"/></svg></span>VN TS - AI Ideas Hub</span>
             <span class="ui-nav"><span class="on">Board</span></span>
             <span class="ui-search">⌕ Search ideas</span>
             <span class="ui-plus">+</span>
@@ -841,7 +842,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
               <div class="ui-label">Display name</div>
               <div class="ui-input" style="margin-bottom:11px;color:#2e3640">Khoa Vu</div>
               <div class="ui-grid" style="grid-template-columns:1fr 1fr">
-                <span><span class="ui-label">Region</span><span class="ui-input" style="display:block;color:#2e3640">Vietnam</span></span>
+                <span><span class="ui-label">Region</span><span class="ui-input" style="display:block;color:#2e3640">VN ▾</span></span>
                 <span><span class="ui-label">Timezone</span><span class="ui-input" style="display:block;color:#2e3640">Asia/Ho_Chi_Minh ▾</span></span>
               </div>
               <div class="ui-row" style="margin-top:14px">
@@ -858,7 +859,8 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <li><b>Photo</b> — PNG, JPG, GIF or WebP up to 2 MB. It replaces your initials everywhere.</li>
         <li><b>Avatar colour</b> — used when you have no photo. Pick one and it stays the same on every screen.</li>
         <li><b>Display name</b> — the name others see on ideas and comments.</li>
-        <li><b>Region and timezone</b> — helpful on an APAC team spread across time zones.</li>
+        <li><b>Region</b> — pick one of <b>VN</b>, <b>AU</b>, <b>UK</b> or <b>US</b>.</li>
+        <li><b>Timezone</b> — helpful on a team spread across time zones.</li>
       </ul>
 
       <p>Your <b>username, email and role are managed by an administrator</b> and cannot be changed here. To change your password, use <b>Change password</b>, which sends you a code by email.</p>
@@ -923,7 +925,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <p>Feedback goes straight to the administrators, who are emailed as soon as you send it. For anything urgent, or if you cannot sign in at all, message the <b>project admin</b> directly.</p>
 
-      <p class="end">VN TS - AI Ideas Hub · User guideline · Administrator tools are documented separately in the Admin guideline. Written against the production build, 31 July 2026. Screens are reproductions drawn from the application's own design tokens.</p>
+      <p class="end">VN TS - AI Ideas Hub · User guideline</p>
     </section>
 
   </main>
