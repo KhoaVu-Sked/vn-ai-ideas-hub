@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, ROLES, JOINABLE_ROLES, LEAD_ROLE, INITIATOR_ROLE,
+  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, ROLES, LEAD_ROLE, INITIATOR_ROLE,
   REQUEST_STATE_META, isClosed,
 } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
@@ -489,7 +489,7 @@ export default function IdeaPage() {
               ))}
               {members.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No team yet.</div>}
             </div>
-            {isAdmin && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Admin: change a role, or set someone as {LEAD_ROLE} to transfer the lead. {INITIATOR_ROLE} records who raised the idea.</div>}
+            {isAdmin && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Admin: change a role, or set someone as {LEAD_ROLE} to transfer the lead. There can be one {LEAD_ROLE} and one {INITIATOR_ROLE} per idea.</div>}
           </div>
         </div>
       </div>
@@ -500,7 +500,7 @@ export default function IdeaPage() {
             <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 4 }}>Join the team as…</div>
             <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>Pick one or more roles.</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {JOINABLE_ROLES.filter((role) => role !== LEAD_ROLE || !hasLead).map((role) => {
+              {ROLES.filter((role) => !((role === LEAD_ROLE && hasLead) || (role === INITIATOR_ROLE && hasInitiator))).map((role) => {
                 const on = pickedRoles.includes(role);
                 return (
                   <button

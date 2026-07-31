@@ -267,6 +267,12 @@ create unique index if not exists idea_members_one_lead
 create unique index if not exists idea_members_one_initiator
   on idea_members (idea_id) where roles @> array['Initiator'];
 
+-- Migration 013: the old combined role is Project Lead only. Initiator is a
+-- role people can take, not one granted automatically alongside the lead.
+update idea_members
+set roles = array_remove(roles, 'Initiator')
+where roles @> array['Initiator'] and roles @> array['Project Lead'];
+
 -- Drop any old CHECK that pinned status to the previous 4 values (the app
 -- validates the allowed statuses, so we don't re-add a DB-level check).
 alter table ideas drop constraint if exists ideas_status_check;
