@@ -1,7 +1,7 @@
 # Contribution scoring — draft spec
 
 **Status:** draft for review. Not built.
-**Context:** the VN TS - AI Ideas Hub leader dashboard shows a "Top contributors" panel. This document defines how that score should be calculated.
+**Context:** the TS - AI Ideas Hub leader dashboard shows a "Top contributors" panel. This document defines how that score should be calculated.
 
 ---
 

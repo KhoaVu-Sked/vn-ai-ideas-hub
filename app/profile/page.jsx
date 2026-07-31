@@ -33,6 +33,10 @@ export default function ProfilePage() {
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
   const { refresh: refreshSession } = useSession();
+  const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
+  const [pwErr, setPwErr] = useState("");
+  const [pwDone, setPwDone] = useState(false);
+  const [pwBusy, setPwBusy] = useState(false);
 
   // The browser knows every IANA zone; no need to ship a list.
   const zones = useMemo(() => {
@@ -91,6 +95,18 @@ export default function ProfilePage() {
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
 
+  const setPwField = (k, v) => { setPw((f) => ({ ...f, [k]: v })); setPwErr(""); setPwDone(false); };
+  const changePassword = async (e) => {
+    e?.preventDefault();
+    if (pw.next !== pw.confirm) { setPwErr("The two new passwords don't match."); return; }
+    setPwBusy(true); setPwErr(""); setPwDone(false);
+    try {
+      await api("/api/profile/password", { method: "PATCH", body: JSON.stringify({ current: pw.current, next: pw.next }) });
+      setPw({ current: "", next: "", confirm: "" });
+      setPwDone(true);
+    } catch (e) { setPwErr(e.message); } finally { setPwBusy(false); }
+  };
+
   const photo = avatarSrc(me);
   const shownColor = form?.avatar_color || defaultAvatarColor(me?.username || "");
   const initials = initialsOf(form?.name || me?.username || "?");
@@ -106,6 +122,7 @@ export default function ProfilePage() {
             {err || "Could not load your profile."} <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link>
           </div>
         ) : (
+          <>
           <section style={card}>
             <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>My profile</h1>
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 18 }}>
@@ -197,9 +214,37 @@ export default function ProfilePage() {
                 {busy ? "Saving…" : "Save changes"}
               </button>
               {saved && <span style={{ fontSize: 12.5, color: "#2f9e44", fontWeight: 700 }}>Saved</span>}
-              <Link href="/forgot" style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--blue)", fontWeight: 700 }}>Change password</Link>
             </div>
           </section>
+
+          {/* Change password — your own account, no email step. Asking for an
+              address here would let someone type a colleague's by mistake. */}
+          <form onSubmit={changePassword} style={{ ...card, marginTop: 16 }}>
+            <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", margin: "0 0 4px" }}>Change password</h2>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
+              Changing it for <b style={{ color: "var(--ink)" }}>{me.username}</b>. You stay signed in on this device.
+            </div>
+
+            <div style={label}>Current password</div>
+            <input type="password" value={pw.current} onChange={(e) => setPwField("current", e.target.value)} autoComplete="current-password" style={field} />
+
+            <div style={label}>New password</div>
+            <input type="password" value={pw.next} onChange={(e) => setPwField("next", e.target.value)} autoComplete="new-password" placeholder="at least 6 characters" style={field} />
+
+            <div style={label}>Confirm new password</div>
+            <input type="password" value={pw.confirm} onChange={(e) => setPwField("confirm", e.target.value)} autoComplete="new-password" style={field} />
+
+            {pwErr && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 12 }}>{pwErr}</div>}
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button type="submit" disabled={pwBusy || !pw.current || !pw.next} style={{ ...btn, background: "var(--blue)", color: "#fff", border: "none", cursor: pwBusy ? "wait" : "pointer" }}>
+                {pwBusy ? "Changing…" : "Change password"}
+              </button>
+              {pwDone && <span style={{ fontSize: 12.5, color: "#2f9e44", fontWeight: 700 }}>Password changed</span>}
+              <Link href="/forgot" style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)" }}>Forgotten it?</Link>
+            </div>
+          </form>
+          </>
         )}
       </main>
     </div>

@@ -12,7 +12,7 @@ import Loading from "./Loading";
 import useRevalidateOnFocus from "./useRevalidateOnFocus";
 
 // ─────────────────────────────────────────────────────────────
-// VN TS - AI Ideas Hub — board
+// TS - AI Ideas Hub — board
 // Fetch scoping:
 //   • Refresh → light project LIST only.
 //   • "Preview" on a card → that ONE project's light detail (drawer), cached.
