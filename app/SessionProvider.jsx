@@ -30,6 +30,9 @@ export default function SessionProvider({ children }) {
       // signing in elsewhere, or changing the password. Send them to sign in
       // rather than leaving a shell that 401s on every action.
       if (res.status === 401 && !AUTH_PATHS.has(window.location.pathname)) {
+        // Clear the dead cookie first. Otherwise middleware still reads it as
+        // valid and bounces us straight back here — a redirect loop.
+        try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* go anyway */ }
         window.location.href = "/login?ended=1";
       }
     } catch {

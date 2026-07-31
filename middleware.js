@@ -5,12 +5,27 @@ import { COOKIE_NAME, verifySessionToken } from "@/lib/session";
 // while already signed in just reads as broken, so these bounce to the board.
 const AUTH_PAGES = new Set(["/login", "/register", "/forgot"]);
 
-// Gate page routes. API routes are NOT matched here — they enforce auth
-// themselves (returning JSON 401s) so fetches never get an HTML redirect.
+// Middleware runs on the Edge and only checks the cookie's SIGNATURE — it has
+// no database, so it can't know the session was retired (signed in elsewhere,
+// password changed, or a cookie predating single-session).
+//
+// getUser() does know, and returns 401. Without the flags below the two
+// disagree forever: the browser is sent to /login, middleware still reads the
+// cookie as valid and sends it back — an endless redirect loop that also aborts
+// any in-flight fetch. So when the browser says the session ended, believe it:
+// bin the cookie and show the page.
+const ENDED_FLAGS = ["ended", "changed", "reset"];
+
 export async function middleware(request) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
   const user = await verifySessionToken(request.cookies.get(COOKIE_NAME)?.value);
   const isAuthPage = AUTH_PAGES.has(pathname);
+
+  if (user && isAuthPage && ENDED_FLAGS.some((f) => searchParams.has(f))) {
+    const res = NextResponse.next();
+    res.cookies.set(COOKIE_NAME, "", { path: "/", maxAge: 0 });   // match how /api/auth/logout clears it
+    return res;
+  }
 
   // Signed in and not on an auth page, or signed out and on one → let it through.
   if (user ? !isAuthPage : isAuthPage) return NextResponse.next();
@@ -23,6 +38,6 @@ export async function middleware(request) {
 
 export const config = {
   // Everything except /api/*, Next internals and the app icon. The auth pages
-  // ARE matched now, so a signed-in visitor to /login gets redirected away.
+  // ARE matched, so a signed-in visitor to /login gets redirected away.
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icon.svg).*)"],
 };
