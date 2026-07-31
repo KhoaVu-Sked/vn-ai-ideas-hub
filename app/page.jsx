@@ -10,6 +10,7 @@ import AppHeader from "./AppHeader";
 import SubmitModal from "./SubmitModal";
 import Loading from "./Loading";
 import useRevalidateOnFocus from "./useRevalidateOnFocus";
+import { api } from "./apiClient";
 
 // ─────────────────────────────────────────────────────────────
 // TS - AI Ideas Hub — board
@@ -20,12 +21,6 @@ import useRevalidateOnFocus from "./useRevalidateOnFocus";
 //   • New idea / status change → refetch LIST only.
 // ─────────────────────────────────────────────────────────────
 
-async function api(path, init) {
-  const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
-  return body;
-}
 
 function Pill({ bg, fg, children }) {
   return <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>{children}</span>;

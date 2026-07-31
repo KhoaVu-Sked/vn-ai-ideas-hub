@@ -6,13 +6,8 @@ import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 import useRevalidateOnFocus from "../useRevalidateOnFocus";
 import { useSession } from "../SessionProvider";
+import { api } from "../apiClient";
 
-async function api(path) {
-  const res = await fetch(path);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
-  return body;
-}
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
 const field = { border: "1px solid #dde3ec", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, background: "#fff", color: "#3a4a63", fontWeight: 600, outline: "none" };

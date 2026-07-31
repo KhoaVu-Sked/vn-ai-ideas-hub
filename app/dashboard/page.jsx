@@ -7,13 +7,8 @@ import Avatar from "../Avatar";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 import { useSession } from "../SessionProvider";
+import { api } from "../apiClient";
 
-async function api(path) {
-  const res = await fetch(path);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
-  return body;
-}
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "18px 20px" };
 const ghost = { background: "transparent", border: "1px solid #33456b", color: "#c4d1e8", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "none" };

@@ -4,13 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { tagPill } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import FieldInput from "./FieldInput";
+import { api } from "./apiClient";
 
-async function api(path, init) {
-  const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
-  return body;
-}
 
 // onCreated(project) is called after the idea (and any files) are created.
 export default function SubmitModal({ onClose, onCreated }) {
@@ -51,8 +46,9 @@ export default function SubmitModal({ onClose, onCreated }) {
       const failed = [];
       for (const f of files) {
         const fd = new FormData(); fd.append("file", f);
-        const res = await fetch(`/api/ideas/${project.id}/attachments`, { method: "POST", body: fd });
-        if (!res.ok) failed.push(f.name);
+        // Per-file: one refusal shouldn't lose the others, or the new idea.
+        try { await api(`/api/ideas/${project.id}/attachments`, { method: "POST", body: fd }); }
+        catch { failed.push(f.name); }
       }
       if (failed.length) alert(`Idea created, but these files didn't upload: ${failed.join(", ")}. You can add them from the idea page.`);
       await onCreated(project);

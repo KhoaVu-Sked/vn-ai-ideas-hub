@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { endSession } from "./apiClient";
 
 // The signed-in user, fetched once for the whole app instead of per page.
 //
@@ -26,15 +27,9 @@ export default function SessionProvider({ children }) {
       const res = await fetch("/api/auth/me");
       if (res.ok) { setUser((await res.json()).user); return; }
       setUser(null);
-      // 401 on a page that requires a session means the session was retired —
-      // signing in elsewhere, or changing the password. Send them to sign in
-      // rather than leaving a shell that 401s on every action.
-      if (res.status === 401 && !AUTH_PATHS.has(window.location.pathname)) {
-        // Clear the dead cookie first. Otherwise middleware still reads it as
-        // valid and bounces us straight back here — a redirect loop.
-        try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* go anyway */ }
-        window.location.href = "/login?ended=1";
-      }
+      // 401 here means the session was retired — signed in elsewhere, or the
+      // password changed. Same handling as any other 401.
+      if (res.status === 401 && !AUTH_PATHS.has(window.location.pathname)) endSession();
     } catch {
       setUser(null);
     }

@@ -7,13 +7,8 @@ import { AVATAR_ACCEPT_ATTR, validateAvatar } from "@/lib/upload";
 import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 import { useSession } from "../SessionProvider";
+import { api } from "../apiClient";
 
-async function api(path, init) {
-  const res = await fetch(path, { ...init, headers: init?.body instanceof FormData ? undefined : { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
-  return body;
-}
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
 const label = { fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, textTransform: "uppercase" };

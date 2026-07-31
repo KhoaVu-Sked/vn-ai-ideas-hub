@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { api } from "./apiClient";
 
 export default function FeedbackWidget() {
   const pathname = usePathname();
@@ -19,13 +20,7 @@ export default function FeedbackWidget() {
     if (!body) return;
     setBusy(true); setErr("");
     try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body, page: pathname }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      await api("/api/feedback", { method: "POST", body: JSON.stringify({ body, page: pathname }) });
       setSent(true); setText("");
       setTimeout(() => { setOpen(false); setSent(false); }, 1400);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }

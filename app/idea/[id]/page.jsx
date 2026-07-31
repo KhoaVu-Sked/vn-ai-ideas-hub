@@ -15,13 +15,8 @@ import AppHeader from "../../AppHeader";
 import SubmitModal from "../../SubmitModal";
 import Loading from "../../Loading";
 import useRevalidateOnFocus from "../../useRevalidateOnFocus";
+import { api } from "../../apiClient";
 
-async function api(path, init) {
-  const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
-  return body;
-}
 
 function Pill({ bg, fg, children }) {
   return <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>{children}</span>;
@@ -235,10 +230,8 @@ export default function IdeaPage() {
     const fd = new FormData();
     fd.append("file", file);
     run(async () => {
-      const res = await fetch(`/api/ideas/${id}/attachments`, { method: "POST", body: fd });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
-      patch((d) => ({ attachments: [...d.attachments, body.attachment] }));
+      const { attachment } = await api(`/api/ideas/${id}/attachments`, { method: "POST", body: fd });
+      patch((d) => ({ attachments: [...d.attachments, attachment] }));
     });
   };
   const removeAttachment = (attId) => {

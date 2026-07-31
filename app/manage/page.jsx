@@ -8,13 +8,8 @@ import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 import useRevalidateOnFocus from "../useRevalidateOnFocus";
 import { useSession } from "../SessionProvider";
+import { api } from "../apiClient";
 
-async function api(path, init) {
-  const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
-  return body;
-}
 
 // The fixed part of the New Idea form, in the order it renders.
 const BUILT_IN = [
