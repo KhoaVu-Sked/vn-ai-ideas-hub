@@ -350,6 +350,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
             <tr><td>Change an idea's status</td><td>—</td><td>Own idea</td><td><b>Any idea</b></td></tr>
             <tr><td>Triage requests</td><td>—</td><td>Own idea</td><td><b>Any idea</b></td></tr>
             <tr><td>Edit team roles, transfer the lead</td><td>—</td><td>—</td><td><b>Yes</b></td></tr>
+            <tr><td>Set or correct the Initiator</td><td>—</td><td>—</td><td><b>Yes</b></td></tr>
             <tr><td>Remove someone from a team</td><td>—</td><td>—</td><td><b>Yes</b></td></tr>
             <tr><td>Delete an idea</td><td>—</td><td>Request only</td><td><b>Yes</b></td></tr>
             <tr><td>Dashboard, Tasks, Activity, Manage</td><td>—</td><td>—</td><td><b>Yes</b></td></tr>
@@ -630,7 +631,8 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
                 <span style="flex:1">
                   <b style="font-size:12px;color:#0b1e49">Trung Vo</b>
                   <span class="ui-row" style="gap:4px;margin-top:5px">
-                    <span class="ui-tag" style="font-size:9.5px;padding:2px 6px">Initiator / Project Lead</span>
+                    <span class="ui-tag" style="font-size:9.5px;padding:2px 6px">Initiator</span>
+                    <span class="ui-tag" style="font-size:9.5px;padding:2px 6px">Project Lead</span>
                     <span class="ui-tag" style="font-size:9.5px;padding:2px 6px;border-color:#0055ff;color:#0055ff;background:#eef1fb">✓ Tester</span>
                     <span class="ui-tag" style="font-size:9.5px;padding:2px 6px;border-color:#0055ff;color:#0055ff;background:#eef1fb">✓ Data / Ops</span>
                     <span class="ui-tag" style="font-size:9.5px;padding:2px 6px">Observer</span>
@@ -638,13 +640,18 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
                 </span>
                 <span class="ui-faint" style="font-size:11px">✕</span>
               </div>
-              <p class="ui-meta ui-faint" style="font-size:10px;margin:10px 0 0">Admin: change a role, or set someone as Initiator / Project Lead to transfer the lead.</p>
+              <p class="ui-meta ui-faint" style="font-size:10px;margin:10px 0 0">Admin: change a role, or set someone as Project Lead to transfer the lead. Initiator records who raised the idea.</p>
             </div>
           </div>
         </div>
         <figcaption><b>Team &amp; roles</b> — the admin view, with editable role chips</figcaption>
       </figure>
-      <p>Assigning <b>Initiator / Project Lead</b> to someone new <b>removes it from the current holder automatically</b> — only one lead per idea is allowed, and the app enforces it rather than warning you.</p>
+      <p>Assigning <b>Project Lead</b> to someone new <b>removes it from the current holder automatically</b> — only one per idea is allowed, and the app enforces it rather than warning you. <b>Initiator</b> behaves the same way.</p>
+      <div class="note">
+        <span class="note__tag">Initiator vs Project Lead</span>
+        <p><b>Initiator</b> is a record of who raised the idea. It is set when the form is submitted and nobody can join a team as the Initiator, so it stays truthful. Correct it here only if the wrong person is credited.</p>
+        <p><b>Project Lead</b> is accountable for driving the idea. It is expected to move — reassign it whenever the person driving the work changes.</p>
+      </div>
 
       <h3>Deleting an idea</h3>
       <p>A <b>Delete idea</b> button sits in the action row on every idea. It does not need a request first — the request queue exists so leads can ask, not because you need permission.</p>
@@ -698,7 +705,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <h3>Two things to keep an eye on</h3>
       <ul>
-        <li><b>Ideas with no Project Lead.</b> The board shows them as <b>Unassigned</b>. An idea with no owner will not move on its own.</li>
+        <li><b>Ideas with no Project Lead.</b> The board shows them as <b>Unassigned</b>. An idea with no owner will not move on its own — the Initiator is a record of who raised it, not a substitute owner.</li>
         <li><b>The activity log ages out at 14 days.</b> If a decision needs a paper trail beyond that, record it as a request on the idea, where it is kept permanently.</li>
       </ul>
 

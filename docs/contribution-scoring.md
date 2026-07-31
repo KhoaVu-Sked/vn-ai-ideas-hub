@@ -287,14 +287,14 @@ Total 2.1, below the floor of 4, so `denominator = 4`:
 
 ## 9. Prerequisites
 
-Four gaps must be closed first, or the score faithfully records ungoverned behaviour.
+Three gaps remain, or the score faithfully records ungoverned behaviour. (The first is now done.)
 
-1. **Split Initiator from Project Lead.** They are currently one merged role, `Initiator / Project Lead` (see `migrations/005_merge_lead_roles.sql`, which combined them). Separating them again needs: a migration to split existing rows, two one-per-idea unique indexes instead of one, an `initiator` that is assigned at creation and not joinable, and updates to the role picker, the "Initiated by" line on the idea page, and admin role editing.
+1. ~~**Split Initiator from Project Lead.**~~ **Done** — `migrations/012_split_initiator_lead.sql`. They are now two roles, one of each per idea, each with its own partial unique index. Initiator is set at submission and cannot be self-assigned by joining a team; only an admin can correct it.
 2. **Join approval.** Anyone signed in can currently self-assign any role except the lead, with no approval. The v0.1 requirements specify lead approval; it was never built. This is the main way to game any scoring model.
 3. **`requests.accepted_at`.** A nullable timestamp set the first time a request is accepted and never cleared. Without it, editing or closing a request silently removes its author's points (§6).
 4. **Per-role headcount caps.** The requirements specify AI Design 0–2, Form/UX 0–2, Data/Ops 0–2. Not enforced. Enforcing them bounds the team weight and makes scores stable.
 
-Suggested order: **role split → join approval + role caps → `accepted_at` → awards ledger → scoring.** The scoring is the last and smallest piece.
+Suggested order: ~~role split~~ → **join approval + role caps → `accepted_at` → awards ledger → scoring.** The scoring is the last and smallest piece.
 
 ---
 

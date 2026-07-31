@@ -76,10 +76,12 @@ create table if not exists idea_members (
   unique (idea_id, account_id)
 );
 create index if not exists idea_members_idea_id_idx on idea_members (idea_id);
--- At most one lead ("Initiator / Project Lead") per idea. (Recreated in the
--- migration block below, since the index NAME predates this predicate.)
+-- At most one Project Lead and one Initiator per idea. (Both recreated in the
+-- migration block below, since the index NAMES predate these predicates.)
 create unique index if not exists idea_members_one_lead
-  on idea_members (idea_id) where roles @> array['Initiator / Project Lead'];
+  on idea_members (idea_id) where roles @> array['Project Lead'];
+create unique index if not exists idea_members_one_initiator
+  on idea_members (idea_id) where roles @> array['Initiator'];
 
 -- Expected time frame options for the submit form (admin-managed).
 create table if not exists time_frames (
@@ -244,8 +246,26 @@ alter table idea_members add column if not exists roles text[] not null default 
 update idea_members set roles = array[role] where cardinality(roles) = 0 and role is not null;
 alter table idea_members alter column role drop not null;
 drop index if exists idea_members_one_lead;
+
+-- Migration 012: split the combined role back into Initiator + Project Lead.
+update idea_members
+set roles = array_replace(roles, 'Initiator / Project Lead', 'Project Lead')
+where roles @> array['Initiator / Project Lead'];
+with first_lead as (
+  select distinct on (m.idea_id) m.id, m.idea_id
+  from idea_members m
+  where m.roles @> array['Project Lead']
+    and not exists (select 1 from idea_members x
+                    where x.idea_id = m.idea_id and x.roles @> array['Initiator'])
+  order by m.idea_id, m.created_at
+)
+update idea_members m set roles = m.roles || array['Initiator']
+from first_lead f where m.id = f.id and not (m.roles @> array['Initiator']);
+update idea_members set role = 'Project Lead' where role = 'Initiator / Project Lead';
 create unique index if not exists idea_members_one_lead
-  on idea_members (idea_id) where roles @> array['Initiator / Project Lead'];
+  on idea_members (idea_id) where roles @> array['Project Lead'];
+create unique index if not exists idea_members_one_initiator
+  on idea_members (idea_id) where roles @> array['Initiator'];
 
 -- Drop any old CHECK that pinned status to the previous 4 values (the app
 -- validates the allowed statuses, so we don't re-add a DB-level check).

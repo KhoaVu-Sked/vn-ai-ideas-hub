@@ -622,7 +622,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <div class="note note--good">
         <span class="note__tag">What happens next</span>
-        <p>Your idea is created at <b>Submitted</b>, you become its <b>Initiator / Project Lead</b>, and it is given a permanent number such as <code>IDEA-015</code>. All administrators are emailed. You can paste the idea's link straight into Slack.</p>
+        <p>Your idea is created at <b>Submitted</b>, you become its <b>Initiator</b> and its <b>Project Lead</b>, and it is given a permanent number such as <code>IDEA-015</code>. All administrators are emailed. You can paste the idea's link straight into Slack.</p>
       </div>
 
       <div class="note note--warn">
@@ -647,7 +647,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
                   <span class="ui-tag"><i class="ui-dot" style="background:#0070cc"></i>Support / CX</span>
                 </div>
                 <div class="ui-h" style="font-size:19px;line-height:1.25;margin-bottom:5px">Auto-draft the PIR from ticket history</div>
-                <p class="ui-meta" style="margin:0 0 12px">IDEA-015 · Initiated by Khoa Vu · Submitted 2026-07-29 · Target: 3-4 weeks</p>
+                <p class="ui-meta" style="margin:0 0 12px">IDEA-015 · Raised by Khoa Vu · Led by Khoa Vu · Submitted 2026-07-29 · Target: 3-4 weeks</p>
                 <div class="ui-row" style="margin-bottom:14px">
                   <span class="ui-btn" style="color:#0055ff;border-color:#0055ff">♡ Like · 4</span>
                   <span class="ui-btn" style="color:#0055ff;border-color:#c9d6f5">+ Add request</span>
@@ -676,7 +676,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
                   <span class="ui-av" style="width:30px;height:30px">KV</span>
                   <span>
                     <b style="font-size:12px;color:#0b1e49">Khoa Vu</b>
-                    <span class="ui-meta" style="display:block;font-size:10.5px">Initiator / Project Lead</span>
+                    <span class="ui-meta" style="display:block;font-size:10.5px">Initiator · Project Lead</span>
                   </span>
                 </div>
                 <div class="ui-row" style="align-items:flex-start">
@@ -693,11 +693,11 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <figcaption><b>An idea page</b> — as a team member sees it</figcaption>
       </figure>
 
-      <p>Reading down the page: the <b>status pill and tags</b>, the <b>title</b>, then a line giving the idea's number, its current Project Lead, when it was submitted and its target time frame. Below that the action buttons, the three content sections, attachments, the requests thread, and the progress timeline. The sidebar always shows who is on the team and in what role.</p>
+      <p>Reading down the page: the <b>status pill and tags</b>, the <b>title</b>, then a line giving the idea's number, who raised it, its current Project Lead, when it was submitted and its target time frame. Below that the action buttons, the three content sections, attachments, the requests thread, and the progress timeline. The sidebar always shows who is on the team and in what role.</p>
 
       <div class="note">
         <span class="note__tag">Note</span>
-        <p><b>Initiated by</b> names whoever currently holds the Initiator / Project Lead role. If the role is vacant, that part of the line is left out.</p>
+        <p><b>Raised by</b> names the Initiator — who submitted it. <b>Led by</b> names the current Project Lead, which an admin can transfer. They start as the same person, and either part of the line is left out while nobody holds that role.</p>
       </div>
     </section>
 
@@ -745,7 +745,8 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <table>
           <thead><tr><th style="width:200px">Role</th><th>What you are taking on</th></tr></thead>
           <tbody>
-            <tr><td><b>Initiator / Project Lead</b></td><td>Accountable for the idea. Edits content, moves the status, triages requests. <b>One per idea.</b></td></tr>
+            <tr><td><b>Initiator</b></td><td>Raised the idea. A record of who thought of it — set automatically when you submit, and not something you can join as. <b>One per idea.</b></td></tr>
+            <tr><td><b>Project Lead</b></td><td>Accountable for the idea. Edits content, moves the status, triages requests. <b>One per idea</b>, and transferable by an admin.</td></tr>
             <tr><td><b>AI Design</b></td><td>Shapes the prompt, model or agent behaviour.</td></tr>
             <tr><td><b>Form / UX Design</b></td><td>Designs the interface or the intake flow.</td></tr>
             <tr><td><b>Data / Ops</b></td><td>Data sources, pipelines, integration and rollout.</td></tr>
@@ -756,8 +757,8 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       </div>
 
       <div class="note">
-        <span class="note__tag">If Project Lead is greyed out</span>
-        <p>Someone already holds it — only one lead per idea. Ask an administrator to reassign it if it should be you.</p>
+        <span class="note__tag">Two roles you cannot simply pick</span>
+        <p><b>Initiator</b> never appears in this list — it records who raised the idea, so it is set at submission and only an administrator can correct it. <b>Project Lead</b> is greyed out once someone holds it; ask an administrator to transfer it if it should be you.</p>
       </div>
     </section>
 
@@ -765,7 +766,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
     <section id="s9">
       <p class="sec-num">Section 09</p>
       <h2>If you lead an idea</h2>
-      <p class="lede">Extra controls appear once you hold the Initiator / Project Lead role.</p>
+      <p class="lede">Extra controls appear once you hold the Project Lead role.</p>
 
       <h3>Edit the content</h3>
       <p><b>Edit content</b> turns Context, Pain points, Expected benefit, the tags, the target time frame and any custom fields into editable inputs. <b>Save changes</b> commits them; everyone on the team and every follower is emailed a summary of what changed.</p>

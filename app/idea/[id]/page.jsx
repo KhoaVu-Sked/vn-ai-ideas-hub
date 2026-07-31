@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, ROLES, LEAD_ROLE, REQUEST_STATE_META, isClosed,
+  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, ROLES, JOINABLE_ROLES, LEAD_ROLE, INITIATOR_ROLE,
+  REQUEST_STATE_META, isClosed,
 } from "@/lib/statusMeta";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import Avatar from "../../Avatar";
@@ -117,6 +118,8 @@ export default function IdeaPage() {
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
   const leadMember = members.find((m) => (m.roles || []).includes(LEAD_ROLE)) || null;
   const hasLead = !!leadMember;
+  const initiator = members.find((m) => (m.roles || []).includes(INITIATOR_ROLE)) || null;
+  const hasInitiator = !!initiator;
   const tagColors = Object.fromEntries(tagCatalog.filter((t) => t.color).map((t) => [t.name, t.color]));
   const toggleFormTag = (name) => setForm((f) => ({ ...f, tags: (f.tags || []).includes(name) ? f.tags.filter((x) => x !== name) : [...(f.tags || []), name] }));
   const setExtra = (key, v) => setForm((f) => ({ ...f, extra: { ...(f.extra || {}), [key]: v } }));
@@ -182,7 +185,8 @@ export default function IdeaPage() {
       members: d.members.map((m) => {
         if (m.account_id === accountId) return { ...m, roles };
         // Mirror the server's lead transfer.
-        if (roles.includes(LEAD_ROLE) && (m.roles || []).includes(LEAD_ROLE)) return { ...m, roles: m.roles.filter((r) => r !== LEAD_ROLE) };
+        const taking = [INITIATOR_ROLE, LEAD_ROLE].filter((r) => roles.includes(r));
+        if (taking.some((r) => (m.roles || []).includes(r))) return { ...m, roles: (m.roles || []).filter((r) => !taking.includes(r)) };
         return m;
       }),
       myRoles: accountId === meId ? roles : d.myRoles,
@@ -271,9 +275,10 @@ export default function IdeaPage() {
           <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px", lineHeight: 1.25, overflowWrap: "anywhere" }}>{idea.name}</h1>
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
             {idea.number}
-            {/* Whoever holds the role now — not who first typed the form. Blank
-                while the role is vacant. */}
-            {leadMember ? ` · Initiated by ${leadMember.name}` : ""}
+            {/* Who raised it, and who is driving it — two separate roles. Each
+                is left out while nobody holds it. */}
+            {initiator ? ` · Raised by ${initiator.name}` : ""}
+            {leadMember ? ` · Led by ${leadMember.name}` : ""}
             {idea.submitted ? ` · Submitted ${idea.submitted}` : ""}
             {idea.target_date ? ` · Target: ${idea.target_date}` : ""}
           </div>
@@ -464,7 +469,7 @@ export default function IdeaPage() {
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                         {ROLES.map((r) => {
                           const on = (m.roles || []).includes(r);
-                          const disabled = r === LEAD_ROLE && !on && hasLead;
+                          const disabled = !on && ((r === LEAD_ROLE && hasLead) || (r === INITIATOR_ROLE && hasInitiator));
                           return (
                             <button
                               key={r}
@@ -484,7 +489,7 @@ export default function IdeaPage() {
               ))}
               {members.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No team yet.</div>}
             </div>
-            {isAdmin && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Admin: change a role, or set someone as {LEAD_ROLE} to transfer the lead.</div>}
+            {isAdmin && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Admin: change a role, or set someone as {LEAD_ROLE} to transfer the lead. {INITIATOR_ROLE} records who raised the idea.</div>}
           </div>
         </div>
       </div>
@@ -495,7 +500,7 @@ export default function IdeaPage() {
             <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 4 }}>Join the team as…</div>
             <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>Pick one or more roles.</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {ROLES.filter((role) => role !== LEAD_ROLE || !hasLead).map((role) => {
+              {JOINABLE_ROLES.filter((role) => role !== LEAD_ROLE || !hasLead).map((role) => {
                 const on = pickedRoles.includes(role);
                 return (
                   <button
