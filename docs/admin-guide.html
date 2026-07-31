@@ -1,0 +1,656 @@
+<title>VN TS - AI Ideas Hub — Administrator Guide</title>
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Tokens. The document chrome themes; the UI mockups below do not
+   — a screenshot of a light-only app shouldn't invert in dark mode.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --navy:#002755; --brand:#007ee6; --accent:#0055ff;
+  --ink:#0b1e49; --body:#2e3640; --muted:#5e687a; --faint:#646e82;
+  --line:#e2e7ef; --line-soft:#eef1f6; --ground:#f6f8fb; --surface:#ffffff;
+  --good:#1f7a4d; --warn:#9a6300; --bad:#c4342a;
+  --good-bg:#e7f4ec; --warn-bg:#fdf3e0; --bad-bg:#fdecea;
+  --code-bg:#f0f3f8;
+  --display:"Manrope","Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif;
+  --text:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --rail:250px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ink:#e9eef7; --body:#c2cbd9; --muted:#95a1b4; --faint:#75839a;
+    --line:#24324a; --line-soft:#1b2739; --ground:#0c1420; --surface:#111c2c;
+    --accent:#5c9bff; --brand:#3aa0f0;
+    --good:#5bc98c; --warn:#e0aa4e; --bad:#f0827a;
+    --good-bg:#12301f; --warn-bg:#312512; --bad-bg:#331a19;
+    --code-bg:#16233a;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e9eef7; --body:#c2cbd9; --muted:#95a1b4; --faint:#75839a;
+  --line:#24324a; --line-soft:#1b2739; --ground:#0c1420; --surface:#111c2c;
+  --accent:#5c9bff; --brand:#3aa0f0;
+  --good:#5bc98c; --warn:#e0aa4e; --bad:#f0827a;
+  --good-bg:#12301f; --warn-bg:#312512; --bad-bg:#331a19;
+  --code-bg:#16233a;
+}
+:root[data-theme="light"]{
+  --ink:#0b1e49; --body:#2e3640; --muted:#5e687a; --faint:#646e82;
+  --line:#e2e7ef; --line-soft:#eef1f6; --ground:#f6f8fb; --surface:#ffffff;
+  --accent:#0055ff; --brand:#007ee6;
+  --good:#1f7a4d; --warn:#9a6300; --bad:#c4342a;
+  --good-bg:#e7f4ec; --warn-bg:#fdf3e0; --bad-bg:#fdecea;
+  --code-bg:#f0f3f8;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--body);
+  font-family:var(--text);font-size:15.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── Masthead ───────────────────────────────────────────────── */
+.mast{background:var(--navy);color:#fff;padding:46px 32px 40px}
+.mast__in{max-width:1180px;margin:0 auto}
+.mast__eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:#7fb6e8;margin:0 0 14px}
+.mast h1{font-family:var(--display);font-weight:800;font-size:clamp(30px,4.4vw,46px);
+  line-height:1.1;letter-spacing:-.02em;margin:0 0 12px;color:#fff;text-wrap:balance}
+.mast p{margin:0;max-width:62ch;color:#c2d8ee;font-size:16px}
+.mast__meta{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:26px;
+  padding-top:20px;border-top:1px solid rgba(255,255,255,.16)}
+.mast__meta div{font-size:12.5px;color:#9dc0e2}
+.mast__meta b{display:block;color:#fff;font-weight:600;font-size:13.5px;
+  font-family:var(--mono);letter-spacing:.01em}
+
+/* ── Shell ──────────────────────────────────────────────────── */
+.shell{max-width:1180px;margin:0 auto;padding:0 32px 90px;
+  display:grid;grid-template-columns:var(--rail) minmax(0,1fr);gap:52px;align-items:start}
+@media (max-width:940px){
+  .shell{grid-template-columns:1fr;gap:0;padding:0 20px 60px}
+  .toc{position:static!important;margin:26px 0 10px;
+    border:1px solid var(--line);border-radius:12px;padding:18px 20px;background:var(--surface)}
+}
+
+/* ── Contents rail ──────────────────────────────────────────── */
+.toc{position:sticky;top:26px;padding-top:34px;font-size:13.5px}
+.toc h2{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 14px;font-weight:600}
+.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+.toc li{counter-increment:toc;margin:0 0 2px}
+.toc a{display:flex;gap:10px;padding:5px 8px;border-radius:6px;
+  text-decoration:none;color:var(--muted);line-height:1.4}
+.toc a:hover{background:var(--line-soft);color:var(--ink)}
+.toc a::before{content:counter(toc,decimal-leading-zero);font-family:var(--mono);
+  font-size:11px;color:var(--faint);padding-top:2px;flex:none}
+.toc__note{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--faint);line-height:1.55}
+
+/* ── Content ────────────────────────────────────────────────── */
+main{padding-top:34px;min-width:0}
+section{scroll-margin-top:20px;padding-bottom:8px}
+section + section{margin-top:56px;padding-top:52px;border-top:1px solid var(--line)}
+.sec-num{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 8px;font-weight:600}
+h2{font-family:var(--display);font-weight:800;font-size:29px;line-height:1.2;
+  letter-spacing:-.018em;color:var(--ink);margin:0 0 10px;text-wrap:balance}
+h3{font-family:var(--display);font-weight:700;font-size:18.5px;color:var(--ink);
+  margin:38px 0 8px;letter-spacing:-.01em}
+h4{font-family:var(--display);font-weight:700;font-size:15px;color:var(--ink);margin:24px 0 6px}
+p{margin:0 0 14px;max-width:68ch}
+.lede{font-size:17px;color:var(--muted);max-width:66ch;margin-bottom:26px}
+ul,ol{margin:0 0 14px;padding-left:22px;max-width:68ch}
+li{margin-bottom:6px}
+b,strong{color:var(--ink);font-weight:650}
+code{font-family:var(--mono);font-size:.87em;background:var(--code-bg);
+  padding:1.5px 5px;border-radius:4px;color:var(--ink)}
+
+/* Numbered walkthrough steps — the order is the procedure, so it carries meaning */
+.steps{list-style:none;counter-reset:step;padding:0;margin:22px 0 8px;max-width:none}
+.steps > li{counter-increment:step;position:relative;padding-left:44px;margin-bottom:26px}
+.steps > li::before{content:counter(step);position:absolute;left:0;top:-1px;
+  width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:12.5px;font-weight:600;
+  display:flex;align-items:center;justify-content:center}
+.steps > li > :first-child{margin-top:0}
+.steps p{max-width:64ch}
+
+/* Callouts */
+.note{border-left:3px solid var(--accent);background:var(--line-soft);
+  padding:14px 18px;border-radius:0 8px 8px 0;margin:18px 0;font-size:14.5px}
+.note--warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.note--good{border-left-color:var(--good);background:var(--good-bg)}
+.note p{margin:0;max-width:64ch}
+.note p + p{margin-top:8px}
+.note__tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;font-weight:600;color:var(--accent);display:block;margin-bottom:4px}
+.note--warn .note__tag{color:var(--warn)}
+.note--good .note__tag{color:var(--good)}
+
+/* Tables */
+.tw{overflow-x:auto;margin:18px 0 22px;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:480px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);font-weight:600;
+  padding:11px 16px;background:var(--line-soft);border-bottom:1px solid var(--line)}
+td{padding:11px 16px;border-bottom:1px solid var(--line-soft);vertical-align:top;color:var(--body)}
+tbody tr:last-child td{border-bottom:none}
+td b{color:var(--ink)}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* Figure wrapper around every mockup */
+figure{margin:20px 0 24px}
+figcaption{font-size:12.5px;color:var(--faint);margin-top:9px;
+  font-family:var(--mono);letter-spacing:.01em}
+figcaption b{color:var(--muted);font-weight:600}
+
+/* ─────────────────────────────────────────────────────────────
+   UI MOCKUPS — reproductions of the live interface, drawn in CSS
+   from the app's own tokens. Deliberately fixed to the app's light
+   palette in both themes: a screenshot doesn't invert.
+   ───────────────────────────────────────────────────────────── */
+.ui{
+  --u-brand:#007ee6; --u-accent:#0055ff; --u-ink:#0b1e49; --u-body:#2e3640;
+  --u-muted:#5e687a; --u-faint:#9aa2b2; --u-line:#e4e7ed; --u-bg:#f3f5f9;
+  border:1px solid #d7dde7;border-radius:12px;overflow:hidden;background:#fff;
+  box-shadow:0 2px 10px rgba(11,30,73,.07);
+  font-family:var(--text);color:var(--u-body);font-size:13px;line-height:1.45
+}
+.ui *{box-sizing:border-box}
+.ui-bar{background:var(--u-brand);height:46px;display:flex;align-items:center;
+  gap:6px;padding:0 13px;color:#fff}
+.ui-logo{display:flex;align-items:center;gap:8px;font-family:var(--display);
+  font-weight:700;font-size:14px;padding-right:6px;white-space:nowrap}
+.ui-mark{width:20px;height:20px;border-radius:5px;background:rgba(255,255,255,.28);
+  display:flex;align-items:center;justify-content:center;font-size:11px}
+.ui-nav{display:flex;gap:2px}
+.ui-nav span{padding:6px 9px;border-radius:5px;font-size:12px;font-weight:500;white-space:nowrap}
+.ui-nav .on{background:rgba(255,255,255,.18)}
+.ui-search{margin-left:auto;background:rgba(255,255,255,.18);border-radius:5px;
+  height:29px;display:flex;align-items:center;gap:6px;padding:0 10px;
+  color:rgba(255,255,255,.82);font-size:12px;min-width:120px}
+.ui-plus{width:29px;height:29px;border-radius:5px;background:#fff;color:var(--u-brand);
+  display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+.ui-av{width:29px;height:29px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:10.5px;font-weight:700;color:#fff;flex:none;
+  background:#4263eb;letter-spacing:.02em}
+.ui-body{padding:15px;background:var(--u-bg)}
+.ui-panel{background:#fff;border:1px solid var(--u-line);border-radius:10px;padding:14px}
+.ui-panel + .ui-panel{margin-top:10px}
+.ui-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ui-pill{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.ui-tag{font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:6px;
+  border:1px solid var(--u-line);background:var(--u-bg);color:var(--u-body);
+  display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.ui-dot{width:6px;height:6px;border-radius:50%;flex:none}
+.ui-btn{border:1px solid #d5dce6;background:#fff;color:#3a4a63;border-radius:7px;
+  padding:6px 11px;font-size:11.5px;font-weight:700;white-space:nowrap;display:inline-block}
+.ui-btn--pri{background:var(--u-accent);border-color:var(--u-accent);color:#fff}
+.ui-btn--bad{color:#d53c30;border-color:#f5c9c9}
+.ui-input{border:1px solid #d5dce6;border-radius:7px;padding:7px 10px;
+  font-size:12px;color:var(--u-faint);background:#fff}
+.ui-h{font-family:var(--display);font-weight:700;color:var(--u-ink)}
+.ui-label{font-size:9.5px;font-weight:700;color:var(--u-muted);letter-spacing:.06em;
+  text-transform:uppercase;margin-bottom:4px}
+.ui-meta{font-size:11px;color:var(--u-muted)}
+.ui-faint{color:var(--u-faint)}
+.ui-grid{display:grid;gap:9px}
+
+/* Board pipeline strip */
+.ui-pipe{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:11px}
+.ui-pipe span{border-radius:7px;padding:7px 4px;text-align:center;
+  font-size:10.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Progress timeline */
+.ui-track{display:flex;margin-top:6px}
+.ui-track > div{flex:1;display:flex;flex-direction:column;align-items:center;
+  position:relative;font-size:9.5px;font-weight:600;color:var(--u-faint)}
+.ui-track > div::after{content:"";position:absolute;top:8px;left:50%;width:100%;height:2px;
+  background:#dadee6;z-index:0}
+.ui-track > div:last-child::after{display:none}
+.ui-track i{width:16px;height:16px;border-radius:50%;border:2px solid #dadee6;
+  background:#fff;z-index:1;margin-bottom:5px}
+.ui-track .done{color:var(--u-body)}
+.ui-track .done i{background:#8d95a5;border-color:#8d95a5}
+.ui-track .done::after{background:#8d95a5}
+.ui-track .last i{background:#33a3ff;border-color:#33a3ff}
+.ui-track .last{color:#33a3ff}
+
+/* Modal-on-scrim */
+.ui-scrim{background:#0a162c;padding:20px;display:flex;justify-content:center}
+.ui-modal{background:#fff;border-radius:12px;padding:18px;width:100%;max-width:390px}
+
+/* KPI tiles */
+.ui-kpi{background:#fff;border:1px solid var(--u-line);border-radius:10px;padding:11px 13px}
+.ui-kpi b{display:block;font-family:var(--display);font-size:22px;font-weight:800;
+  color:var(--u-ink);line-height:1.15;font-variant-numeric:tabular-nums}
+.ui-kpi span{font-size:10px;color:var(--u-muted);display:block;margin-top:2px}
+
+.ui-bars{display:flex;flex-direction:column;gap:6px}
+.ui-bars > div{display:flex;align-items:center;gap:8px;font-size:11px}
+.ui-bars i{height:16px;border-radius:4px;display:block}
+
+kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
+  border-bottom-width:2px;border-radius:5px;padding:1px 6px;background:var(--surface);color:var(--ink)}
+
+.end{margin-top:60px;padding-top:26px;border-top:1px solid var(--line);
+  font-size:13px;color:var(--faint)}
+</style>
+<header class="mast">
+  <div class="mast__in">
+    <p class="mast__eyebrow">Internal documentation · Support Engineering, APAC · Part 2 of 2</p>
+    <h1>Administrator Guide</h1>
+    <p>An extension to the user guide, covering the four tools only administrators can see and the extra authority an admin account carries on any idea.</p>
+    <div class="mast__meta">
+      <div>Audience<b>Administrators only</b></div>
+      <div>Read first<b>User guide (part 1)</b></div>
+      <div>Applies to<b>Production</b></div>
+      <div>Owner<b>Khoa Vu</b></div>
+      <div>Last updated<b>31 July 2026</b></div>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#a1">What an admin can do</a></li>
+      <li><a href="#a2">The admin top bar</a></li>
+      <li><a href="#a3">Dashboard</a></li>
+      <li><a href="#a4">Manage — Tags</a></li>
+      <li><a href="#a5">Manage — Form fields</a></li>
+      <li><a href="#a6">Manage — User accounts</a></li>
+      <li><a href="#a7">Manage — Feedback</a></li>
+      <li><a href="#a8">Manage — Delete requests</a></li>
+      <li><a href="#a9">Tasks</a></li>
+      <li><a href="#a10">Activity log</a></li>
+      <li><a href="#a11">Authority on any idea</a></li>
+      <li><a href="#a12">Emails admins receive</a></li>
+      <li><a href="#a13">A suggested rhythm</a></li>
+    </ol>
+    <p class="toc__note">Everything in the user guide also applies to you. This document covers only what is additional.</p>
+  </nav>
+
+  <main>
+
+    <section id="a1">
+      <p class="sec-num">Section 01</p>
+      <h2>What an admin can do</h2>
+      <p class="lede">Four extra tools, and authority over every idea rather than only the ones you lead.</p>
+
+      <p>An administrator account is a <b>workspace-level</b> role, separate from the per-idea roles everyone holds. It is set on your account by another administrator; there is no way to grant it to yourself.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:250px">Capability</th><th>Member</th><th>Project&nbsp;Lead</th><th>Admin</th></tr></thead>
+          <tbody>
+            <tr><td>Submit, like, follow, comment</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Join a team in any role</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Edit an idea's content</td><td>—</td><td>Own idea</td><td><b>Any idea</b></td></tr>
+            <tr><td>Change an idea's status</td><td>—</td><td>Own idea</td><td><b>Any idea</b></td></tr>
+            <tr><td>Triage requests</td><td>—</td><td>Own idea</td><td><b>Any idea</b></td></tr>
+            <tr><td>Edit team roles, transfer the lead</td><td>—</td><td>—</td><td><b>Yes</b></td></tr>
+            <tr><td>Remove someone from a team</td><td>—</td><td>—</td><td><b>Yes</b></td></tr>
+            <tr><td>Delete an idea</td><td>—</td><td>Request only</td><td><b>Yes</b></td></tr>
+            <tr><td>Dashboard, Tasks, Activity, Manage</td><td>—</td><td>—</td><td><b>Yes</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--warn">
+        <span class="note__tag">Worth knowing</span>
+        <p>A Project Lead cannot manage their own team. Adding a role, removing a member or transferring the lead all require an administrator — so those requests will come to you.</p>
+      </div>
+    </section>
+
+    <section id="a2">
+      <p class="sec-num">Section 02</p>
+      <h2>The admin top bar</h2>
+      <p>Four items appear that members never see.</p>
+      <figure>
+        <div class="ui">
+          <div class="ui-bar">
+            <span class="ui-logo"><span class="ui-mark">◈</span>VN TS - AI Ideas Hub</span>
+            <span class="ui-nav">
+              <span class="on">Board</span><span>Dashboard</span><span>Tasks</span><span>Activity</span><span>Manage ▾</span>
+            </span>
+            <span class="ui-search">⌕ Search ideas</span>
+            <span class="ui-plus">+</span>
+            <span class="ui-av">KV</span>
+          </div>
+          <div class="ui-body" style="height:104px;position:relative">
+            <div style="position:absolute;left:196px;top:0;background:#fff;border:1px solid #e4e7ed;border-radius:9px;
+                        box-shadow:0 10px 28px rgba(11,30,73,.16);padding:5px;width:158px">
+              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640">Tags</div>
+              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640;background:#f3f5f9;border-radius:5px">Form fields</div>
+              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640">User accounts</div>
+              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640">Feedback</div>
+              <div style="padding:6px 9px;font-size:11.5px;font-weight:600;color:#2e3640">Delete requests</div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Admin top bar</b> — with the Manage menu open</figcaption>
+      </figure>
+      <p>The <b>Manage</b> menu opens on hover, so you can jump straight to a section without loading the page first. Clicking <b>Manage</b> itself opens the page with a dropdown to switch sections.</p>
+    </section>
+
+    <section id="a3">
+      <p class="sec-num">Section 03</p>
+      <h2>Dashboard</h2>
+      <p class="lede">The leadership view. Read the flags first — they are the only part that asks you to act.</p>
+
+      <p>A period switch at the top offers <b>All time</b> or <b>This quarter</b>, which filters the idea-based figures.</p>
+
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <div class="ui-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:10px">
+              <div class="ui-kpi"><span>Total ideas</span><b>9</b><span style="color:#2f9e44;font-weight:700">▲ +4 this quarter</span></div>
+              <div class="ui-kpi"><span>Active (in review → pilot)</span><b>5</b></div>
+              <div class="ui-kpi"><span>Launched</span><b>2</b><span>22% of all ideas</span></div>
+              <div class="ui-kpi"><span>Team participation</span><b>78%</b></div>
+              <div class="ui-kpi"><span>Est. hours saved / week</span><b>—</b><span>not tracked yet</span></div>
+            </div>
+            <div class="ui-grid" style="grid-template-columns:1.4fr 1fr">
+              <div class="ui-panel">
+                <div class="ui-h" style="font-size:12.5px;margin-bottom:10px">Pipeline funnel</div>
+                <div class="ui-bars">
+                  <div><span style="width:78px;color:#5e687a">Submitted</span><i style="width:62%;background:#3b5bdb"></i><b style="font-size:10.5px;color:#0b1e49">2</b></div>
+                  <div><span style="width:78px;color:#5e687a">In Review</span><i style="width:34%;background:#b7791f"></i><b style="font-size:10.5px;color:#0b1e49">1</b></div>
+                  <div><span style="width:78px;color:#5e687a">Approved</span><i style="width:6%;background:#147a5a"></i><b style="font-size:10.5px;color:#0b1e49">0</b></div>
+                  <div><span style="width:78px;color:#5e687a">In Progress</span><i style="width:88%;background:#2f9e44"></i><b style="font-size:10.5px;color:#0b1e49">3</b></div>
+                  <div><span style="width:78px;color:#5e687a">Pilot</span><i style="width:34%;background:#7048e8"></i><b style="font-size:10.5px;color:#0b1e49">1</b></div>
+                  <div><span style="width:78px;color:#5e687a">Launched</span><i style="width:62%;background:#2b8a3e"></i><b style="font-size:10.5px;color:#0b1e49">2</b></div>
+                </div>
+              </div>
+              <div class="ui-panel">
+                <div class="ui-h" style="font-size:12.5px;margin-bottom:10px">Needs attention</div>
+                <p style="font-size:11px;margin:0 0 7px;padding:7px 9px;background:#fdf3e0;border-radius:6px;color:#9a6300">1 idea in review &gt; 7 days — review SLA is 7 days</p>
+                <p style="font-size:11px;margin:0;padding:7px 9px;background:#fdf3e0;border-radius:6px;color:#9a6300">"Bulk tag cleanup" on hold 21 days — no update from idea lead</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Dashboard</b> — KPI tiles, funnel and attention flags</figcaption>
+      </figure>
+
+      <h3>What each tile means</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:230px">Tile</th><th>How it is calculated</th></tr></thead>
+          <tbody>
+            <tr><td><b>Total ideas</b></td><td>Every idea in the period, with the count added this quarter beneath.</td></tr>
+            <tr><td><b>Active (in review → pilot)</b></td><td>Ideas at In Review, Approved, In Progress or Pilot. Work in flight.</td></tr>
+            <tr><td><b>Launched</b></td><td>Ideas at Launched, and what share of all ideas that is.</td></tr>
+            <tr><td><b>Team participation</b></td><td>The share of accounts that have taken part in at least one idea.</td></tr>
+            <tr><td><b>Est. hours saved / week</b></td><td>Not yet tracked. The tile is a placeholder until the team agrees how to measure it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Needs attention</h3>
+      <p>Two rules raise a flag, both about ideas going quiet rather than ideas being wrong:</p>
+      <ul>
+        <li>An idea has been <b>In Review for more than 7 days</b> — the team's review target.</li>
+        <li>An idea is <b>On Hold</b> with no update from its lead for an extended period.</li>
+      </ul>
+      <p>Below these sit <b>Ideas by category &amp; engagement</b>, an <b>Ideas by engagement</b> table (likes, requests, members and target per idea) and <b>Top contributors</b>.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">Read with care</span>
+        <p><b>Top contributors</b> currently scores <code>ideas × 5 + requests × 1 + team memberships × 2</code>. That rewards volume rather than outcome — someone who comments frequently can outrank someone who led an idea to launch. A replacement is drafted in <code>docs/contribution-scoring.md</code>. Treat the current ranking as indicative, not as a performance measure.</p>
+      </div>
+    </section>
+
+    <section id="a4">
+      <p class="sec-num">Section 04</p>
+      <h2>Manage — Tags</h2>
+      <p class="lede">The category list offered on the submit form.</p>
+      <p>Add a tag, remove one, and set each one's colour. The colour is used for the chip on every card and idea page, so pick distinguishable ones.</p>
+      <div class="note">
+        <span class="note__tag">Safe to change</span>
+        <p>Removing a tag strips it from every idea that carries it. <b>No idea is deleted.</b> Renaming is not supported — add the new tag, retag, then remove the old one.</p>
+      </div>
+      <div class="note note--warn">
+        <span class="note__tag">Outstanding decision</span>
+        <p>The list is still <b>Work / Personal Development / Family / Home</b>, carried over from the original prototype. The proposed categories are Support/CX, Internal Ops, Knowledge, Reporting and Other. Changing it takes a couple of minutes here once the team agrees.</p>
+      </div>
+    </section>
+
+    <section id="a5">
+      <p class="sec-num">Section 05</p>
+      <h2>Manage — Form fields</h2>
+      <p class="lede">Extra questions on the submit form, beyond the six built-in ones.</p>
+      <p>Add a field with a label and a type — text, long text, number or a dropdown with your own options. Mark it required if an idea cannot be assessed without it. Fields can be reordered, and the order applies to the form immediately.</p>
+      <div class="note note--good">
+        <span class="note__tag">Nothing is lost</span>
+        <p>Removing a field <b>archives</b> it. Answers already given on existing ideas are kept and still displayed, marked <i>(archived)</i>. The field simply stops appearing on the form for new submissions.</p>
+      </div>
+      <p>The six built-in fields — Idea Name, Category, Context, Pain Points, Expected Benefit and Expected time frame — are shown here for reference but cannot be removed.</p>
+    </section>
+
+    <section id="a6">
+      <p class="sec-num">Section 06</p>
+      <h2>Manage — User accounts</h2>
+      <p class="lede">Everyone with access, and what they can do.</p>
+
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <div class="ui-panel">
+              <div class="ui-h" style="font-size:13px;margin-bottom:11px">User accounts</div>
+              <div style="display:flex;gap:8px;font-size:9.5px;font-weight:700;color:#5e687a;letter-spacing:.06em;text-transform:uppercase;padding-bottom:7px;border-bottom:1px solid #e4e7ed">
+                <span style="width:82px">Username</span><span style="width:132px">Email</span><span style="width:78px">Name</span><span style="width:62px">Role</span><span>Actions</span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #eef1f6;font-size:11px">
+                <span class="ui-input" style="width:82px;padding:4px 7px;color:#2e3640">khoa.vu</span>
+                <span class="ui-input" style="width:132px;padding:4px 7px;color:#2e3640">khoa.vu@skedulo.com</span>
+                <span class="ui-input" style="width:78px;padding:4px 7px;color:#2e3640">Khoa Vu</span>
+                <span class="ui-input" style="width:62px;padding:4px 7px;color:#2e3640">admin ▾</span>
+                <span class="ui-btn" style="padding:4px 8px">Reset pw</span>
+                <span class="ui-btn ui-btn--bad" style="padding:4px 8px">Delete</span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;padding:8px 0;font-size:11px">
+                <span class="ui-input" style="width:82px;padding:4px 7px;color:#2e3640">trung.vo</span>
+                <span class="ui-input" style="width:132px;padding:4px 7px;color:#2e3640">trung.vo@skedulo.com</span>
+                <span class="ui-input" style="width:78px;padding:4px 7px;color:#2e3640">Trung Vo</span>
+                <span class="ui-input" style="width:62px;padding:4px 7px;color:#2e3640">member ▾</span>
+                <span class="ui-btn" style="padding:4px 8px">Reset pw</span>
+                <span class="ui-btn ui-btn--bad" style="padding:4px 8px">Delete</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>User accounts</b> — inline editing, one save</figcaption>
+      </figure>
+
+      <p>Edit a row in place and save. You can change someone's username, email, display name and role, reset their password, or delete the account. Making someone an <b>admin</b> gives them everything in this guide.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">Deleting an account</span>
+        <p>Deleting removes that person's team memberships, likes and requests along with the account. If they led an idea, that idea is left <b>without a Project Lead</b> — reassign it afterwards. Consider switching them to <b>member</b> instead if they are only changing role.</p>
+      </div>
+
+      <p>Most people will never appear here: anyone with a <b>@skedulo.com</b> address can create their own account, confirmed by an emailed code. Use this page for role changes, corrections and departures.</p>
+    </section>
+
+    <section id="a7">
+      <p class="sec-num">Section 07</p>
+      <h2>Manage — Feedback</h2>
+      <p class="lede">Everything sent through the button in the bottom-right corner.</p>
+      <p>Each entry shows who sent it, when, and <b>which page they were on</b> — so you rarely need to ask what they were looking at. Mark an item <b>Resolved</b> when it is dealt with, or delete it. Resolved items grey out but stay on the list.</p>
+      <p>You are emailed as soon as feedback arrives, so this page is a record rather than something to poll.</p>
+    </section>
+
+    <section id="a8">
+      <p class="sec-num">Section 08</p>
+      <h2>Manage — Delete requests</h2>
+      <p class="lede">The queue of ideas a Project Lead has asked to have removed.</p>
+      <p>Each entry shows the idea, its number, who asked, when, and the reason they gave. You have two choices:</p>
+      <ul>
+        <li><b>Delete idea</b> — removes it permanently.</li>
+        <li><b>Dismiss</b> — clears the request and the banner. The idea stays exactly as it was.</li>
+      </ul>
+      <div class="note note--warn">
+        <span class="note__tag">Irreversible</span>
+        <p>Deleting an idea also removes its team, likes, requests and every uploaded file. There is no undo and no recycle bin. Open the idea and read it before you delete.</p>
+      </div>
+      <p>A dismissed request leaves the lead with full use of the idea — dismissing does not restrict them in any way.</p>
+    </section>
+
+    <section id="a9">
+      <p class="sec-num">Section 09</p>
+      <h2>Tasks</h2>
+      <p class="lede">A shared to-do list for administrators.</p>
+      <p>Unrelated to ideas — it is a plain checklist that every admin sees and can edit. Type an item and press <kbd>Enter</kbd> or <b>Add</b>. Tick it to complete it; completed items collect under a <b>Done</b> heading with a count. The <b>✕</b> removes an item outright.</p>
+      <p>Use it for the running work of administering the Hub: confirming the tag list, chasing a stalled review, rotating a password.</p>
+    </section>
+
+    <section id="a10">
+      <p class="sec-num">Section 10</p>
+      <h2>Activity log</h2>
+      <p class="lede">Who did what, and when.</p>
+
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <div class="ui-panel">
+              <div class="ui-h" style="font-size:14px;margin-bottom:3px">Activity log</div>
+              <p class="ui-meta" style="margin:0 0 11px">Every notable action in the Hub. Entries are kept for 14 days and removed automatically after that.</p>
+              <div class="ui-row" style="margin-bottom:11px">
+                <span class="ui-input" style="font-weight:600;color:#3a4a63">Anyone ▾</span>
+                <span class="ui-input" style="font-weight:600;color:#3a4a63">All types ▾</span>
+                <span class="ui-meta" style="font-size:10.5px">From</span><span class="ui-input">2026-07-01</span>
+                <span class="ui-meta" style="font-size:10.5px">to</span><span class="ui-input">2026-07-31</span>
+                <span class="ui-meta" style="margin-left:auto;font-weight:600">18 entries</span>
+              </div>
+              <div style="border-top:1px solid #e4e7ed;padding:7px 0;display:flex;gap:11px;font-size:11px">
+                <span class="ui-faint num" style="width:120px">7/31/2026, 09:14:02</span>
+                <b style="width:96px;color:#0b1e49">Khoa Vu</b>
+                <span>moved "Auto-draft the PIR from ticket history" to In Review</span>
+              </div>
+              <div style="border-top:1px solid #e4e7ed;padding:7px 0;display:flex;gap:11px;font-size:11px">
+                <span class="ui-faint num" style="width:120px">7/30/2026, 16:48:31</span>
+                <b style="width:96px;color:#0b1e49">Trung Vo</b>
+                <span>joined a team as Tester, Data / Ops</span>
+              </div>
+              <div style="border-top:1px solid #e4e7ed;padding:7px 0;display:flex;gap:11px;font-size:11px">
+                <span class="ui-faint num" style="width:120px">7/30/2026, 11:02:44</span>
+                <b style="width:96px;color:#0b1e49">Sked Admin</b>
+                <span>edited Context, Expected benefit on "PIR Automation"</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Activity log</b> — filters and entries</figcaption>
+      </figure>
+
+      <p>Filter by <b>person</b>, by <b>type</b> (Ideas, Accounts, Form fields, Feedback) and by <b>date range</b>. The date filter uses your own timezone, so the boundaries match the timestamps on screen. <b>Clear</b> resets everything.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">14-day retention</span>
+        <p>Entries are deleted automatically after 14 days. There is no export. If you need a record for a review or an audit, copy it out before it ages away.</p>
+      </div>
+    </section>
+
+    <section id="a11">
+      <p class="sec-num">Section 11</p>
+      <h2>Authority on any idea</h2>
+      <p class="lede">An admin sees the Project Lead's controls on every idea, plus two of their own.</p>
+
+      <p>Open any idea and you can edit its content, change its status and triage its requests, exactly as its lead can. Two further controls are yours alone.</p>
+
+      <h3>Editing the team</h3>
+      <p>In the <b>Team &amp; roles</b> sidebar each member's roles become clickable chips. Tick and untick to change them, and <b>✕</b> removes the person from the team.</p>
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <div class="ui-panel" style="max-width:290px">
+              <div class="ui-h" style="font-size:13px;margin-bottom:11px">Team &amp; roles</div>
+              <div class="ui-row" style="align-items:flex-start">
+                <span class="ui-av" style="width:30px;height:30px;background:#7950f2">TV</span>
+                <span style="flex:1">
+                  <b style="font-size:12px;color:#0b1e49">Trung Vo</b>
+                  <span class="ui-row" style="gap:4px;margin-top:5px">
+                    <span class="ui-tag" style="font-size:9.5px;padding:2px 6px">Initiator / Project Lead</span>
+                    <span class="ui-tag" style="font-size:9.5px;padding:2px 6px;border-color:#0055ff;color:#0055ff;background:#eef1fb">✓ Tester</span>
+                    <span class="ui-tag" style="font-size:9.5px;padding:2px 6px;border-color:#0055ff;color:#0055ff;background:#eef1fb">✓ Data / Ops</span>
+                    <span class="ui-tag" style="font-size:9.5px;padding:2px 6px">Observer</span>
+                  </span>
+                </span>
+                <span class="ui-faint" style="font-size:11px">✕</span>
+              </div>
+              <p class="ui-meta ui-faint" style="font-size:10px;margin:10px 0 0">Admin: change a role, or set someone as Initiator / Project Lead to transfer the lead.</p>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Team &amp; roles</b> — the admin view, with editable role chips</figcaption>
+      </figure>
+      <p>Assigning <b>Initiator / Project Lead</b> to someone new <b>removes it from the current holder automatically</b> — only one lead per idea is allowed, and the app enforces it rather than warning you.</p>
+
+      <h3>Deleting an idea</h3>
+      <p>A <b>Delete idea</b> button sits in the action row on every idea. It does not need a request first — the request queue exists so leads can ask, not because you need permission.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">Use sparingly</span>
+        <p>Because an admin can edit any idea's content and status, it is easy to change something the lead is in the middle of. Prefer posting a request and letting the lead act. Step in directly when the lead has left, is away, or the idea has gone quiet.</p>
+      </div>
+    </section>
+
+    <section id="a12">
+      <p class="sec-num">Section 12</p>
+      <h2>Emails admins receive</h2>
+      <p class="lede">On top of the emails you get for ideas you are on the team of, or following.</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:250px">When</th><th>What it tells you</th></tr></thead>
+          <tbody>
+            <tr><td><b>A new idea is submitted</b></td><td>Who raised it and what it is. Your cue to start the review clock.</td></tr>
+            <tr><td><b>Deletion is requested</b></td><td>Which idea, who asked, and the reason given.</td></tr>
+            <tr><td><b>Feedback is sent</b></td><td>The message and the page it came from.</td></tr>
+            <tr><td><b>A user account changes</b></td><td>An account created, edited or deleted — including by another admin.</td></tr>
+            <tr><td><b>The submit form changes</b></td><td>A field added, edited, reordered or archived.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>You are never emailed about your own actions, so a busy admin does not fill their own inbox.</p>
+      <div class="note note--warn">
+        <span class="note__tag">Deliverability</span>
+        <p>Hub email is sent from an address that is not yet on a Skedulo domain, so the first message to each person usually lands in spam. Tell new joiners to mark it <b>Not spam</b> once. Moving to a verified Skedulo sending domain is the permanent fix.</p>
+      </div>
+    </section>
+
+    <section id="a13">
+      <p class="sec-num">Section 13</p>
+      <h2>A suggested rhythm</h2>
+      <p class="lede">Not enforced by the tool — a starting point the team can adjust.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:130px">When</th><th>What to check</th></tr></thead>
+          <tbody>
+            <tr><td><b>As emails arrive</b></td><td>New submissions. Move an idea to <b>In Review</b> so the 7-day clock is visible to everyone, rather than leaving it at Submitted.</td></tr>
+            <tr><td><b>Weekly</b></td><td><b>Dashboard → Needs attention.</b> Clear anything past the 7-day review target, and chase On Hold ideas that have gone quiet.</td></tr>
+            <tr><td><b>Weekly</b></td><td><b>Manage → Delete requests</b> and <b>Feedback</b>. Both are short queues; leaving them makes people stop using them.</td></tr>
+            <tr><td><b>Monthly</b></td><td><b>Manage → User accounts.</b> Remove leavers, and check nobody holds admin who no longer needs it.</td></tr>
+            <tr><td><b>Quarterly</b></td><td>Switch the dashboard to <b>This quarter</b> for a review. Note which ideas launched and what the funnel shows about where work stalls.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Two things to keep an eye on</h3>
+      <ul>
+        <li><b>Ideas with no Project Lead.</b> The board shows them as <b>Unassigned</b>. An idea with no owner will not move on its own.</li>
+        <li><b>The activity log ages out at 14 days.</b> If a decision needs a paper trail beyond that, record it as a request on the idea, where it is kept permanently.</li>
+      </ul>
+
+      <p class="end">VN TS - AI Ideas Hub · Administrator guide (part 2 of 2) · Read alongside the user guide. Written against the production build, 31 July 2026. Screens are reproductions drawn from the application's own design tokens.</p>
+    </section>
+
+  </main>
+</div>
