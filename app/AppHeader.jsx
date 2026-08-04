@@ -11,7 +11,7 @@ import { useSession } from "./SessionProvider";
 
 const MANAGE_SECTIONS = [
   ["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"],
-  ["feedback", "Feedback"], ["deletions", "Delete requests"],
+  ["feedback", "Feedback"], ["deletions", "Delete requests"], ["settings", "Settings"],
 ];
 
 // App top bar, modelled on the Skedulo product header.

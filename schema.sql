@@ -183,6 +183,14 @@ create table if not exists audit_log (
 );
 create index if not exists audit_log_created_at_idx on audit_log (created_at desc);
 
+-- Runtime settings an admin can flip without a redeploy. Absent row = default.
+create table if not exists app_settings (
+  key        text primary key,
+  value      text not null,
+  updated_at timestamptz not null default now(),
+  updated_by uuid
+);
+
 -- Feedback — any signed-in user can submit; admins review. Kept if the account
 -- is later deleted (account_id set null).
 create table if not exists feedback (
@@ -224,6 +232,10 @@ alter table accounts add column if not exists region text;
 alter table accounts add column if not exists timezone text;
 alter table accounts add column if not exists session_id uuid not null default gen_random_uuid();
 alter table requests add column if not exists updated_at timestamptz;
+create table if not exists app_settings (
+  key text primary key, value text not null,
+  updated_at timestamptz not null default now(), updated_by uuid
+);
 
 -- Merge "Project Lead" + "Initiator / Idea Lead" into "Initiator / Project Lead".
 -- The old index has the same NAME but the old predicate, so `if not exists`

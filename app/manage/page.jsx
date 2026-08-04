@@ -44,6 +44,7 @@ function ManagePage() {
   const [timeFrames, setTimeFrames] = useState([]);
   const [newTimeFrame, setNewTimeFrame] = useState("");
   const [deleteRequests, setDeleteRequests] = useState([]);
+  const [emailOn, setEmailOn] = useState(true);
   const searchParams = useSearchParams();
   const [view, setView] = useState("tags");
   // Deep-link from the header's hover menu: /manage?section=users
@@ -59,10 +60,12 @@ function ManagePage() {
     setErr("");
     try {
       // One parallel wave — six sequential round trips made this page crawl.
-      const [t, a, fb, ff, tf, dr] = await Promise.all([
+      const [t, a, fb, ff, tf, dr, st] = await Promise.all([
         api("/api/tags"), api("/api/accounts"), api("/api/feedback"),
         api("/api/form-fields"), api("/api/time-frames"), api("/api/ideas/delete-requests"),
+        api("/api/settings"),
       ]);
+      setEmailOn(st.settings.email_notifications);
       setTags(t.tags);
       setAccounts(a.accounts);
       setFeedback(fb.feedback);
@@ -77,7 +80,7 @@ function ManagePage() {
   // Pick up other admins' changes when you come back to the tab.
   useRevalidateOnFocus(() => { if (me) load(); }, { enabled: Object.values(dirty).every((v) => !v) });
 
-  const run = async (fn, okMsg) => { setErr(""); try { await fn(); if (okMsg) { setToast(okMsg); setTimeout(() => setToast(""), 2500); } } catch (e) { setErr(e.message); } };
+  const run = async (fn, okMsg, revert) => { setErr(""); try { await fn(); if (okMsg) { setToast(okMsg); setTimeout(() => setToast(""), 2500); } } catch (e) { revert?.(); setErr(e.message); } };
 
   const addTag = () => { const n = newTag.trim(); if (!n) return; run(async () => { const { tags: t } = await api("/api/tags", { method: "POST", body: JSON.stringify({ name: n }) }); setTags(t); setNewTag(""); }); };
   const delTag = (name) => { if (!confirm(`Delete tag "${name}"? It will be removed from any ideas using it.`)) return; run(async () => { const { tags: t } = await api("/api/tags", { method: "DELETE", body: JSON.stringify({ name }) }); setTags(t); }); };
@@ -127,9 +130,17 @@ function ManagePage() {
   const delTimeFrame = (name) => { if (!confirm(`Remove "${name}" from the options? Ideas already using it keep their value.`)) return; run(async () => { const { timeFrames: tf } = await api("/api/time-frames", { method: "DELETE", body: JSON.stringify({ name }) }); setTimeFrames(tf); }); };
 
   const dismissReq = (r) => run(async () => { await api(`/api/ideas/${r.id}/delete-request`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); });
+  const toggleEmail = () => {
+    const next = !emailOn;
+    setEmailOn(next);   // optimistic
+    run(async () => {
+      const { settings } = await api("/api/settings", { method: "PATCH", body: JSON.stringify({ email_notifications: next }) });
+      setEmailOn(settings.email_notifications);
+    }, next ? "Email notifications are on." : "Email notifications are off.", () => setEmailOn(!next));
+  };
   const deleteIdeaNow = (r) => { if (!confirm(`Delete "${r.name}" permanently? This removes its team, likes, requests, and files.`)) return; run(async () => { await api(`/api/ideas/${r.id}`, { method: "DELETE" }); setDeleteRequests((rs) => rs.filter((x) => x.id !== r.id)); }); };
   const openFb = feedback.filter((f) => f.status === "open").length;
-  const VIEWS = [["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"], ["feedback", "Feedback"], ["deletions", "Delete requests"]];
+  const VIEWS = [["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"], ["feedback", "Feedback"], ["deletions", "Delete requests"], ["settings", "Settings"]];
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
@@ -354,6 +365,46 @@ function ManagePage() {
             )}
 
             {/* Delete requests */}
+            {view === "settings" && (
+            <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" }}>
+              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 4px" }}>Settings</h2>
+              <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 18px" }}>
+                Applies to everyone, immediately. No redeploy needed.
+              </p>
+
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14, border: "1px solid var(--line)", borderRadius: 12, padding: "14px 16px" }}>
+                <button
+                  onClick={toggleEmail}
+                  role="switch" aria-checked={emailOn}
+                  title={emailOn ? "Turn email notifications off" : "Turn email notifications on"}
+                  style={{
+                    flex: "none", width: 46, height: 26, borderRadius: 999, border: "none", cursor: "pointer",
+                    background: emailOn ? "var(--blue)" : "#c8d0dc", padding: 3, display: "flex",
+                    justifyContent: emailOn ? "flex-end" : "flex-start", transition: "background 140ms",
+                  }}
+                >
+                  <span style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff", display: "block" }} />
+                </button>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)" }}>
+                    Email notifications {emailOn
+                      ? <span style={{ color: "#2f9e44" }}>on</span>
+                      : <span style={{ color: "#d53c30" }}>off</span>}
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "4px 0 0", lineHeight: 1.55 }}>
+                    Status changes, new requests, content edits, someone joining a team, and the
+                    admin alerts. Turn it off while testing so nobody gets mailed.
+                  </p>
+                  <p style={{ fontSize: 12, color: "var(--faint)", margin: "8px 0 0", lineHeight: 1.55 }}>
+                    <b style={{ color: "var(--muted)" }}>Sign-up and password-reset codes are not affected</b> — those
+                    still send, or nobody could get in. Suppressed notifications are logged, not queued: they
+                    are not delivered later.
+                  </p>
+                </div>
+              </div>
+            </section>
+            )}
+
             {view === "deletions" && (
             <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" }}>
               <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 12px" }}>Delete requests {deleteRequests.length > 0 && <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>({deleteRequests.length})</span>}</h2>
