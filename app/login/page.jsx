@@ -17,7 +17,14 @@ function LoginForm() {
   const [notice, setNotice] = useState("");
   useEffect(() => {
     if (searchParams.get("reset") === "1") setResetDone(true);
-    if (searchParams.get("changed") === "1") setNotice("Password changed. Sign in with your new one.");
+    const sso = searchParams.get("sso");
+    if (sso) setNotice({
+      unconfigured: "Google sign-in isn't set up yet. Use your username and password.",
+      domain: "Sign in with your @skedulo.com Google account.",
+      cancelled: "Google sign-in was cancelled.",
+      state: "That sign-in attempt expired. Please try again.",
+    }[sso] || "Google sign-in didn't work. Try again, or use your password.");
+    else if (searchParams.get("changed") === "1") setNotice("Password changed. Sign in with your new one.");
     else if (searchParams.get("ended") === "1") setNotice("Your session ended — you signed in on another device, or your password changed.");
   }, [searchParams]);
   const [username, setUsername] = useState("");
@@ -98,6 +105,30 @@ function LoginForm() {
         >
           {busy ? "Signing in…" : "Sign in"}
         </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
+          <span style={{ flex: 1, height: 1, background: "#e4e7ed" }} />
+          <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 600 }}>OR</span>
+          <span style={{ flex: 1, height: 1, background: "#e4e7ed" }} />
+        </div>
+
+        <a
+          href="/api/auth/google"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            width: "100%", padding: "10px 0", borderRadius: 9, border: "1px solid #d5dce6",
+            background: "#fff", color: "#3a4a63", fontSize: 14, fontWeight: 700,
+            textDecoration: "none", boxSizing: "border-box",
+          }}
+        >
+          <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-2.8-.4-4H24v7.6h11.9c-.2 2-1.5 5-4.4 7l-.1.3 6.4 5 .4.1c4.1-3.8 6.9-9.4 6.9-16z"/>
+            <path fill="#34A853" d="M24 46c5.9 0 10.9-1.9 14.5-5.3l-6.9-5.3c-1.8 1.3-4.3 2.2-7.6 2.2-5.8 0-10.7-3.8-12.5-9.1l-.3.1-6.6 5.1-.1.3C7.6 41 15.2 46 24 46z"/>
+            <path fill="#FBBC05" d="M11.5 28.5c-.5-1.4-.7-2.9-.7-4.5s.3-3.1.7-4.5v-.3l-6.9-5.3-.2.1C2.8 17.1 2 20.4 2 24s.8 6.9 2.4 10l7.1-5.5z"/>
+            <path fill="#EA4335" d="M24 10.2c4.1 0 6.9 1.8 8.5 3.3l6.2-6C34.9 4 29.9 2 24 2 15.2 2 7.6 7 4.4 14l7.1 5.5c1.8-5.3 6.7-9.3 12.5-9.3z"/>
+          </svg>
+          Continue with Google
+        </a>
+
         <div style={{ fontSize: 12.5, marginTop: 14, textAlign: "center" }}>
           <Link href="/forgot" style={{ color: "var(--blue)", fontWeight: 700 }}>Forgot your password?</Link>
         </div>

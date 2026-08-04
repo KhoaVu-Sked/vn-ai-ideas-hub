@@ -20,7 +20,13 @@ export async function PATCH(request) {
     if (next.length < 6) return Response.json({ error: "Your new password must be at least 6 characters." }, { status: 400 });
     if (next === current) return Response.json({ error: "That's the same as your current password." }, { status: 400 });
 
-    if (!(await verifyPassword(current, await getPasswordHash(user.uid)))) {
+    const hash = await getPasswordHash(user.uid);
+    if (!hash) {
+      return Response.json({
+        error: "Your account signs in with Google, so there's no password to change.",
+      }, { status: 400 });
+    }
+    if (!(await verifyPassword(current, hash))) {
       return Response.json({ error: "That isn't your current password." }, { status: 400 });
     }
 
