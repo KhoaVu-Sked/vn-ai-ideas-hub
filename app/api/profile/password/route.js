@@ -1,10 +1,11 @@
 import { NextResponse, after } from "next/server";
-import { getPasswordHash, setAccountPassword, rotateSessionId, jsonError } from "@/lib/db";
-import { hashPassword, verifyPassword } from "@/lib/auth";
-import { requireUser } from "@/lib/guard";
-import { COOKIE_NAME } from "@/lib/session";
-import { audit } from "@/lib/notify";
-import { anyPasswordLogin, passwordLoginOff } from "@/lib/authMode";
+import { getPasswordHash, rotateSessionId, setAccountPassword } from "@/features/auth/queries";
+import { jsonError } from "@/lib/sql";
+import { hashPassword, verifyPassword } from "@/features/auth/password";
+import { requireUser } from "@/features/auth/guard";
+import { COOKIE_NAME } from "@/features/auth/session";
+import { audit } from "@/features/notifications/notify";
+import { anyPasswordLogin, passwordLoginOff } from "@/features/auth/authMode";
 
 // PATCH /api/profile/password { current, next } → change your own password.
 //

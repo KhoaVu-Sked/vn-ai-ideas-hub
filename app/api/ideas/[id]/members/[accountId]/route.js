@@ -1,5 +1,6 @@
-import { setMemberRoles, removeMember, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { removeMember, setMemberRoles } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
 
 // PATCH /api/ideas/:id/members/:accountId { roles: [...] } → set a member's
 // roles. Admin only. Granting the lead transfers it from whoever held it.

@@ -1,7 +1,8 @@
-import { listFormFields, createFormField, jsonError } from "@/lib/db";
-import { requireUser, requireAdmin } from "@/lib/guard";
+import { createFormField, listFormFields } from "@/features/admin/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser, requireAdmin } from "@/features/auth/guard";
 import { after } from "next/server";
-import { adminEvent } from "@/lib/notify";
+import { adminEvent } from "@/features/notifications/notify";
 import { APP_NAME } from "@/lib/brand";
 
 // GET /api/form-fields → all fields incl. archived (any signed-in user).

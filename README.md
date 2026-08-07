@@ -57,10 +57,35 @@ npm run dev                  # http://localhost:3000
 
 > **Plan check:** Vercel's free Hobby tier is licensed for personal, non-commercial use. An internal Skedulo tool should run under a Skedulo Vercel Team / Pro account — confirm before the team-wide rollout.
 
+## Layout
+
+Code is grouped by feature. `app/` holds routing only — in the App Router its
+folder names *are* the URLs, so features can't live inside it.
+
+```
+app/          pages and route handlers; thin, they call into features/
+features/     one folder per feature, each owning its own queries + UI
+  auth/         session, guard, Google OAuth, sign-in modes
+  ideas/        board, idea detail, engagement, submit modal, vocabulary
+  accounts/     admin user management, profiles, avatars
+  admin/        tags, time frames, form fields, settings, audit log
+  dashboard/    leader dashboard aggregates
+  notifications/ email templates, sending, who-to-notify
+  tasks/        admin to-do list
+  feedback/     in-app feedback
+components/   presentational pieces shared by more than one feature
+lib/          feature-agnostic: the Neon client, the fetch wrapper, upload rules
+```
+
+Each feature's `queries.js` is its data layer. They all share the client and
+row-shaping helpers in `lib/sql.js` and import each other directly when they
+genuinely need to — there is no barrel file, so an import tells you which
+feature you are depending on.
+
 ## Auth
 
 - **Login page** at `/login`. `middleware.js` redirects any unauthenticated page visit there; the `/api/*` data routes independently return `401` JSON, so the API is protected even if middleware is bypassed.
-- **Accounts** live in the `accounts` table. `password_hash` is null for everyone who signs in with Google, which is everyone; the bcrypt columns and routes survive behind `PASSWORD_LOGIN` in `lib/authMode.js` only so the app can be reopened if OAuth breaks.
+- **Accounts** live in the `accounts` table. `password_hash` is null for everyone who signs in with Google, which is everyone; the bcrypt columns and routes survive behind `PASSWORD_LOGIN` in `features/auth/authMode.js` only so the app can be reopened if OAuth breaks.
 - **Seeded admin:** `skedadmin` (role `admin`), email `khoa.vu@skedulo.com`. Signing in with that Google address lands on this row — accounts are matched on `lower(email)`, so it keeps its admin role rather than creating a duplicate.
 - **Add a user:** you don't. The first Google sign-in creates the account. If you pre-create one from Manage → User accounts, **set the email address** — a row with a null email can never be matched to a Google identity and its owner is locked out.
 - **Self-serve sign-up** at `/register`, restricted to `@skedulo.com`. Two steps: details → 6-digit code emailed to the address. The row lives in `signup_codes` (bcrypt-hashed code, 10-minute expiry, 5 attempts, 60s resend cooldown) and **no `accounts` row is created until the code checks out**, so an unreadable address can't become a login.

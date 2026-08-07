@@ -1,7 +1,8 @@
 import { after } from "next/server";
-import { addRequest, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
-import { ideaEvent } from "@/lib/notify";
+import { addRequest } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
+import { ideaEvent } from "@/features/notifications/notify";
 
 // POST /api/ideas/:id/requests { body } → add a request/input
 export async function POST(request, { params }) {

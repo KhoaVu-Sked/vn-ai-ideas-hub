@@ -1,5 +1,6 @@
-import { deleteRequest, setRequestState, updateRequestBody, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { deleteRequest, setRequestState, updateRequestBody } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 
 // DELETE /api/ideas/:id/requests/:reqId → remove (author, or lead/admin)
 export async function DELETE(_request, { params }) {

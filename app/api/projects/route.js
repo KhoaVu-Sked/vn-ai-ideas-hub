@@ -1,7 +1,8 @@
-import { listProjects, createProject, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { createProject, listProjects } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 import { after } from "next/server";
-import { adminEvent } from "@/lib/notify";
+import { adminEvent } from "@/features/notifications/notify";
 
 // GET /api/projects → light board list (with a per-user `mine` flag)
 export async function GET() {

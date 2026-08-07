@@ -5,7 +5,7 @@
 // only accepts admin accounts here, so a member's old password won't work.
 
 import { useState } from "react";
-import SkeduloMark from "../SkeduloMark";
+import SkeduloMark from "@/components/SkeduloMark";
 import { APP_NAME } from "@/lib/brand";
 
 export default function AdminLoginPage() {

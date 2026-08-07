@@ -1,6 +1,6 @@
 "use client";
 
-import { avatarColor, initialsOf, avatarSrc } from "@/lib/statusMeta";
+import { avatarColor, avatarSrc, initialsOf } from "@/features/accounts/avatar";
 
 // One avatar for the whole app: uploaded image if there is one, otherwise
 // initials on the person's chosen colour.

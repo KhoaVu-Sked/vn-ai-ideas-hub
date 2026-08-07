@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { COOKIE_NAME } from "@/lib/session";
+import { COOKIE_NAME } from "@/features/auth/session";
 
 // POST /api/auth/logout → clear the session cookie
 export async function POST() {

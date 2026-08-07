@@ -1,0 +1,444 @@
+// Ideas: the board, one idea's detail, status and content edits, deletion
+// requests, and everything under engagement (likes, follows, requests, team).
+
+import { err, lightProject, sql, toArray, toBool, toJsonArray, ymd } from "@/lib/sql";
+import { INITIATOR_ROLE, LEAD_ROLE, REQUEST_STATES, ROLES, STATUSES } from "./constants";
+
+// ── board ─────────────────────────────────────────────────────
+export async function listProjects(accountId) {
+  const rows = await sql`
+    select i.id, i.name, i.status, i.tags,
+      left(coalesce(i.context, ''), 180) as context,
+      (select count(*) from likes l where l.idea_id = i.id)::int as like_count,
+      (select count(*) from requests rq where rq.idea_id = i.id)::int as request_count,
+      (select count(*) from idea_members mc where mc.idea_id = i.id)::int as member_count,
+      coalesce((select json_agg(json_build_object('id', m.account_id, 'name', coalesce(a.name, a.username),
+                  'username', a.username, 'avatar_color', a.avatar_color, 'avatar_url', a.avatar_url) order by m.created_at)
+                from idea_members m join accounts a on a.id = m.account_id
+                where m.idea_id = i.id and exists (select 1 from unnest(m.roles) r where r <> 'Observer')), '[]'::json) as members,
+      (exists(select 1 from idea_members m where m.idea_id = i.id and m.account_id = ${accountId})
+       or exists(select 1 from follows f where f.idea_id = i.id and f.account_id = ${accountId})) as mine
+    from ideas i order by i.updated_at desc limit 50
+  `;
+  return rows.map((r) => ({
+    ...lightProject(r),
+    context: r.context || "",
+    counts: { likes: r.like_count, requests: r.request_count, members: r.member_count },
+    mine: toBool(r.mine),
+  }));
+}
+
+// ── create / status ───────────────────────────────────────────
+export async function createProject({ name, tags, context, pain_points, expected_benefit, target_date, extra, initiatorAccountId }) {
+  const clean = (name || "").trim();
+  const tagList = Array.isArray(tags) ? tags : [];
+  const rows = await sql`
+    insert into ideas (name, status, tags, context, pain_points, expected_benefit, target_date, extra, initiator_account_id)
+    values (${clean}, 'Submitted', ${tagList}, ${context ?? null}, ${pain_points ?? null},
+            ${expected_benefit ?? null}, ${target_date ?? null}, ${JSON.stringify(extra || {})}::jsonb, ${initiatorAccountId || null})
+    returning id, name, status, tags
+  `;
+  const idea = rows[0];
+  // The creator becomes the idea's lead.
+  if (initiatorAccountId) {
+    await sql`
+      insert into idea_members (idea_id, account_id, roles)
+      values (${idea.id}, ${initiatorAccountId}, array['Project Lead'])
+      on conflict (idea_id, account_id) do nothing
+    `;
+  }
+  return lightProject({ ...idea, members: [] });
+}
+
+export async function updateStatus(id, status) {
+  if (!STATUSES.includes(status)) throw err(400, `Status must be one of: ${STATUSES.join(", ")}`);
+  const rows = await sql`
+    with upd as (
+      update ideas i set status = ${status}, updated_at = now()
+      from (select id, status as prev from ideas where id = ${id}) o
+      where i.id = o.id
+      returning i.id, i.name, i.status, i.tags, o.prev
+    )
+    select u.id, u.name, u.status, u.tags, u.prev,
+      coalesce((select json_agg(json_build_object('id', m.account_id, 'name', coalesce(a.name, a.username),
+                  'username', a.username, 'avatar_color', a.avatar_color, 'avatar_url', a.avatar_url) order by m.created_at)
+                from idea_members m join accounts a on a.id = m.account_id
+                where m.idea_id = u.id and exists (select 1 from unnest(m.roles) r where r <> 'Observer')), '[]'::json) as members
+    from upd u
+  `;
+  if (rows.length === 0) throw err(404, "This idea no longer exists.");
+  return { ...lightProject(rows[0]), previousStatus: rows[0].prev };
+}
+
+// Lead-only content edit (permission enforced in the route). `tags` optional:
+// pass an array to replace the idea's tags, or omit to leave them unchanged.
+export async function updateContent(id, { context, pain_points, expected_benefit, target_date, tags, extra }) {
+  const tagList = Array.isArray(tags) ? tags : null;
+  // Merge extra (|| is right-biased) so archived/other keys are preserved.
+  const extraJson = extra && typeof extra === "object" ? JSON.stringify(extra) : null;
+  // `o` reads the pre-update snapshot, so we can report exactly what changed.
+  const rows = await sql`
+    update ideas i set
+      context = ${context ?? null},
+      pain_points = ${pain_points ?? null},
+      expected_benefit = ${expected_benefit ?? null},
+      target_date = ${target_date ?? null},
+      tags = coalesce(${tagList}::text[], i.tags),
+      extra = coalesce(i.extra, '{}'::jsonb) || coalesce(${extraJson}::jsonb, '{}'::jsonb),
+      updated_at = now()
+    from (select id, context, pain_points, expected_benefit, target_date, tags, extra from ideas where id = ${id}) o
+    where i.id = o.id
+    returning
+      i.name,
+      (i.context is distinct from o.context) as c1,
+      (i.pain_points is distinct from o.pain_points) as c2,
+      (i.expected_benefit is distinct from o.expected_benefit) as c3,
+      (i.target_date is distinct from o.target_date) as c4,
+      (i.tags is distinct from o.tags) as c5,
+      (i.extra is distinct from o.extra) as c6
+  `;
+  if (rows.length === 0) throw err(404, "This idea no longer exists.");
+  const r = rows[0];
+  const changed = [
+    [toBool(r.c1), "Context"], [toBool(r.c2), "Pain points"], [toBool(r.c3), "Expected benefit"],
+    [toBool(r.c4), "Target date"], [toBool(r.c5), "Tags"], [toBool(r.c6), "Other fields"],
+  ].filter(([yes]) => yes).map(([, label]) => label);
+  return { ok: true, name: r.name, changed };
+}
+
+// ── idea deletion ─────────────────────────────────────────────
+// Hard delete (admin). Returns attachment blob URLs so the route can clean them.
+export async function deleteIdea(id) {
+  const urls = (await sql`select url from attachments where idea_id = ${id}`).map((r) => r.url);
+  const rows = await sql`delete from ideas where id = ${id} returning id`;
+  if (rows.length === 0) throw err(404, "This idea no longer exists.");
+  return { ok: true, urls };
+}
+// Project lead asks admin to delete (permission enforced in the route).
+export async function requestIdeaDeletion(id, accountId, reason) {
+  const rows = await sql`
+    update ideas set delete_requested = true, delete_reason = ${(reason || "").trim().slice(0, 500) || null}, delete_requested_by = ${accountId}
+    where id = ${id} returning id
+  `;
+  if (rows.length === 0) throw err(404, "This idea no longer exists.");
+  return { ok: true };
+}
+export async function clearDeleteRequest(id) {
+  await sql`update ideas set delete_requested = false, delete_reason = null, delete_requested_by = null where id = ${id}`;
+  return { ok: true };
+}
+export async function listDeleteRequests() {
+  const rows = await sql`
+    select i.id, i.name, 'IDEA-' || lpad(coalesce(i.seq, 0)::text, 3, '0') as number, i.delete_reason, i.updated_at,
+      coalesce(a.name, a.username) as requester
+    from ideas i left join accounts a on a.id = i.delete_requested_by
+    where i.delete_requested = true order by i.updated_at desc
+  `;
+  return rows.map((r) => ({ id: r.id, name: r.name, number: r.number, reason: r.delete_reason, requester: r.requester, date: ymd(r.updated_at) }));
+}
+
+// ── drawer preview (light detail) ─────────────────────────────
+export async function getProject(id) {
+  const rows = await sql`
+    select i.id, i.name, i.status, i.tags, i.context, i.pain_points, i.expected_benefit,
+      coalesce((select json_agg(json_build_object('id', m.account_id, 'name', coalesce(a.name, a.username),
+                  'username', a.username, 'avatar_color', a.avatar_color, 'avatar_url', a.avatar_url) order by m.created_at)
+                from idea_members m join accounts a on a.id = m.account_id
+                where m.idea_id = i.id and exists (select 1 from unnest(m.roles) r where r <> 'Observer')), '[]'::json) as members,
+      (select count(*) from likes l where l.idea_id = i.id)::int as like_count,
+      (select count(*) from requests r where r.idea_id = i.id)::int as request_count,
+      (select count(*) from idea_members m where m.idea_id = i.id)::int as member_count
+    from ideas i where i.id = ${id}
+  `;
+  if (rows.length === 0) throw err(404, "This idea no longer exists.");
+  const row = rows[0];
+  return {
+    project: lightProject(row),
+    content: buildContent(row),
+    counts: { likes: row.like_count, requests: row.request_count, members: row.member_count },
+  };
+}
+
+function buildContent(row) {
+  const content = [];
+  for (const [heading, text] of [
+    ["Context", row.context], ["Pain points", row.pain_points], ["Expected benefit", row.expected_benefit],
+  ]) {
+    const body = (text || "").trim();
+    if (!body) continue;
+    content.push({ kind: "heading", text: heading });
+    content.push({ kind: "text", text: body });
+  }
+  return content;
+}
+
+// ── full idea page ────────────────────────────────────────────
+export async function getIdea(id, accountId) {
+  const rows = await sql`
+    select i.id, i.name, i.status, i.tags, i.target_date, i.created_at,
+      'IDEA-' || lpad(coalesce(i.seq, 0)::text, 3, '0') as number,
+      i.context, i.pain_points, i.expected_benefit, i.extra, i.delete_requested, i.delete_reason,
+      ini.name as initiator_name, ini.username as initiator_username,
+      (select count(*) from likes l where l.idea_id = i.id)::int as like_count,
+      exists(select 1 from likes l where l.idea_id = i.id and l.account_id = ${accountId}) as liked_by_me,
+      exists(select 1 from follows f where f.idea_id = i.id and f.account_id = ${accountId}) as followed_by_me,
+      (select roles from idea_members m where m.idea_id = i.id and m.account_id = ${accountId}) as my_roles,
+      coalesce((select json_agg(json_build_object('account_id', m.account_id, 'id', m.account_id, 'name', coalesce(a.name, a.username),
+                  'username', a.username, 'avatar_color', a.avatar_color, 'avatar_url', a.avatar_url,
+                  'region', a.region, 'timezone', a.timezone, 'roles', m.roles) order by m.created_at)
+                from idea_members m join accounts a on a.id = m.account_id where m.idea_id = i.id), '[]'::json) as members,
+      coalesce((select json_agg(json_build_object('id', r.id, 'body', r.body, 'state', r.state, 'created_at', r.created_at,
+                  'updated_at', r.updated_at, 'author', coalesce(ra.name, ra.username), 'author_id', r.account_id,
+                  'author_color', ra.avatar_color, 'author_avatar', ra.avatar_url) order by r.created_at)
+                from requests r join accounts ra on ra.id = r.account_id where r.idea_id = i.id), '[]'::json) as requests,
+      coalesce((select json_agg(json_build_object('id', at.id, 'filename', at.filename, 'url', at.url, 'size', at.size,
+                  'uploader', coalesce(ua.name, ua.username), 'uploader_id', at.account_id) order by at.created_at)
+                from attachments at join accounts ua on ua.id = at.account_id where at.idea_id = i.id), '[]'::json) as attachments
+    from ideas i
+    left join accounts ini on ini.id = i.initiator_account_id
+    where i.id = ${id}
+  `;
+  if (rows.length === 0) throw err(404, "This idea no longer exists.");
+  const r = rows[0];
+  return {
+    idea: {
+      id: r.id,
+      number: r.number,
+      name: r.name,
+      status: r.status,
+      tags: toArray(r.tags),
+      initiator: r.initiator_name || r.initiator_username || null,
+      submitted: ymd(r.created_at),
+      target_date: r.target_date || null,
+      context: r.context || "",
+      pain_points: r.pain_points || "",
+      expected_benefit: r.expected_benefit || "",
+      extra: typeof r.extra === "string" ? JSON.parse(r.extra) : (r.extra || {}),
+    },
+    members: toJsonArray(r.members).map((m) => ({ ...m, roles: toArray(m.roles) })),
+    requests: toJsonArray(r.requests).map((x) => ({
+      id: x.id, body: x.body, state: x.state, date: ymd(x.created_at), edited: !!x.updated_at,
+      mine: x.author_id === accountId,
+      // Shaped for <Avatar person={…} />
+      author: { id: x.author_id, name: x.author, avatar_color: x.author_color, avatar_url: x.author_avatar },
+    })),
+    attachments: toJsonArray(r.attachments).map((x) => ({
+      id: x.id, filename: x.filename, url: x.url, size: Number(x.size),
+      uploader: x.uploader, mine: x.uploader_id === accountId,
+    })),
+    likeCount: r.like_count,
+    likedByMe: toBool(r.liked_by_me),
+    followedByMe: toBool(r.followed_by_me),
+    myRoles: toArray(r.my_roles),
+    deleteRequested: toBool(r.delete_requested),
+    deleteReason: r.delete_reason || "",
+  };
+}
+
+export async function addAttachment(ideaId, accountId, { filename, url, size, content_type }) {
+  const rows = await sql`
+    with ins as (
+      insert into attachments (idea_id, account_id, filename, url, size, content_type)
+      values (${ideaId}, ${accountId}, ${filename}, ${url}, ${size || 0}, ${content_type || null})
+      returning id, account_id, filename, url, size
+    )
+    select ins.id, ins.filename, ins.url, ins.size, coalesce(a.name, a.username) as uploader
+    from ins join accounts a on a.id = ins.account_id
+  `;
+  const r = rows[0];
+  return { id: r.id, filename: r.filename, url: r.url, size: Number(r.size), uploader: r.uploader };
+}
+
+export async function getAttachment(attId) {
+  const rows = await sql`select id, idea_id, url, filename, content_type from attachments where id = ${attId}`;
+  return rows[0] || null;
+}
+
+// Author, or a moderator (idea lead / admin), can delete. Returns the blob URL.
+export async function deleteAttachment(attId, accountId, isAdmin) {
+  const rows = await sql`
+    delete from attachments at
+    where at.id = ${attId}
+      and ( at.account_id = ${accountId}
+         or ${isAdmin}
+         or exists (select 1 from idea_members m where m.idea_id = at.idea_id and m.account_id = ${accountId} and m.roles @> array['Project Lead']) )
+    returning url
+  `;
+  if (rows.length === 0) throw err(403, "You can't remove this file.");
+  return { url: rows[0].url };
+}
+
+export async function isProjectLead(ideaId, accountId) {
+  const rows = await sql`
+    select 1 from idea_members
+    where idea_id = ${ideaId} and account_id = ${accountId} and roles @> array['Project Lead']
+  `;
+  return rows.length > 0;
+}
+
+// ── engagement ────────────────────────────────────────────────
+// One round trip: delete-or-insert plus the resulting count. The CTEs share a
+// snapshot, so `before` is the pre-statement count and we adjust by the delta.
+export async function toggleLike(ideaId, accountId) {
+  const rows = await sql`
+    with del as (
+      delete from likes where idea_id = ${ideaId} and account_id = ${accountId} returning 1
+    ), ins as (
+      insert into likes (idea_id, account_id)
+      select ${ideaId}::uuid, ${accountId}::uuid where not exists (select 1 from del)
+      returning 1
+    )
+    select (select count(*) from ins)::int as inserted,
+           (select count(*) from del)::int as deleted,
+           (select count(*) from likes where idea_id = ${ideaId})::int as before
+  `;
+  const r = rows[0];
+  return { liked: r.inserted > 0, count: r.before + r.inserted - r.deleted };
+}
+
+export async function toggleFollow(ideaId, accountId) {
+  const rows = await sql`
+    with del as (
+      delete from follows where idea_id = ${ideaId} and account_id = ${accountId} returning 1
+    ), ins as (
+      insert into follows (idea_id, account_id)
+      select ${ideaId}::uuid, ${accountId}::uuid where not exists (select 1 from del)
+      returning 1
+    )
+    select (select count(*) from ins)::int as inserted
+  `;
+  return { following: rows[0].inserted > 0 };
+}
+
+export async function addRequest(ideaId, accountId, body) {
+  const clean = (body || "").trim().slice(0, 2000);
+  if (!clean) throw err(400, "Request text is required.");
+  const rows = await sql`
+    with ins as (
+      insert into requests (idea_id, account_id, body)
+      values (${ideaId}, ${accountId}, ${clean})
+      returning id, account_id, body, state, created_at
+    )
+    select ins.id, ins.body, ins.state, ins.created_at, ins.account_id,
+           coalesce(a.name, a.username) as author, a.avatar_color, a.avatar_url
+    from ins join accounts a on a.id = ins.account_id
+  `;
+  const r = rows[0];
+  return {
+    id: r.id, body: r.body, state: r.state, date: ymd(r.created_at), edited: false, mine: true,
+    author: { id: r.account_id, name: r.author, avatar_color: r.avatar_color, avatar_url: r.avatar_url },
+  };
+}
+
+// Author can delete their own; a moderator (idea lead or admin) can delete any.
+export async function deleteRequest(reqId, accountId, isAdmin) {
+  const rows = await sql`
+    delete from requests r
+    where r.id = ${reqId}
+      and ( r.account_id = ${accountId}
+         or ${isAdmin}
+         or exists (select 1 from idea_members m where m.idea_id = r.idea_id and m.account_id = ${accountId} and m.roles @> array['Project Lead']) )
+    returning id
+  `;
+  if (rows.length === 0) throw err(403, "You can't remove this request.");
+  return { ok: true };
+}
+
+// The author (or an admin) can reword their own request. Editing sends it back
+// to 'open' — a triage verdict was about the old text, not this one.
+export async function updateRequestBody(reqId, body, accountId, isAdmin) {
+  const clean = (body || "").trim().slice(0, 2000);
+  if (!clean) throw err(400, "Request text is required.");
+  const rows = await sql`
+    update requests set body = ${clean}, state = 'open', updated_at = now()
+    where id = ${reqId} and (account_id = ${accountId} or ${isAdmin})
+    returning id, body, state
+  `;
+  if (rows.length === 0) throw err(403, "You can only edit your own request.");
+  const r = rows[0];
+  return { id: r.id, body: r.body, state: r.state, edited: true };
+}
+
+// Only the idea's lead (or admin) can triage a request's state.
+export async function setRequestState(reqId, state, accountId, isAdmin) {
+  if (!REQUEST_STATES.includes(state)) throw err(400, "Invalid request state.");
+  const rows = await sql`
+    update requests r set state = ${state}
+    where r.id = ${reqId}
+      and ( ${isAdmin}
+         or exists (select 1 from idea_members m where m.idea_id = r.idea_id and m.account_id = ${accountId} and m.roles @> array['Project Lead']) )
+    returning id, state
+  `;
+  if (rows.length === 0) throw err(403, "Only the project lead can triage requests.");
+  return { id: rows[0].id, state: rows[0].state };
+}
+
+// Join (or update your own membership) with one or more roles.
+function cleanRoles(roles) {
+  const list = (Array.isArray(roles) ? roles : [roles]).filter((r) => ROLES.includes(r));
+  if (list.length === 0) throw err(400, "Pick at least one role.");
+  return [...new Set(list)];
+}
+
+export async function joinTeam(ideaId, accountId, roles) {
+  const list = cleanRoles(roles);
+  try {
+    const rows = await sql`
+      with ins as (
+        insert into idea_members (idea_id, account_id, roles)
+        values (${ideaId}, ${accountId}, ${list})
+        on conflict (idea_id, account_id) do update set roles = excluded.roles
+        returning account_id, roles
+      )
+      select ins.account_id, ins.roles, coalesce(a.name, a.username) as name
+      from ins join accounts a on a.id = ins.account_id
+    `;
+    const m = rows[0];
+    return { account_id: m.account_id, name: m.name, roles: toArray(m.roles) };
+  } catch (e) {
+    if (/idea_members_one_initiator/.test(e?.message || "")) {
+      throw err(409, "This idea already has an Initiator.");
+    }
+    // Partial unique index on the lead role, or a unique violation.
+    if (e?.code === "23505" || /idea_members_one_lead/.test(e?.message || "")) {
+      throw err(409, "This idea already has a Project Lead.");
+    }
+    throw e;
+  }
+}
+
+// Admin sets another member's roles. Granting the lead transfers it: any other
+// lead on that idea loses that role in the same statement (disjoint rows).
+export async function setMemberRoles(ideaId, accountId, roles) {
+  const list = cleanRoles(roles);
+  // Initiator and Project Lead are one-per-idea. Whichever of them this person
+  // is taking has to come off whoever holds it, or the partial unique indexes
+  // reject the write.
+  const singular = [INITIATOR_ROLE, LEAD_ROLE].filter((r) => list.includes(r));
+  const rows = await sql`
+    with demote as (
+      update idea_members m
+      set roles = array(select x from unnest(m.roles) x where x <> all(${singular}::text[]))
+      where m.idea_id = ${ideaId} and m.account_id <> ${accountId}
+        and m.roles && ${singular}::text[]
+      returning m.account_id
+    )
+    update idea_members m set roles = ${list}
+    where m.idea_id = ${ideaId} and m.account_id = ${accountId}
+    returning m.account_id, m.roles, (select count(*) from demote)::int as demoted
+  `;
+  if (rows.length === 0) throw err(404, "That person isn't on this idea's team.");
+  return { account_id: rows[0].account_id, roles: toArray(rows[0].roles), demoted: rows[0].demoted > 0 };
+}
+
+// Admin removes a member from an idea's team.
+export async function removeMember(ideaId, accountId) {
+  const rows = await sql`delete from idea_members where idea_id = ${ideaId} and account_id = ${accountId} returning account_id`;
+  if (rows.length === 0) throw err(404, "That person isn't on this idea's team.");
+  return { ok: true };
+}
+
+export async function leaveTeam(ideaId, accountId) {
+  await sql`delete from idea_members where idea_id = ${ideaId} and account_id = ${accountId}`;
+  return { ok: true };
+}

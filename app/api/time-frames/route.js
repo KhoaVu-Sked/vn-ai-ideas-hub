@@ -1,5 +1,6 @@
-import { listTimeFrames, addTimeFrame, deleteTimeFrame, jsonError } from "@/lib/db";
-import { requireUser, requireAdmin } from "@/lib/guard";
+import { addTimeFrame, deleteTimeFrame, listTimeFrames } from "@/features/admin/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser, requireAdmin } from "@/features/auth/guard";
 
 // GET /api/time-frames → options for the submit form (any signed-in user)
 export async function GET() {

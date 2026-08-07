@@ -1,6 +1,7 @@
 import { get } from "@vercel/blob";
-import { getAvatarRef, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { getAvatarRef } from "@/features/accounts/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 
 // GET /api/avatars/:accountId → stream someone's avatar to signed-in users.
 // Avatars live in a private blob store, so <img src> can't hit the blob URL.

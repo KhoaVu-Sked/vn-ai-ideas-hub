@@ -1,10 +1,12 @@
-import { updateAccount, setAccountPassword, deleteAccount, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { updateAccount } from "@/features/accounts/queries";
+import { deleteAccount, setAccountPassword } from "@/features/auth/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
 import { after } from "next/server";
-import { adminEvent } from "@/lib/notify";
-import { hashPassword } from "@/lib/auth";
+import { adminEvent } from "@/features/notifications/notify";
+import { hashPassword } from "@/features/auth/password";
 import { APP_NAME } from "@/lib/brand";
-import { PASSWORD_LOGIN } from "@/lib/authMode";
+import { PASSWORD_LOGIN } from "@/features/auth/authMode";
 
 // PATCH /api/accounts/:id { username, email, name, role, password? }
 // → edit an account / change role / reset password (admin only)

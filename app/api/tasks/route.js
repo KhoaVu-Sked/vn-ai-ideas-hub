@@ -1,5 +1,6 @@
-import { listTasks, createTask, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { createTask, listTasks } from "@/features/tasks/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
 
 // GET /api/tasks → admin to-do list
 export async function GET() {

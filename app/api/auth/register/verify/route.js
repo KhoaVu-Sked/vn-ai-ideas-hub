@@ -1,12 +1,10 @@
 import { NextResponse, after } from "next/server";
-import {
-  getLiveSignupCode, recordSignupAttempt, consumeSignupCode,
-  createRegisteredAccount, rotateSessionId, jsonError,
-} from "@/lib/db";
-import { verifyPassword } from "@/lib/auth";
-import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
-import { audit } from "@/lib/notify";
-import { PASSWORD_LOGIN, passwordLoginOff } from "@/lib/authMode";
+import { consumeSignupCode, createRegisteredAccount, getLiveSignupCode, recordSignupAttempt, rotateSessionId } from "@/features/auth/queries";
+import { jsonError } from "@/lib/sql";
+import { verifyPassword } from "@/features/auth/password";
+import { signSession, COOKIE_NAME, cookieOptions } from "@/features/auth/session";
+import { audit } from "@/features/notifications/notify";
+import { PASSWORD_LOGIN, passwordLoginOff } from "@/features/auth/authMode";
 
 const BAD_CODE = "That code is wrong or has expired. Request a new one.";
 

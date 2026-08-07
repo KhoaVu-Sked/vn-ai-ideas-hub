@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import AppHeader from "../AppHeader";
-import Loading from "../Loading";
-import useRevalidateOnFocus from "../useRevalidateOnFocus";
-import { useSession } from "../SessionProvider";
-import { api } from "../apiClient";
+import AppHeader from "@/components/AppHeader";
+import Loading from "@/components/Loading";
+import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
+import { useSession } from "@/features/auth/SessionProvider";
+import { api } from "@/lib/apiClient";
 
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };

@@ -1,5 +1,6 @@
-import { listAuditEntries, AUDIT_RETENTION_DAYS, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { AUDIT_RETENTION_DAYS, listAuditEntries } from "@/features/admin/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const clean = (v) => (v && v.trim() ? v.trim() : null);

@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import SkeduloMark from "../SkeduloMark";
+import SkeduloMark from "@/components/SkeduloMark";
 import { APP_NAME } from "@/lib/brand";
-import { PASSWORD_LOGIN } from "@/lib/authMode";
+import { PASSWORD_LOGIN } from "@/features/auth/authMode";
 
 export default function LoginPage() {
   return <Suspense fallback={null}><LoginForm /></Suspense>;

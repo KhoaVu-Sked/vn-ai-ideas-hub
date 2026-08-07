@@ -3,19 +3,17 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  STATUS_META, STATUS_ORDER, ALL_STATUSES, tagPill, ROLES, LEAD_ROLE, INITIATOR_ROLE,
-  REQUEST_STATE_META, isClosed,
-} from "@/lib/statusMeta";
+import { tagPill } from "@/features/admin/tagColors";
+import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, REQUEST_STATE_META, ROLES, STATUS_META, STATUS_ORDER, isClosed } from "@/features/ideas/constants";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
-import Avatar from "../../Avatar";
-import TagChip from "../../TagChip";
-import FieldInput from "../../FieldInput";
-import AppHeader from "../../AppHeader";
-import SubmitModal from "../../SubmitModal";
-import Loading from "../../Loading";
-import useRevalidateOnFocus from "../../useRevalidateOnFocus";
-import { api } from "../../apiClient";
+import Avatar from "@/components/Avatar";
+import TagChip from "@/components/TagChip";
+import FieldInput from "@/components/FieldInput";
+import AppHeader from "@/components/AppHeader";
+import SubmitModal from "@/features/ideas/SubmitModal";
+import Loading from "@/components/Loading";
+import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
+import { api } from "@/lib/apiClient";
 
 
 function Pill({ bg, fg, children }) {

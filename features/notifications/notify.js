@@ -6,10 +6,11 @@
 //   audit(...)        → the 14-day audit log
 // The idea helpers also write the audit entry, so a route calls one function.
 
-import { getIdeaRecipients, getIdeaMeta, getAdminEmails, addAuditEntry } from "@/lib/db";
-import { sendEmail } from "@/lib/mail";
-import { notificationsEnabled } from "@/lib/db";
-import { renderEmail, renderEmailText } from "@/lib/emailTemplate";
+import { addAuditEntry } from "@/features/admin/queries";
+import { getAdminEmails, getIdeaMeta, getIdeaRecipients } from "@/features/notifications/queries";
+import { sendEmail } from "@/features/notifications/mail";
+import { notificationsEnabled } from "@/features/admin/queries";
+import { renderEmail, renderEmailText } from "@/features/notifications/emailTemplate";
 import { APP_NAME } from "@/lib/brand";
 
 const appUrl = (base) => (base || process.env.APP_URL || "").replace(/\/$/, "");

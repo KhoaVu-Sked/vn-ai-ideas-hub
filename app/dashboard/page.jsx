@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { STATUS_META, defaultTagColor } from "@/lib/statusMeta";
-import Avatar from "../Avatar";
-import AppHeader from "../AppHeader";
-import Loading from "../Loading";
-import { useSession } from "../SessionProvider";
-import { api } from "../apiClient";
+import { defaultTagColor } from "@/features/admin/tagColors";
+import { STATUS_META } from "@/features/ideas/constants";
+import Avatar from "@/components/Avatar";
+import AppHeader from "@/components/AppHeader";
+import Loading from "@/components/Loading";
+import { useSession } from "@/features/auth/SessionProvider";
+import { api } from "@/lib/apiClient";
 
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "18px 20px" };

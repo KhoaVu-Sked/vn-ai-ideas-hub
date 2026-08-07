@@ -1,6 +1,7 @@
 import { get } from "@vercel/blob";
-import { getAttachment, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { getAttachment } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 
 // GET /api/ideas/:id/attachments/:attId/download → stream a private blob to
 // signed-in users (the raw blob URL isn't public).

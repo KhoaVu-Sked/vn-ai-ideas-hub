@@ -1,5 +1,5 @@
-import { getUser } from "@/lib/guard";
-import { getProfile } from "@/lib/db";
+import { getUser } from "@/features/auth/guard";
+import { getProfile } from "@/features/accounts/queries";
 
 // GET /api/auth/me → current user, or 401 if not signed in.
 // The session cookie only carries id/username/role; the header also wants the

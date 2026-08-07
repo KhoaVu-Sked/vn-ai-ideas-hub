@@ -1,5 +1,6 @@
-import { toggleFollow, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { toggleFollow } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 
 // POST /api/ideas/:id/follow → toggle following (email notifications come later)
 export async function POST(_request, { params }) {

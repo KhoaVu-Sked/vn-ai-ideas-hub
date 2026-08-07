@@ -1,5 +1,6 @@
-import { toggleLike, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { toggleLike } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 
 // POST /api/ideas/:id/like → toggle the current user's like
 export async function POST(_request, { params }) {

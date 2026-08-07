@@ -1,7 +1,8 @@
 import { after } from "next/server";
-import { getProject, updateStatus, isProjectLead, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
-import { ideaEvent } from "@/lib/notify";
+import { getProject, isProjectLead, updateStatus } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
+import { ideaEvent } from "@/features/notifications/notify";
 
 // GET /api/projects/:id → one project's full detail
 // (fetched only when a card is clicked; the board list never includes this)

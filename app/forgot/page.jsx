@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import SkeduloMark from "../SkeduloMark";
+import SkeduloMark from "@/components/SkeduloMark";
 
 export default function ForgotPage() {
   const router = useRouter();

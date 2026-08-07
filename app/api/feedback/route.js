@@ -1,7 +1,8 @@
-import { addFeedback, listFeedback, jsonError } from "@/lib/db";
-import { requireUser, requireAdmin } from "@/lib/guard";
+import { addFeedback, listFeedback } from "@/features/feedback/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser, requireAdmin } from "@/features/auth/guard";
 import { after } from "next/server";
-import { adminEvent } from "@/lib/notify";
+import { adminEvent } from "@/features/notifications/notify";
 import { APP_NAME } from "@/lib/brand";
 
 // GET /api/feedback → all feedback (admin only)

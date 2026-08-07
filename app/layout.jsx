@@ -1,9 +1,9 @@
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 import { APP_NAME } from "@/lib/brand";
-import SessionProvider from "./SessionProvider";
-import SessionTimer from "./SessionTimer";
-import FeedbackWidget from "./FeedbackWidget";
+import SessionProvider from "@/features/auth/SessionProvider";
+import SessionTimer from "@/features/auth/SessionTimer";
+import FeedbackWidget from "@/features/feedback/FeedbackWidget";
 
 // Skedulo brand type: Manrope (display/headings) + Inter (body/UI).
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });

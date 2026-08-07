@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { COOKIE_NAME, verifySessionToken } from "@/lib/session";
-import { PASSWORD_LOGIN, ADMIN_PASSWORD_LOGIN } from "@/lib/authMode";
+import { COOKIE_NAME, verifySessionToken } from "@/features/auth/session";
+import { PASSWORD_LOGIN, ADMIN_PASSWORD_LOGIN } from "@/features/auth/authMode";
 
 // Pages you're meant to reach WITHOUT a session. Landing on a sign-in form
 // while already signed in just reads as broken, so these bounce to the board.

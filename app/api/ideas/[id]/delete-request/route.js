@@ -1,7 +1,8 @@
-import { requestIdeaDeletion, clearDeleteRequest, isProjectLead, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { clearDeleteRequest, isProjectLead, requestIdeaDeletion } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 import { after } from "next/server";
-import { adminEvent } from "@/lib/notify";
+import { adminEvent } from "@/features/notifications/notify";
 
 // POST /api/ideas/:id/delete-request { reason } → project lead asks admin to delete
 export async function POST(request, { params }) {

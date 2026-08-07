@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { tagPill, defaultTagColor } from "@/lib/statusMeta";
-import AppHeader from "../AppHeader";
-import Loading from "../Loading";
-import useRevalidateOnFocus from "../useRevalidateOnFocus";
-import { useSession } from "../SessionProvider";
-import { api } from "../apiClient";
-import { PASSWORD_LOGIN } from "@/lib/authMode";
+import { defaultTagColor, tagPill } from "@/features/admin/tagColors";
+import AppHeader from "@/components/AppHeader";
+import Loading from "@/components/Loading";
+import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
+import { useSession } from "@/features/auth/SessionProvider";
+import { api } from "@/lib/apiClient";
+import { PASSWORD_LOGIN } from "@/features/auth/authMode";
 
 
 // The fixed part of the New Idea form, in the order it renders.

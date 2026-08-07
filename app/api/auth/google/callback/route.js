@@ -1,8 +1,8 @@
 import { NextResponse, after } from "next/server";
-import { identityFromCode, googleConfigured } from "@/lib/google";
-import { findOrCreateSsoAccount, rotateSessionId } from "@/lib/db";
-import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
-import { audit } from "@/lib/notify";
+import { identityFromCode, googleConfigured } from "@/features/auth/google";
+import { findOrCreateSsoAccount, rotateSessionId } from "@/features/auth/queries";
+import { signSession, COOKIE_NAME, cookieOptions } from "@/features/auth/session";
+import { audit } from "@/features/notifications/notify";
 
 const STATE_COOKIE = "g_state";
 

@@ -1,8 +1,10 @@
 import { del } from "@vercel/blob";
-import { getIdea, updateContent, isProjectLead, deleteIdea, LEAD_ROLE, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { LEAD_ROLE } from "@/features/ideas/constants";
+import { deleteIdea, getIdea, isProjectLead, updateContent } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 import { after } from "next/server";
-import { ideaEvent } from "@/lib/notify";
+import { ideaEvent } from "@/features/notifications/notify";
 
 // GET /api/ideas/:id → full detail for the /idea/[id] page
 export async function GET(_request, { params }) {

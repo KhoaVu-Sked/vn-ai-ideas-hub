@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
-import { AVATAR_COLORS, defaultAvatarColor, initialsOf, avatarSrc } from "@/lib/statusMeta";
+import { AVATAR_COLORS, avatarSrc, defaultAvatarColor, initialsOf } from "@/features/accounts/avatar";
 import { AVATAR_ACCEPT_ATTR, validateAvatar } from "@/lib/upload";
-import AppHeader from "../AppHeader";
-import Loading from "../Loading";
-import { useSession } from "../SessionProvider";
-import { api } from "../apiClient";
-import { PASSWORD_LOGIN, ADMIN_PASSWORD_LOGIN } from "@/lib/authMode";
+import AppHeader from "@/components/AppHeader";
+import Loading from "@/components/Loading";
+import { useSession } from "@/features/auth/SessionProvider";
+import { api } from "@/lib/apiClient";
+import { PASSWORD_LOGIN, ADMIN_PASSWORD_LOGIN } from "@/features/auth/authMode";
 
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };

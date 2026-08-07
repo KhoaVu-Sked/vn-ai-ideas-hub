@@ -1,4 +1,4 @@
-import { tagColorOf } from "@/lib/statusMeta";
+import { tagColorOf } from "@/features/admin/tagColors";
 
 // A tag renders as a soft, square-ish "label": neutral chip + a small colored
 // dot — visually distinct from the colored, pill-shaped status lozenge.

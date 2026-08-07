@@ -1,6 +1,7 @@
 import { put } from "@vercel/blob";
-import { addAttachment, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { addAttachment } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 import { validateUpload } from "@/lib/upload";
 
 // POST /api/ideas/:id/attachments (multipart, field "file") → upload to Vercel Blob

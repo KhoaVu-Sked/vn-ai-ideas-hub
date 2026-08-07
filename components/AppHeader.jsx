@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import SkeduloMark from "./SkeduloMark";
+import SkeduloMark from "@/components/SkeduloMark";
 import { APP_NAME } from "@/lib/brand";
-import { avatarColor, initialsOf } from "@/lib/statusMeta";
-import Avatar from "./Avatar";
-import { useSession } from "./SessionProvider";
+import { avatarColor, initialsOf } from "@/features/accounts/avatar";
+import Avatar from "@/components/Avatar";
+import { useSession } from "@/features/auth/SessionProvider";
 
 const MANAGE_SECTIONS = [
   ["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"],

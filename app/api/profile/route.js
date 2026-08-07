@@ -1,5 +1,6 @@
-import { getProfile, updateProfile, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { getProfile, updateProfile } from "@/features/accounts/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 
 // GET /api/profile → the signed-in user's own profile
 export async function GET() {

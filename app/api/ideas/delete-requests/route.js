@@ -1,5 +1,6 @@
-import { listDeleteRequests, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { listDeleteRequests } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
 
 // GET /api/ideas/delete-requests → ideas a project lead asked to delete (admin)
 export async function GET() {

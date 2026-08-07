@@ -1,5 +1,6 @@
-import { listTags, addTag, setTagColor, deleteTag, jsonError } from "@/lib/db";
-import { requireUser, requireAdmin } from "@/lib/guard";
+import { addTag, deleteTag, listTags, setTagColor } from "@/features/admin/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser, requireAdmin } from "@/features/auth/guard";
 
 // GET /api/tags → the tag catalog (for the submit form + filters)
 export async function GET() {

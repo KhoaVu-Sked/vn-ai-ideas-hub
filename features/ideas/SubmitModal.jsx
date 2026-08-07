@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { tagPill } from "@/lib/statusMeta";
+import { tagPill } from "@/features/admin/tagColors";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
-import FieldInput from "./FieldInput";
-import { api } from "./apiClient";
+import FieldInput from "@/components/FieldInput";
+import { api } from "@/lib/apiClient";
 
 
 // onCreated(project) is called after the idea (and any files) are created.

@@ -1,7 +1,8 @@
-import { updateFormField, archiveFormField, moveFormField, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { archiveFormField, moveFormField, updateFormField } from "@/features/admin/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
 import { after } from "next/server";
-import { adminEvent } from "@/lib/notify";
+import { adminEvent } from "@/features/notifications/notify";
 import { APP_NAME } from "@/lib/brand";
 
 // PATCH /api/form-fields/:id { label, type, options, required } → edit (admin)

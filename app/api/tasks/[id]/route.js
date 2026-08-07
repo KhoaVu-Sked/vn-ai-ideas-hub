@@ -1,5 +1,6 @@
-import { updateTask, deleteTask, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { deleteTask, updateTask } from "@/features/tasks/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
 
 // PATCH /api/tasks/:id { title?, done? } → edit or check off a task
 export async function PATCH(request, { params }) {

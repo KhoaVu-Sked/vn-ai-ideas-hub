@@ -1,14 +1,12 @@
 import { randomInt } from "node:crypto";
 import { after } from "next/server";
-import {
-  accountExistsByEmail, createSignupCode, signupRequestedRecently,
-  SIGNUP_TTL_MINUTES, jsonError,
-} from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
-import { sendEmail } from "@/lib/mail";
-import { renderEmail, renderEmailText } from "@/lib/emailTemplate";
+import { SIGNUP_TTL_MINUTES, accountExistsByEmail, createSignupCode, signupRequestedRecently } from "@/features/auth/queries";
+import { jsonError } from "@/lib/sql";
+import { hashPassword } from "@/features/auth/password";
+import { sendEmail } from "@/features/notifications/mail";
+import { renderEmail, renderEmailText } from "@/features/notifications/emailTemplate";
 import { APP_NAME } from "@/lib/brand";
-import { PASSWORD_LOGIN, passwordLoginOff } from "@/lib/authMode";
+import { PASSWORD_LOGIN, passwordLoginOff } from "@/features/auth/authMode";
 
 const ALLOWED_DOMAIN = "@skedulo.com";
 

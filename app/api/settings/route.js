@@ -1,7 +1,8 @@
 import { after } from "next/server";
-import { listSettings, setSetting, EMAIL_NOTIFICATIONS, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
-import { audit } from "@/lib/notify";
+import { EMAIL_NOTIFICATIONS, listSettings, setSetting } from "@/features/admin/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
+import { audit } from "@/features/notifications/notify";
 
 // GET /api/settings → current switches (admin only)
 export async function GET() {

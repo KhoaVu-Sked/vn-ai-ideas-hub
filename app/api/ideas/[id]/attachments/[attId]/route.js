@@ -1,6 +1,7 @@
 import { del } from "@vercel/blob";
-import { deleteAttachment, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { deleteAttachment } from "@/features/ideas/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 
 // DELETE /api/ideas/:id/attachments/:attId → remove (uploader, or lead/admin)
 export async function DELETE(_request, { params }) {

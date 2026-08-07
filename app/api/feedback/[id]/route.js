@@ -1,5 +1,6 @@
-import { setFeedbackStatus, deleteFeedback, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { deleteFeedback, setFeedbackStatus } from "@/features/feedback/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
 
 // PATCH /api/feedback/:id { status } → mark open/resolved (admin only)
 export async function PATCH(request, { params }) {

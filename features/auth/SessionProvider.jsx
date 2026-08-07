@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { endSession } from "./apiClient";
+import { endSession } from "@/lib/apiClient";
 
 // The signed-in user, fetched once for the whole app instead of per page.
 //

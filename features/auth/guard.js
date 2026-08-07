@@ -2,8 +2,8 @@
 // Node runtime (route handlers) — uses next/headers, so not for middleware.
 
 import { cookies } from "next/headers";
-import { COOKIE_NAME, verifySessionToken } from "@/lib/session";
-import { getSessionId } from "@/lib/db";
+import { COOKIE_NAME, verifySessionToken } from "@/features/auth/session";
+import { getSessionId } from "@/features/auth/queries";
 
 // Returns { uid, username, role, sid } or null.
 //

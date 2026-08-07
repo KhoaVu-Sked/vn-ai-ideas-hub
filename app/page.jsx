@@ -3,14 +3,14 @@
 import { useState, useRef, useCallback, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { STATUS_META, STATUS_ORDER, ALL_STATUSES } from "@/lib/statusMeta";
-import Avatar from "./Avatar";
-import TagChip from "./TagChip";
-import AppHeader from "./AppHeader";
-import SubmitModal from "./SubmitModal";
-import Loading from "./Loading";
-import useRevalidateOnFocus from "./useRevalidateOnFocus";
-import { api } from "./apiClient";
+import { ALL_STATUSES, STATUS_META, STATUS_ORDER } from "@/features/ideas/constants";
+import Avatar from "@/components/Avatar";
+import TagChip from "@/components/TagChip";
+import AppHeader from "@/components/AppHeader";
+import SubmitModal from "@/features/ideas/SubmitModal";
+import Loading from "@/components/Loading";
+import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
+import { api } from "@/lib/apiClient";
 
 // ─────────────────────────────────────────────────────────────
 // TS - AI Ideas Hub — board

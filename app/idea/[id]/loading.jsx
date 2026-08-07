@@ -1,5 +1,5 @@
-import AppHeader from "../../AppHeader";
-import Loading from "../../Loading";
+import AppHeader from "@/components/AppHeader";
+import Loading from "@/components/Loading";
 
 // Rendered immediately on navigation, before the idea page's JS/data arrive —
 // so clicking a card switches pages at once and the wait happens here.

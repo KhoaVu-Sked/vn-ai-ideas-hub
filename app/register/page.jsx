@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import SkeduloMark from "../SkeduloMark";
+import SkeduloMark from "@/components/SkeduloMark";
 
 export default function RegisterPage() {
   const [step, setStep] = useState("details");   // details → verify

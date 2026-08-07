@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { authUrl, googleConfigured } from "@/lib/google";
+import { authUrl, googleConfigured } from "@/features/auth/google";
 
 const STATE_COOKIE = "g_state";
 

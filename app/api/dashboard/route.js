@@ -1,5 +1,6 @@
-import { getDashboard, jsonError } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { getDashboard } from "@/features/dashboard/queries";
+import { jsonError } from "@/lib/sql";
+import { requireAdmin } from "@/features/auth/guard";
 
 // GET /api/dashboard?period=all|quarter → leader dashboard metrics (admin only)
 export async function GET(request) {

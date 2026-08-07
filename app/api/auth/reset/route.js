@@ -1,11 +1,9 @@
 import { after } from "next/server";
-import {
-  getAccountByLogin, getLivePasswordReset, recordResetAttempt,
-  consumePasswordReset, setAccountPassword, jsonError,
-} from "@/lib/db";
-import { hashPassword, verifyPassword } from "@/lib/auth";
-import { audit } from "@/lib/notify";
-import { PASSWORD_LOGIN, passwordLoginOff } from "@/lib/authMode";
+import { consumePasswordReset, getAccountByLogin, getLivePasswordReset, recordResetAttempt, setAccountPassword } from "@/features/auth/queries";
+import { jsonError } from "@/lib/sql";
+import { hashPassword, verifyPassword } from "@/features/auth/password";
+import { audit } from "@/features/notifications/notify";
+import { PASSWORD_LOGIN, passwordLoginOff } from "@/features/auth/authMode";
 
 const BAD_CODE = "That code is wrong or has expired. Request a new one.";
 

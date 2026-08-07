@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { getAccountByLogin, rotateSessionId, jsonError } from "@/lib/db";
-import { verifyPassword } from "@/lib/auth";
-import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
-import { PASSWORD_LOGIN, anyPasswordLogin, passwordLoginOff } from "@/lib/authMode";
+import { getAccountByLogin, rotateSessionId } from "@/features/auth/queries";
+import { jsonError } from "@/lib/sql";
+import { verifyPassword } from "@/features/auth/password";
+import { signSession, COOKIE_NAME, cookieOptions } from "@/features/auth/session";
+import { PASSWORD_LOGIN, anyPasswordLogin, passwordLoginOff } from "@/features/auth/authMode";
 
 // POST /api/auth/login { username, password } → set session cookie.
 // `username` is an identifier: it matches either a username or an email.

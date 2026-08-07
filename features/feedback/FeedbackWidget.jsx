@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { api } from "./apiClient";
+import { api } from "@/lib/apiClient";
 
 export default function FeedbackWidget() {
   const pathname = usePathname();

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/guard";
-import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
+import { requireUser } from "@/features/auth/guard";
+import { signSession, COOKIE_NAME, cookieOptions } from "@/features/auth/session";
 
 // POST /api/auth/refresh → re-issue the session cookie with a fresh 30-min
 // expiry (slides the idle timeout). No-op-ish if the session is already invalid.

@@ -1,6 +1,7 @@
 import { put, del } from "@vercel/blob";
-import { setAvatarUrl, jsonError } from "@/lib/db";
-import { requireUser } from "@/lib/guard";
+import { setAvatarUrl } from "@/features/accounts/queries";
+import { jsonError } from "@/lib/sql";
+import { requireUser } from "@/features/auth/guard";
 import { validateAvatar } from "@/lib/upload";
 
 const blobConfigured = () => !!(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN);
