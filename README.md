@@ -63,19 +63,27 @@ Code is grouped by feature. `app/` holds routing only — in the App Router its
 folder names *are* the URLs, so features can't live inside it.
 
 ```
-app/          pages and route handlers; thin, they call into features/
-features/     one folder per feature, each owning its own queries + UI
-  auth/         session, guard, Google OAuth, sign-in modes
-  ideas/        board, idea detail, engagement, submit modal, vocabulary
-  accounts/     admin user management, profiles, avatars
-  admin/        tags, time frames, form fields, settings, audit log
-  dashboard/    leader dashboard aggregates
+app/          routing only — each page.jsx is a one-line re-export
+features/     one folder per feature, each owning its own queries AND its pages
+  auth/         LoginPage, RegisterPage, ForgotPage, AdminLoginPage,
+                session, guard, Google OAuth, sign-in modes
+  ideas/        BoardPage, IdeaPage, SubmitModal, vocabulary, engagement
+  accounts/     ProfilePage, avatars, admin user records
+  admin/        ManagePage + manage/*Section.jsx (tags, form fields, users,
+                feedback, delete requests, settings), ActivityPage, audit log
+  dashboard/    DashboardPage and its aggregates
   notifications/ email templates, sending, who-to-notify
-  tasks/        admin to-do list
-  feedback/     in-app feedback
+  tasks/        TasksPage, the admin to-do list
+  feedback/     FeedbackWidget, triage queries
 components/   presentational pieces shared by more than one feature
 lib/          feature-agnostic: the Neon client, the fetch wrapper, upload rules
 ```
+
+Every `app/*/page.jsx` is a one-line re-export of the real page in
+`features/`, so a URL still tells you where the file is, but the code sits with
+the rest of its feature. `/manage` is split further: each admin screen is its
+own file under `features/admin/manage/`, rather than six `view === "x" &&`
+blocks in one component.
 
 Each feature's `queries.js` is its data layer. They all share the client and
 row-shaping helpers in `lib/sql.js` and import each other directly when they

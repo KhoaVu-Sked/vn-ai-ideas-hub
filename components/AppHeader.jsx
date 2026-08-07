@@ -3,16 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { MANAGE_SECTIONS } from "@/features/admin/sections";
 import SkeduloMark from "@/components/SkeduloMark";
 import { APP_NAME } from "@/lib/brand";
 import { avatarColor, initialsOf } from "@/features/accounts/avatar";
 import Avatar from "@/components/Avatar";
 import { useSession } from "@/features/auth/SessionProvider";
 
-const MANAGE_SECTIONS = [
-  ["tags", "Tags"], ["fields", "Form fields"], ["users", "User accounts"],
-  ["feedback", "Feedback"], ["deletions", "Delete requests"], ["settings", "Settings"],
-];
 
 // App top bar, modelled on the Skedulo product header.
 //   crumb     — optional text after the app name (e.g. an idea's title)
