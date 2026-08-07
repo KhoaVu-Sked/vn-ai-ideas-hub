@@ -6,6 +6,7 @@ import {
 import { verifyPassword } from "@/lib/auth";
 import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
 import { audit } from "@/lib/notify";
+import { PASSWORD_LOGIN, passwordLoginOff } from "@/lib/authMode";
 
 const BAD_CODE = "That code is wrong or has expired. Request a new one.";
 
@@ -13,6 +14,7 @@ const BAD_CODE = "That code is wrong or has expired. Request a new one.";
 // create the account. The name and password hash come off the pending row, so
 // they can't be swapped between the two steps. Signs the user in on success.
 export async function POST(request) {
+  if (!PASSWORD_LOGIN) return passwordLoginOff();
   try {
     const { email, code } = await request.json();
     const em = (email || "").trim().toLowerCase();

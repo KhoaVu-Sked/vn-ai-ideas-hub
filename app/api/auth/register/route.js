@@ -8,6 +8,7 @@ import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { renderEmail, renderEmailText } from "@/lib/emailTemplate";
 import { APP_NAME } from "@/lib/brand";
+import { PASSWORD_LOGIN, passwordLoginOff } from "@/lib/authMode";
 
 const ALLOWED_DOMAIN = "@skedulo.com";
 
@@ -16,6 +17,7 @@ const ALLOWED_DOMAIN = "@skedulo.com";
 // /api/auth/register/verify, so an address nobody can read never becomes a
 // login. Restricted to @skedulo.com.
 export async function POST(request) {
+  if (!PASSWORD_LOGIN) return passwordLoginOff();
   try {
     const { name, email, password } = await request.json();
     const em = (email || "").trim().toLowerCase();

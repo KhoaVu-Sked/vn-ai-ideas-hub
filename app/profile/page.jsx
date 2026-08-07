@@ -8,6 +8,7 @@ import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 import { useSession } from "../SessionProvider";
 import { api } from "../apiClient";
+import { PASSWORD_LOGIN } from "@/lib/authMode";
 
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
@@ -217,30 +218,32 @@ export default function ProfilePage() {
 
           {/* Change password — your own account, no email step. Asking for an
               address here would let someone type a colleague's by mistake. */}
-          <form onSubmit={changePassword} style={{ ...card, marginTop: 16 }}>
-            <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", margin: "0 0 4px" }}>Change password</h2>
-            <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
-              Changing it for <b style={{ color: "var(--ink)" }}>{me.username}</b>. You&apos;ll be signed out and asked to sign in again.
-            </div>
+          {PASSWORD_LOGIN && (
+            <form onSubmit={changePassword} style={{ ...card, marginTop: 16 }}>
+              <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", margin: "0 0 4px" }}>Change password</h2>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
+                Changing it for <b style={{ color: "var(--ink)" }}>{me.username}</b>. You&apos;ll be signed out and asked to sign in again.
+              </div>
 
-            <div style={label}>Current password</div>
-            <input type="password" value={pw.current} onChange={(e) => setPwField("current", e.target.value)} autoComplete="current-password" style={field} />
+              <div style={label}>Current password</div>
+              <input type="password" value={pw.current} onChange={(e) => setPwField("current", e.target.value)} autoComplete="current-password" style={field} />
 
-            <div style={label}>New password</div>
-            <input type="password" value={pw.next} onChange={(e) => setPwField("next", e.target.value)} autoComplete="new-password" placeholder="at least 6 characters" style={field} />
+              <div style={label}>New password</div>
+              <input type="password" value={pw.next} onChange={(e) => setPwField("next", e.target.value)} autoComplete="new-password" placeholder="at least 6 characters" style={field} />
 
-            <div style={label}>Confirm new password</div>
-            <input type="password" value={pw.confirm} onChange={(e) => setPwField("confirm", e.target.value)} autoComplete="new-password" style={field} />
+              <div style={label}>Confirm new password</div>
+              <input type="password" value={pw.confirm} onChange={(e) => setPwField("confirm", e.target.value)} autoComplete="new-password" style={field} />
 
-            {pwErr && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 12 }}>{pwErr}</div>}
+              {pwErr && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 12 }}>{pwErr}</div>}
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button type="submit" disabled={pwBusy || !pw.current || !pw.next} style={{ ...btn, background: "var(--blue)", color: "#fff", border: "none", cursor: pwBusy ? "wait" : "pointer" }}>
-                {pwBusy ? "Changing…" : "Change password"}
-              </button>
-              {pwDone && <span style={{ fontSize: 12.5, color: "#2f9e44", fontWeight: 700 }}>Password changed — signing you out…</span>}
-            </div>
-          </form>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button type="submit" disabled={pwBusy || !pw.current || !pw.next} style={{ ...btn, background: "var(--blue)", color: "#fff", border: "none", cursor: pwBusy ? "wait" : "pointer" }}>
+                  {pwBusy ? "Changing…" : "Change password"}
+                </button>
+                {pwDone && <span style={{ fontSize: 12.5, color: "#2f9e44", fontWeight: 700 }}>Password changed — signing you out…</span>}
+              </div>
+            </form>
+          )}
           </>
         )}
       </main>

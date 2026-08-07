@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth";
 import { requireUser } from "@/lib/guard";
 import { COOKIE_NAME } from "@/lib/session";
 import { audit } from "@/lib/notify";
+import { PASSWORD_LOGIN, passwordLoginOff } from "@/lib/authMode";
 
 // PATCH /api/profile/password { current, next } → change your own password.
 //
@@ -12,6 +13,7 @@ import { audit } from "@/lib/notify";
 // makes it safe to skip the emailed code: a borrowed, still-signed-in browser
 // can't lock the owner out.
 export async function PATCH(request) {
+  if (!PASSWORD_LOGIN) return passwordLoginOff();
   try {
     const user = await requireUser();
     const { current, next } = await request.json();

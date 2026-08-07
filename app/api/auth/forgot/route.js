@@ -9,6 +9,7 @@ import { sendEmail } from "@/lib/mail";
 import { renderEmail, renderEmailText } from "@/lib/emailTemplate";
 import { audit } from "@/lib/notify";
 import { APP_NAME } from "@/lib/brand";
+import { PASSWORD_LOGIN, passwordLoginOff } from "@/lib/authMode";
 
 // POST /api/auth/forgot { identifier } → email a 6-digit code.
 //
@@ -16,6 +17,7 @@ import { APP_NAME } from "@/lib/brand";
 // identifier matches an account: anything else turns this into an oracle for
 // discovering who has an account here.
 export async function POST(request) {
+  if (!PASSWORD_LOGIN) return passwordLoginOff();
   // The response is identical in every branch below.
   const ok = () => Response.json({ ok: true, expiresInMinutes: RESET_TTL_MINUTES });
   try {

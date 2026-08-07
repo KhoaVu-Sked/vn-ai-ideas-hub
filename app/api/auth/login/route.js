@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { getAccountByLogin, rotateSessionId, jsonError } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth";
 import { signSession, COOKIE_NAME, cookieOptions } from "@/lib/session";
+import { PASSWORD_LOGIN, passwordLoginOff } from "@/lib/authMode";
 
 // POST /api/auth/login { username, password } → set session cookie.
 // `username` is an identifier: it matches either a username or an email.
 export async function POST(request) {
+  if (!PASSWORD_LOGIN) return passwordLoginOff();
   try {
     const { username, password } = await request.json();
     if (!username?.trim() || !password) {

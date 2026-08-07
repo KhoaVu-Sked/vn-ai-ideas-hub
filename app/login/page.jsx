@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import SkeduloMark from "../SkeduloMark";
 import { APP_NAME } from "@/lib/brand";
+import { PASSWORD_LOGIN } from "@/lib/authMode";
 
 export default function LoginPage() {
   return <Suspense fallback={null}><LoginForm /></Suspense>;
@@ -19,11 +20,13 @@ function LoginForm() {
     if (searchParams.get("reset") === "1") setResetDone(true);
     const sso = searchParams.get("sso");
     if (sso) setNotice({
-      unconfigured: "Google sign-in isn't set up yet. Use your username and password.",
+      unconfigured: PASSWORD_LOGIN
+        ? "Google sign-in isn't set up yet. Use your username and password."
+        : "Google sign-in isn't set up yet — ask an admin to finish configuring it.",
       domain: "Sign in with your @skedulo.com Google account.",
       cancelled: "Google sign-in was cancelled.",
       state: "That sign-in attempt expired. Please try again.",
-    }[sso] || "Google sign-in didn't work. Try again, or use your password.");
+    }[sso] || "Google sign-in didn't work. Please try again.");
     else if (searchParams.get("changed") === "1") setNotice("Password changed. Sign in with your new one.");
     else if (searchParams.get("ended") === "1") setNotice("Your session ended — you signed in on another device, or your password changed.");
   }, [searchParams]);
@@ -34,6 +37,7 @@ function LoginForm() {
 
   const submit = async (e) => {
     e?.preventDefault();
+    if (!PASSWORD_LOGIN) return;
     if (!username.trim() || !password) {
       setErr("Enter your username and password.");
       return;
@@ -78,38 +82,47 @@ function LoginForm() {
             ✓ Password updated — sign in with your new password.
           </div>
         )}
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Username or email</label>
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          autoFocus
-          autoComplete="username"
-          style={{ width: "100%", margin: "6px 0 14px", padding: "10px 12px", border: "1px solid #d5dce6", borderRadius: 8, fontSize: 13.5, outline: "none" }}
-        />
+        {PASSWORD_LOGIN && (<>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Username or email</label>
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoFocus
+            autoComplete="username"
+            style={{ width: "100%", margin: "6px 0 14px", padding: "10px 12px", border: "1px solid #d5dce6", borderRadius: 8, fontSize: 13.5, outline: "none" }}
+          />
 
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          style={{ width: "100%", margin: "6px 0 16px", padding: "10px 12px", border: "1px solid #d5dce6", borderRadius: 8, fontSize: 13.5, outline: "none" }}
-        />
+          <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            style={{ width: "100%", margin: "6px 0 16px", padding: "10px 12px", border: "1px solid #d5dce6", borderRadius: 8, fontSize: 13.5, outline: "none" }}
+          />
 
-        {err && <div style={{ fontSize: 12.5, color: "#e03131", marginBottom: 12 }}>{err}</div>}
+          {err && <div style={{ fontSize: 12.5, color: "#e03131", marginBottom: 12 }}>{err}</div>}
 
-        <button
-          type="submit"
-          disabled={busy}
-          style={{ width: "100%", padding: "11px 0", borderRadius: 9, border: "none", background: busy ? "#7b96ea" : "var(--blue)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}
-        >
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
-          <span style={{ flex: 1, height: 1, background: "#e4e7ed" }} />
-          <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 600 }}>OR</span>
-          <span style={{ flex: 1, height: 1, background: "#e4e7ed" }} />
-        </div>
+          <button
+            type="submit"
+            disabled={busy}
+            style={{ width: "100%", padding: "11px 0", borderRadius: 9, border: "none", background: busy ? "#7b96ea" : "var(--blue)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}
+          >
+            {busy ? "Signing in…" : "Sign in"}
+          </button>
+        </>)}
+
+        {PASSWORD_LOGIN ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
+            <span style={{ flex: 1, height: 1, background: "#e4e7ed" }} />
+            <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 600 }}>OR</span>
+            <span style={{ flex: 1, height: 1, background: "#e4e7ed" }} />
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 16px", lineHeight: 1.5 }}>
+            Sign in with your Skedulo Google account. There's no separate password to remember.
+          </p>
+        )}
 
         <a
           href="/api/auth/google"
@@ -129,12 +142,18 @@ function LoginForm() {
           Continue with Google
         </a>
 
-        <div style={{ fontSize: 12.5, marginTop: 14, textAlign: "center" }}>
-          <Link href="/forgot" style={{ color: "var(--blue)", fontWeight: 700 }}>Forgot your password?</Link>
-        </div>
-        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8, textAlign: "center" }}>
-          New here? <Link href="/register" style={{ color: "var(--blue)", fontWeight: 700 }}>Create an account</Link>
-        </div>
+        {PASSWORD_LOGIN ? (<>
+          <div style={{ fontSize: 12.5, marginTop: 14, textAlign: "center" }}>
+            <Link href="/forgot" style={{ color: "var(--blue)", fontWeight: 700 }}>Forgot your password?</Link>
+          </div>
+          <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8, textAlign: "center" }}>
+            New here? <Link href="/register" style={{ color: "var(--blue)", fontWeight: 700 }}>Create an account</Link>
+          </div>
+        </>) : (
+          <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 14, textAlign: "center" }}>
+            First time? Signing in creates your account.
+          </div>
+        )}
       </form>
     </div>
   );

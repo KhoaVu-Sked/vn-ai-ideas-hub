@@ -5,6 +5,7 @@ import {
 } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { audit } from "@/lib/notify";
+import { PASSWORD_LOGIN, passwordLoginOff } from "@/lib/authMode";
 
 const BAD_CODE = "That code is wrong or has expired. Request a new one.";
 
@@ -12,6 +13,7 @@ const BAD_CODE = "That code is wrong or has expired. Request a new one.";
 // The code is compared against a bcrypt hash, is single-use, expires after
 // 10 minutes, and dies after 5 wrong attempts.
 export async function POST(request) {
+  if (!PASSWORD_LOGIN) return passwordLoginOff();
   try {
     const { identifier, code, password } = await request.json();
     if (!identifier?.trim() || !code?.trim()) {
