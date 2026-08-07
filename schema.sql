@@ -221,7 +221,10 @@ alter table ideas add column if not exists initiator_account_id uuid;
 alter table ideas add column if not exists target_date text;
 alter table accounts add column if not exists name text;
 alter table accounts add column if not exists email text;
-create unique index if not exists accounts_email_key on accounts (email);
+-- Case-insensitive, because that is how the SSO lookup matches (migration 017).
+create unique index if not exists accounts_email_lower_key on accounts (lower(email));
+drop index if exists accounts_email_key;
+update accounts set email = lower(email) where email is not null and email <> lower(email);
 alter table tags add column if not exists color text;
 alter table ideas add column if not exists extra jsonb not null default '{}'::jsonb;
 alter table ideas add column if not exists delete_requested boolean not null default false;

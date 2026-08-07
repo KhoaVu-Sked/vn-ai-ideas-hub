@@ -45,7 +45,8 @@ create table if not exists accounts (
   id            uuid primary key default gen_random_uuid(),
   username      text unique not null,
   email         text,                                    -- unique (index added below); login works with either
-  password_hash text not null,
+  password_hash text,                                      -- null = signs in with Google only
+  auth_provider text not null default 'password',          -- password | google
   name          text,                                    -- display name, e.g. "Trung Vo"
   role          text not null default 'member',          -- workspace role: admin | member
   avatar_color  text,                                    -- chosen on /profile; null → hashed default
@@ -197,7 +198,7 @@ create index if not exists feedback_created_at_idx on feedback (created_at desc)
 
 -- Unique email. (In schema.sql this lives in the migration block, because on an
 -- existing database the column has to be added first.)
-create unique index if not exists accounts_email_key on accounts (email);
+create unique index if not exists accounts_email_lower_key on accounts (lower(email));
 
 -- ── Seeds ─────────────────────────────────────────────────────────
 

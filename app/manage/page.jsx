@@ -9,6 +9,7 @@ import Loading from "../Loading";
 import useRevalidateOnFocus from "../useRevalidateOnFocus";
 import { useSession } from "../SessionProvider";
 import { api } from "../apiClient";
+import { PASSWORD_LOGIN } from "@/lib/authMode";
 
 
 // The fixed part of the New Idea form, in the order it renders.
@@ -302,7 +303,7 @@ function ManagePage() {
                           </select>
                         </td>
                         <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
-                          <button onClick={() => resetPw(a)} style={{ ...btn, marginRight: 6 }}>Reset pw</button>
+                          {PASSWORD_LOGIN && <button onClick={() => resetPw(a)} style={{ ...btn, marginRight: 6 }}>Reset pw</button>}
                           <button onClick={() => delAcct(a)} style={{ ...btn, color: "#e03131", borderColor: "#f5c9c9" }}>Delete</button>
                         </td>
                       </tr>
@@ -325,7 +326,7 @@ function ManagePage() {
                   <input value={creating.username} onChange={(e) => setCreating({ ...creating, username: e.target.value })} placeholder="username" style={{ ...field, width: 130 }} />
                   <input value={creating.email} onChange={(e) => setCreating({ ...creating, email: e.target.value })} placeholder="email" style={{ ...field, width: 190 }} />
                   <input value={creating.name} onChange={(e) => setCreating({ ...creating, name: e.target.value })} placeholder="display name" style={{ ...field, width: 150 }} />
-                  <input value={creating.password} onChange={(e) => setCreating({ ...creating, password: e.target.value })} placeholder="initial password" type="text" style={{ ...field, width: 150 }} />
+                  {PASSWORD_LOGIN && <input value={creating.password} onChange={(e) => setCreating({ ...creating, password: e.target.value })} placeholder="initial password" type="text" style={{ ...field, width: 150 }} />}
                   <select value={creating.role} onChange={(e) => setCreating({ ...creating, role: e.target.value })} style={{ ...field, width: 100 }}>
                     <option value="member">member</option>
                     <option value="admin">admin</option>

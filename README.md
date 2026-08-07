@@ -27,7 +27,7 @@ Interaction design (the fetch-scoping that keeps it fast and cheap):
 
 - Next.js 15 (App Router) — frontend + serverless API routes
 - Neon Postgres via `@neondatabase/serverless` (HTTP driver) — raw parameterised SQL, no ORM
-- Username/password auth — bcrypt password hashes + a signed httpOnly session cookie (jose JWT); middleware gates the app
+- Google sign-in restricted to `@skedulo.com` — the only way in; a signed httpOnly session cookie (jose JWT) and middleware gate the app
 
 ## Setup
 
@@ -60,12 +60,12 @@ npm run dev                  # http://localhost:3000
 ## Auth
 
 - **Login page** at `/login`. `middleware.js` redirects any unauthenticated page visit there; the `/api/*` data routes independently return `401` JSON, so the API is protected even if middleware is bypassed.
-- **Accounts** live in the `accounts` table. Passwords are stored **only as bcrypt hashes** — never plaintext.
-- **Seeded admin:** `skedadmin` (role `admin`). Its hash is set by `schema.sql`. **Change this password after first login** — it's weak and was shared in setup.
-- **Add a user:** insert a row with a bcrypt hash. Generate one with `node -e "console.log(require('bcryptjs').hashSync('their-password',10))"`, then `insert into accounts (username, password_hash, role) values ('name','<hash>','member');`.
+- **Accounts** live in the `accounts` table. `password_hash` is null for everyone who signs in with Google, which is everyone; the bcrypt columns and routes survive behind `PASSWORD_LOGIN` in `lib/authMode.js` only so the app can be reopened if OAuth breaks.
+- **Seeded admin:** `skedadmin` (role `admin`), email `khoa.vu@skedulo.com`. Signing in with that Google address lands on this row — accounts are matched on `lower(email)`, so it keeps its admin role rather than creating a duplicate.
+- **Add a user:** you don't. The first Google sign-in creates the account. If you pre-create one from Manage → User accounts, **set the email address** — a row with a null email can never be matched to a Google identity and its owner is locked out.
 - **Self-serve sign-up** at `/register`, restricted to `@skedulo.com`. Two steps: details → 6-digit code emailed to the address. The row lives in `signup_codes` (bcrypt-hashed code, 10-minute expiry, 5 attempts, 60s resend cooldown) and **no `accounts` row is created until the code checks out**, so an unreadable address can't become a login.
 - **My profile** at `/profile` — display name, avatar image, avatar colour, region and timezone. Username, email and role stay admin-only. Avatar colour defaults to a hash of the **username** (stable everywhere); avatars are private blobs streamed through `/api/avatars/:id`.
-- **Forgot password** at `/forgot` — same OTP mechanics via `password_resets`. Accepts a username or an email.
+- `/register` and `/forgot` redirect to `/login`; their routes return 404. Old bookmarks and emailed links still land somewhere sensible.
 ## Views
 
 - **Board** (`/`) — cards with status + tag pills and team avatars, a 6-stage pipeline strip, search and status filter. Clicking a card opens the full idea page; the **Preview** button opens a read-only drawer.
@@ -97,7 +97,7 @@ Project Lead (max 1), Initiator / Idea Lead, AI Design, Form / UX Design, Data /
 ## Data model
 
 - `ideas` — `id, seq, name, status, tags text[], initiator_account_id, target_date, context, pain_points, expected_benefit, created_at, updated_at`. `seq` drives the `IDEA-007` number; the detail page's content is Context / Pain points / Expected benefit.
-- `accounts` — `id, username, password_hash, name, role, created_at`. Login credentials + display name; `password_hash` is bcrypt.
+- `accounts` — `id, username, email, password_hash, name, role, auth_provider, created_at`. `email` is the identity Google is matched on (unique on `lower(email)`); `password_hash` is null for SSO accounts.
 - `tags` — `id, name, created_at`. Admin-managed catalog of allowed tags.
 - `idea_members` — `id, idea_id, account_id, role, created_at`. Per-idea team; unique `(idea_id, account_id)`; a partial unique index enforces one Project Lead per idea.
 - `likes` — `(idea_id, account_id)` PK. One like per person (toggle).
@@ -107,13 +107,13 @@ Project Lead (max 1), Initiator / Idea Lead, AI Design, Form / UX Design, Data /
 ## Known caveats
 
 - **Follow emails aren't wired yet** — the Follow button records the follow; the email/Slack side is a later n8n job.
-- **User management is SQL-only** — add accounts / change passwords via SQL (see Auth). No self-serve reset UI yet.
+- **No break-glass in the UI** — if the Google client is misconfigured nobody can sign in. Recovery is a Vercel instant rollback to the deployment before Google-only, which restores password sign-in without a rebuild.
 - **AUTH_SECRET must be set** in every environment, or sign-in fails and everyone is redirected to `/login`.
 - **Pooled connection**: use Neon's pooled connection string for serverless; the HTTP driver is stateless, so no connection-pool tuning is needed.
 
 ## Roadmap
 
-1. **Auth hardening** — self-serve password change/reset, admin user-management UI; optionally swap username/password for Google SSO restricted to `skedulo.com` (the SSO NFR) if the team prefers it
+1. **Delete the password code** once Google has proven itself in production — `/register`, `/forgot`, the reset OTP tables and the bcrypt dependency are all dead weight behind `PASSWORD_LOGIN`
 2. **Likes / "I'm in!"** — now unblocked (accounts exist for attribution)
 3. **Leader dashboard page** — KPIs, funnel, needs-attention (port of the dashboard mock-up)
 4. **n8n automations** — Slack notify on status transitions, 7-day review-SLA checks, stale-idea flags

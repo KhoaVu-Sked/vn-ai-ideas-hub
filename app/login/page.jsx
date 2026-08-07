@@ -82,6 +82,8 @@ function LoginForm() {
             ✓ Password updated — sign in with your new password.
           </div>
         )}
+        {err && <div style={{ fontSize: 12.5, color: "#e03131", marginBottom: 12 }}>{err}</div>}
+
         {PASSWORD_LOGIN && (<>
           <label style={{ fontSize: 12, fontWeight: 600, color: "#5a6a82" }}>Username or email</label>
           <input
@@ -100,8 +102,6 @@ function LoginForm() {
             autoComplete="current-password"
             style={{ width: "100%", margin: "6px 0 16px", padding: "10px 12px", border: "1px solid #d5dce6", borderRadius: 8, fontSize: 13.5, outline: "none" }}
           />
-
-          {err && <div style={{ fontSize: 12.5, color: "#e03131", marginBottom: 12 }}>{err}</div>}
 
           <button
             type="submit"

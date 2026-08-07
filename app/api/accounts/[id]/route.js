@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { adminEvent } from "@/lib/notify";
 import { hashPassword } from "@/lib/auth";
 import { APP_NAME } from "@/lib/brand";
+import { PASSWORD_LOGIN } from "@/lib/authMode";
 
 // PATCH /api/accounts/:id { username, email, name, role, password? }
 // → edit an account / change role / reset password (admin only)
@@ -12,13 +13,13 @@ export async function PATCH(request, { params }) {
     const admin = await requireAdmin();
     const { id } = await params;
     const body = await request.json();
-    if (body.password?.trim()) {
+    if (PASSWORD_LOGIN && body.password?.trim()) {
       await setAccountPassword(id, await hashPassword(body.password));
     }
     const account = await updateAccount(id, body);
     const base = new URL(request.url).origin;
     const who = admin.name || admin.username;
-    const what = body.password?.trim() ? "reset the password for" : "updated the account";
+    const what = PASSWORD_LOGIN && body.password?.trim() ? "reset the password for" : "updated the account";
     after(() => adminEvent({
       actorId: admin.uid, actor: who, entity: "account", entityId: id,
       auditAction: `${what} "${account.username}"`,
