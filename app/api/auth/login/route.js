@@ -14,7 +14,9 @@ export async function POST(request) {
 
     const account = await getAccountByLogin(username);
     // Same response whether the account is missing or the password is wrong.
-    const ok = account && (await verifyPassword(password, account.password_hash));
+    // A Google-only account has password_hash null — never hand that to bcrypt.
+    // Same generic response, so this doesn't reveal how an account signs in.
+    const ok = account?.password_hash && (await verifyPassword(password, account.password_hash));
     if (!ok) {
       return Response.json({ error: "Invalid username or password." }, { status: 401 });
     }

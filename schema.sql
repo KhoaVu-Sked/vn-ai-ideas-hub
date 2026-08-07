@@ -45,7 +45,8 @@ create table if not exists accounts (
   id            uuid primary key default gen_random_uuid(),
   username      text unique not null,
   email         text,                                    -- unique (index added below); login works with either
-  password_hash text not null,
+  password_hash text,                                    -- null for Google-only accounts
+  auth_provider text not null default 'password',         -- password | google (informational)
   name          text,                                    -- display name, e.g. "Trung Vo"
   role          text not null default 'member',          -- workspace role: admin | member
   avatar_color  text,                                    -- chosen on /profile; null → hashed default
@@ -236,6 +237,8 @@ create table if not exists app_settings (
   key text primary key, value text not null,
   updated_at timestamptz not null default now(), updated_by uuid
 );
+alter table accounts alter column password_hash drop not null;
+alter table accounts add column if not exists auth_provider text not null default 'password';
 
 -- Merge "Project Lead" + "Initiator / Idea Lead" into "Initiator / Project Lead".
 -- The old index has the same NAME but the old predicate, so `if not exists`
