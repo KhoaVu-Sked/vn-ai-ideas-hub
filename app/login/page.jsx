@@ -67,9 +67,9 @@ function LoginForm() {
         onSubmit={submit}
         style={{ background: "#fff", borderRadius: 14, padding: 28, width: 360, boxShadow: "0 20px 60px rgba(10,22,44,0.35)" }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 8, background: "var(--header-blue)", display: "flex", alignItems: "center", justifyContent: "center" }}><SkeduloMark size={20} /></div>
-          <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)" }}>{APP_NAME}</span>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginBottom: 26 }}>
+          <div style={{ width: 60, height: 60, borderRadius: 15, background: "var(--header-blue)", display: "flex", alignItems: "center", justifyContent: "center" }}><SkeduloMark size={36} /></div>
+          <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 25, lineHeight: 1.2, letterSpacing: "-0.02em", color: "var(--ink)", textAlign: "center" }}>{APP_NAME}</span>
         </div>
 
         {notice && !resetDone && (
@@ -118,11 +118,7 @@ function LoginForm() {
             <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 600 }}>OR</span>
             <span style={{ flex: 1, height: 1, background: "#e4e7ed" }} />
           </div>
-        ) : (
-          <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 16px", lineHeight: 1.5 }}>
-            Sign in with your Skedulo Google account. There's no separate password to remember.
-          </p>
-        )}
+        ) : null}
 
         <a
           href="/api/auth/google"
@@ -149,11 +145,7 @@ function LoginForm() {
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8, textAlign: "center" }}>
             New here? <Link href="/register" style={{ color: "var(--blue)", fontWeight: 700 }}>Create an account</Link>
           </div>
-        </>) : (
-          <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 14, textAlign: "center" }}>
-            First time? Signing in creates your account.
-          </div>
-        )}
+        </>) : null}
       </form>
     </div>
   );

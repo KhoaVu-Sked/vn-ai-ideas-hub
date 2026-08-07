@@ -107,6 +107,8 @@ Project Lead (max 1), Initiator / Idea Lead, AI Design, Form / UX Design, Data /
 ## Known caveats
 
 - **Follow emails aren't wired yet** — the Follow button records the follow; the email/Slack side is a later n8n job.
+- **`/skedadmin`** — the old username/password form, kept as break-glass so there is a way in that doesn't depend on Google. Not linked from anywhere, but treat the URL as public. `/api/auth/login` accepts **admin accounts only** while `PASSWORD_LOGIN` is off; every member still carries a bcrypt hash from before the switch, and without that check this page would reopen password login for all of them. A member who tries gets "Invalid username or password", not "not allowed", so it doesn't reveal who the admins are.
+- **The seeded `skedadmin` password is weak and was shared in setup** — change it from Profile → Change password, which is visible to admins again for exactly this reason.
 - **No break-glass in the UI** — if the Google client is misconfigured nobody can sign in. Recovery is a Vercel instant rollback to the deployment before Google-only, which restores password sign-in without a rebuild.
 - **AUTH_SECRET must be set** in every environment, or sign-in fails and everyone is redirected to `/login`.
 - **Pooled connection**: use Neon's pooled connection string for serverless; the HTTP driver is stateless, so no connection-pool tuning is needed.

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { COOKIE_NAME, verifySessionToken } from "@/lib/session";
-import { PASSWORD_LOGIN } from "@/lib/authMode";
+import { PASSWORD_LOGIN, ADMIN_PASSWORD_LOGIN } from "@/lib/authMode";
 
 // Pages you're meant to reach WITHOUT a session. Landing on a sign-in form
 // while already signed in just reads as broken, so these bounce to the board.
-const AUTH_PAGES = new Set(["/login", "/register", "/forgot"]);
+const AUTH_PAGES = new Set(["/login", "/register", "/forgot", "/skedadmin"]);
 
 // With Google as the only way in, these two have nothing to do — registration
 // happens on first sign-in and there's no password to reset. Send them to
@@ -26,6 +26,13 @@ export async function middleware(request) {
   const { pathname, searchParams } = request.nextUrl;
   const user = await verifySessionToken(request.cookies.get(COOKIE_NAME)?.value);
   const isAuthPage = AUTH_PAGES.has(pathname);
+
+  if (!ADMIN_PASSWORD_LOGIN && pathname === "/skedadmin") {
+    const url = request.nextUrl.clone();
+    url.pathname = user ? "/" : "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   if (!PASSWORD_LOGIN && PASSWORD_PAGES.has(pathname)) {
     const url = request.nextUrl.clone();

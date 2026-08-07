@@ -11,7 +11,7 @@ import { endSession } from "./apiClient";
 //
 // Call refresh() after changing your own profile so the header avatar and
 // display name update without a page reload.
-const AUTH_PATHS = new Set(["/login", "/register", "/forgot"]);
+const AUTH_PATHS = new Set(["/login", "/register", "/forgot", "/skedadmin"]);
 
 const SessionCtx = createContext({ user: undefined, refresh: () => {} });
 

@@ -8,7 +8,7 @@ import AppHeader from "../AppHeader";
 import Loading from "../Loading";
 import { useSession } from "../SessionProvider";
 import { api } from "../apiClient";
-import { PASSWORD_LOGIN } from "@/lib/authMode";
+import { PASSWORD_LOGIN, ADMIN_PASSWORD_LOGIN } from "@/lib/authMode";
 
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
@@ -28,7 +28,9 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
-  const { refresh: refreshSession } = useSession();
+  const { user: sessionUser, refresh: refreshSession } = useSession();
+  // Only admins can still sign in with a password, so only they have one to change.
+  const canChangePassword = PASSWORD_LOGIN || (ADMIN_PASSWORD_LOGIN && sessionUser?.role === "admin");
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [pwErr, setPwErr] = useState("");
   const [pwDone, setPwDone] = useState(false);
@@ -218,7 +220,7 @@ export default function ProfilePage() {
 
           {/* Change password — your own account, no email step. Asking for an
               address here would let someone type a colleague's by mistake. */}
-          {PASSWORD_LOGIN && (
+          {canChangePassword && (
             <form onSubmit={changePassword} style={{ ...card, marginTop: 16 }}>
               <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", margin: "0 0 4px" }}>Change password</h2>
               <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
