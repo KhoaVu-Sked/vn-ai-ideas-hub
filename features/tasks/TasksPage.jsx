@@ -7,6 +7,7 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import { api } from "@/lib/apiClient";
+import Pager, { usePaging } from "@/components/Pager";
 
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
@@ -49,6 +50,7 @@ export default function TasksPage() {
 
   const open = tasks.filter((t) => !t.done);
   const done = tasks.filter((t) => t.done);
+  const pg = usePaging(done.length);
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
@@ -79,8 +81,9 @@ export default function TasksPage() {
               <>
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.6, textTransform: "uppercase", margin: "18px 0 6px" }}>Done ({done.length})</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {done.map((t) => <Row key={t.id} task={t} onToggle={toggle} onRemove={remove} />)}
+                  {pg.slice(done).map((t) => <Row key={t.id} task={t} onToggle={toggle} onRemove={remove} />)}
                 </div>
+                <Pager p={pg} total={done.length} noun="task" />
               </>
             )}
           </section>

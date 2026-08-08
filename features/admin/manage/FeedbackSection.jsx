@@ -3,8 +3,10 @@
 // In-app feedback: triage open items, delete handled ones.
 
 import { btn } from "./styles";
+import Pager, { usePaging } from "@/components/Pager";
 
 export default function FeedbackSection({ delFb, feedback, setFbStatus }) {
+  const pg = usePaging(feedback.length);
   return (
             <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" }}>
               <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 12px" }}>Feedback {feedback.length > 0 && <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>({feedback.filter((f) => f.status === "open").length} open)</span>}</h2>
@@ -12,7 +14,7 @@ export default function FeedbackSection({ delFb, feedback, setFbStatus }) {
                 <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No feedback yet.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {feedback.map((f) => (
+                  {pg.slice(feedback).map((f) => (
                     <div key={f.id} style={{ background: f.status === "resolved" ? "#f6f8fb" : "#fff", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px", opacity: f.status === "resolved" ? 0.7 : 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
                         <span className="breakable" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{f.submitter}</span>
@@ -29,6 +31,7 @@ export default function FeedbackSection({ delFb, feedback, setFbStatus }) {
                   ))}
                 </div>
               )}
+              <Pager p={pg} total={feedback.length} noun="item" />
             </section>
   );
 }

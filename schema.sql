@@ -110,8 +110,9 @@ create table if not exists requests (
   title       text,                           -- the only thing the card shows
   body        text not null,                  -- detail, revealed on open
   assignee_id uuid references accounts(id) on delete set null,
-  start_date  date,
-  due_date    date,
+  -- Timing is measured, not declared: created_at is total age,
+  -- state_changed_at is age in the current column.
+  state_changed_at timestamptz not null default now(),
   state       text not null default 'pending_approval',
                        -- pending_approval | accepted | in_progress | done | declined
   position    integer not null default 0,     -- order within a board column
@@ -267,6 +268,8 @@ alter table accounts add column if not exists auth_provider text not null defaul
 -- ── migration 018: task board + comments ──
 alter table requests add column if not exists title text;
 alter table requests add column if not exists assignee_id uuid references accounts(id) on delete set null;
+-- Added by 018, removed again by 019 below. Kept so the replay matches the
+-- migrations an existing database actually ran.
 alter table requests add column if not exists start_date date;
 alter table requests add column if not exists due_date date;
 alter table requests add column if not exists position integer not null default 0;
@@ -369,3 +372,11 @@ values ('skedadmin', 'khoa.vu@skedulo.com', '$2b$10$jXuVkyeenk74ziHvW17gtuAZMdtD
 on conflict (username) do nothing;
 update accounts set name = 'Sked Admin' where username = 'skedadmin' and name is null;
 update accounts set email = 'khoa.vu@skedulo.com' where username = 'skedadmin' and email is null;
+
+-- ── migration 019: time in stage, no deadline ──
+alter table requests add column if not exists state_changed_at timestamptz;
+update requests set state_changed_at = coalesce(updated_at, created_at) where state_changed_at is null;
+alter table requests alter column state_changed_at set default now();
+alter table requests alter column state_changed_at set not null;
+alter table requests drop column if exists start_date;
+alter table requests drop column if exists due_date;

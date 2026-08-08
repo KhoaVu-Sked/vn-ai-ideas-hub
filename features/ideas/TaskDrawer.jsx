@@ -3,13 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { TASK_META, TASK_ORDER, TASK_DECLINED, canMoveTask } from "@/features/ideas/constants";
 import Avatar from "@/components/Avatar";
-
-async function api(path, init) {
-  const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
-  return body;
-}
+import { longAge, stageTone } from "@/features/ideas/elapsed";
+import { api } from "@/lib/apiClient";
 
 const btn = { border: "1px solid #d5dce6", borderRadius: 8, padding: "7px 13px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", background: "#fff", color: "#3a4a63" };
 const label = { fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 4 };
@@ -53,9 +48,10 @@ export default function TaskDrawer({ ideaId, task, canModerate, isAdmin, onClose
   return (
     <div
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      className="drawer-scrim"
       style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.5)", display: "flex", justifyContent: "flex-end", zIndex: 110 }}
     >
-      <div style={{ background: "#fff", width: 520, maxWidth: "100%", height: "100%", overflowY: "auto", padding: "22px 24px", boxShadow: "-12px 0 40px rgba(10,22,44,0.25)" }}>
+      <div className="drawer-panel" style={{ background: "#fff", width: 520, maxWidth: "100%", height: "100%", overflowY: "auto", padding: "22px 24px", boxShadow: "-12px 0 40px rgba(10,22,44,0.25)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--faint)", fontVariantNumeric: "tabular-nums" }}>{task.number}</span>
           <span style={{ background: meta.bg, color: meta.fg, fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999 }}>{meta.label}</span>
@@ -72,9 +68,13 @@ export default function TaskDrawer({ ideaId, task, canModerate, isAdmin, onClose
               : <span style={{ fontSize: 13, color: "var(--faint)" }}>Unassigned</span>}
           </div>
           <div>
-            <div style={label}>Dates</div>
-            <span style={{ fontSize: 13, color: task.start_date || task.due_date ? "var(--body)" : "var(--faint)", fontVariantNumeric: "tabular-nums" }}>
-              {task.start_date || task.due_date ? `${task.start_date || "—"} → ${task.due_date || "—"}` : "Not scheduled"}
+            <div style={label}>Open for</div>
+            <span style={{ fontSize: 13, color: "var(--body)" }}>{longAge(task.created_at)}</span>
+          </div>
+          <div>
+            <div style={label}>In {meta.label} for</div>
+            <span style={{ fontSize: 13, fontWeight: 700, padding: "2px 7px", borderRadius: 5, ...(() => { const t = stageTone(task.state_changed_at); return { background: t.bg, color: t.fg }; })() }}>
+              {longAge(task.state_changed_at)}
             </span>
           </div>
           <div>

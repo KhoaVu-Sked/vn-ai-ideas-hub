@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TASK_ORDER, TASK_DECLINED, TASK_META, canMoveTask } from "@/features/ideas/constants";
 import Avatar from "@/components/Avatar";
+import { shortAge, stageTone } from "@/features/ideas/elapsed";
 
 // Jira-style columns. A card shows only its name (plus its number and assignee)
 // — click it for everything else.
@@ -86,7 +87,15 @@ export default function TaskBoard({ tasks, canModerate, isAdmin, onOpen, onMove 
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--faint)", fontVariantNumeric: "tabular-nums" }}>{t.number}</span>
-                    {t.due_date && <span style={{ fontSize: 10.5, color: "var(--faint)" }}>· due {t.due_date}</span>}
+                    {(() => {
+                      // Dwell time in the current column — the number that says
+                      // whether this card is moving. Colours once it is stale.
+                      const tone = stageTone(t.state_changed_at);
+                      return <span title={`In ${meta.label} for ${shortAge(t.state_changed_at)}`}
+                        style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 4, background: tone.bg, color: tone.fg }}>
+                        {shortAge(t.state_changed_at)}
+                      </span>;
+                    })()}
                     {t.commentCount > 0 && <span style={{ fontSize: 10.5, color: "var(--faint)" }}>· {t.commentCount} 🗨</span>}
                     <span style={{ marginLeft: "auto", display: "flex" }}>
                       {t.assignee

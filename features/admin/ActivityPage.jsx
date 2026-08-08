@@ -7,6 +7,7 @@ import Loading from "@/components/Loading";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
+import Pager, { usePaging } from "@/components/Pager";
 
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
@@ -20,6 +21,7 @@ export default function ActivityPage() {
   const { user } = useSession();
   const me = user === undefined ? undefined : (user?.role === "admin" ? user : null);
   const [entries, setEntries] = useState([]);
+  const pg = usePaging(entries.length);
   const [actors, setActors] = useState([]);
   const [types, setTypes] = useState([]);
   const [days, setDays] = useState(14);
@@ -95,7 +97,7 @@ export default function ActivityPage() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column" }}>
-                {entries.map((e) => (
+                {pg.slice(entries).map((e) => (
                   <div key={e.id} style={{ display: "flex", gap: 12, alignItems: "baseline", padding: "9px 0", borderTop: "1px solid var(--line)" }}>
                     <span style={{ fontSize: 11.5, color: "var(--faint)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", width: 140, flexShrink: 0 }}>
                       {new Date(e.at).toLocaleString()}
@@ -108,6 +110,7 @@ export default function ActivityPage() {
                 ))}
               </div>
             )}
+            <Pager p={pg} total={entries.length} noun="entry" />
           </section>
         )}
       </main>

@@ -1,18 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { validateTaskDates } from "@/features/ideas/ideaWindow";
 
-// Create or edit a task. `window` is the idea's own date range — a task can't
-// be scheduled outside it, so we show the bounds and enforce them here as well
-// as on the server.
-export default function TaskModal({ task, members, window: win, onClose, onSave }) {
+// Create or edit a task. There are no dates to set: a card's timing is measured,
+// not declared — see features/ideas/elapsed.js.
+export default function TaskModal({ task, members, onClose, onSave }) {
   const editing = !!task;
   const [form, setForm] = useState({
     title: task?.title || "",
     detail: task?.detail || "",
-    start_date: task?.start_date || "",
-    due_date: task?.due_date || "",
     assignee_id: task?.assignee?.id || "",
     comment: "",
   });
@@ -24,8 +20,6 @@ export default function TaskModal({ task, members, window: win, onClose, onSave 
   const submit = async (e) => {
     e?.preventDefault();
     if (!form.title.trim()) { setErr("Give the task a name."); return; }
-    const bad = validateTaskDates({ start: form.start_date, due: form.due_date }, win);
-    if (bad) { setErr(bad); return; }
     setBusy(true);
     try { await onSave(form); } catch (e) { setErr(e.message); setBusy(false); }
   };
@@ -52,23 +46,6 @@ export default function TaskModal({ task, members, window: win, onClose, onSave 
 
         <div style={label}>Detail</div>
         <textarea value={form.detail} onChange={(e) => set("detail", e.target.value)} rows={4} placeholder="What needs doing, and why" style={{ ...field, resize: "vertical" }} />
-
-        <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={label}>Start</div>
-            <input type="date" value={form.start_date} min={win?.start || undefined} max={win?.end || undefined} onChange={(e) => set("start_date", e.target.value)} style={field} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={label}>Due</div>
-            <input type="date" value={form.due_date} min={form.start_date || win?.start || undefined} max={win?.end || undefined} onChange={(e) => set("due_date", e.target.value)} style={field} />
-          </div>
-        </div>
-        {win?.start && (
-          <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: -8, marginBottom: 14 }}>
-            The idea&apos;s window: <b style={{ color: "var(--muted)" }}>{win.start}</b>
-            {win.end ? <> → <b style={{ color: "var(--muted)" }}>{win.end}</b></> : <> onward (no time frame set)</>}
-          </div>
-        )}
 
         <div style={label}>Assignee</div>
         <select value={form.assignee_id} onChange={(e) => set("assignee_id", e.target.value)} style={field}>

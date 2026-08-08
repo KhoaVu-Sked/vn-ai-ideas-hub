@@ -6,7 +6,6 @@ import Link from "next/link";
 import { tagPill } from "@/features/admin/tagColors";
 import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, ROLES, STATUS_META, STATUS_ORDER } from "@/features/ideas/constants";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
-import { ideaWindow } from "@/features/ideas/ideaWindow";
 import Avatar from "@/components/Avatar";
 import TagChip from "@/components/TagChip";
 import FieldInput from "@/components/FieldInput";
@@ -115,8 +114,6 @@ export default function IdeaPage() {
   // must flip this immediately.
   const canEdit = isAdmin || isLead;
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
-  // Tasks must be scheduled inside the idea's own window — see lib/ideaWindow.
-  const win = ideaWindow({ created: idea.created_at, target_date: idea.target_date });
   const leadMember = members.find((m) => (m.roles || []).includes(LEAD_ROLE)) || null;
   const hasLead = !!leadMember;
   const initiator = members.find((m) => (m.roles || []).includes(INITIATOR_ROLE)) || null;
@@ -269,7 +266,7 @@ export default function IdeaPage() {
       {showSubmit && <SubmitModal onClose={() => setShowSubmit(false)} onCreated={(project) => router.push(`/idea/${project.id}`)} />}
       {taskModal && (
         <TaskModal
-          task={taskModal.task} members={members} window={win}
+          task={taskModal.task} members={members}
           onClose={() => setTaskModal(null)} onSave={saveTask}
         />
       )}

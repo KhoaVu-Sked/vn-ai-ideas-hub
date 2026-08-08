@@ -111,8 +111,9 @@ create table if not exists requests (
   body        text not null,                   -- the detail, shown when opened
   state       text not null default 'pending_approval',
   assignee_id uuid references accounts(id) on delete set null,
-  start_date  date,
-  due_date    date,
+  -- Timing is measured, not declared: created_at is total age, state_changed_at
+  -- is age in the current column. Both reset themselves.
+  state_changed_at timestamptz not null default now(),
   position    integer not null default 0,      -- order within a column
   seq         bigserial,                       -- human number → T-007
   created_at  timestamptz not null default now(),

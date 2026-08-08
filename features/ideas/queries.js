@@ -191,7 +191,7 @@ export async function getIdea(id, accountId) {
                   'id', t.id, 'number', 'T-' || lpad(coalesce(t.seq, 0)::text, 3, '0'),
                   'title', coalesce(nullif(t.title, ''), left(t.body, 60)), 'detail', t.body,
                   'state', t.state, 'position', t.position,
-                  'start_date', t.start_date, 'due_date', t.due_date, 'updated_at', t.updated_at,
+                  'updated_at', t.updated_at, 'state_changed_at', t.state_changed_at,
                   'created_at', t.created_at, 'author_id', t.account_id,
                   'author', coalesce(ra.name, ra.username), 'author_color', ra.avatar_color, 'author_avatar', ra.avatar_url,
                   'assignee_id', t.assignee_id, 'assignee', coalesce(aa.name, aa.username),
@@ -398,9 +398,6 @@ export async function leaveTeam(ideaId, accountId) {
 
 // ── task board + comments (migration 018) ──────────────────────
 
-// Empty string from an unset date input must become NULL, not ''::date —
-// Postgres rejects the latter. Anything not exactly YYYY-MM-DD is discarded.
-const asDate = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : null);
 
 // ── task board (an idea's requests) ───────────────────────────
 // Both shapes are built for <Avatar person={…} />.
@@ -408,7 +405,9 @@ function shapeTask(x, accountId) {
   return {
     id: x.id, number: x.number, title: x.title || "Untitled", detail: x.detail || "",
     state: x.state, position: x.position,
-    start_date: x.start_date ? ymd(x.start_date) : "", due_date: x.due_date ? ymd(x.due_date) : "",
+    // Sent as raw timestamps: elapsed time has to be worked out in the reader's
+    // timezone, and the server has no idea what that is.
+    created_at: x.created_at, state_changed_at: x.state_changed_at || x.created_at,
     date: ymd(x.created_at), edited: !!x.updated_at, commentCount: x.comment_count || 0,
     mine: x.author_id === accountId,
     mineToDo: x.assignee_id === accountId,
@@ -433,7 +432,7 @@ async function readTask(taskId, accountId) {
   const rows = await sql`
     select t.id, 'T-' || lpad(coalesce(t.seq, 0)::text, 3, '0') as number,
       coalesce(nullif(t.title, ''), left(t.body, 60)) as title, t.body as detail,
-      t.state, t.position, t.start_date, t.due_date, t.created_at, t.updated_at, t.account_id as author_id,
+      t.state, t.position, t.created_at, t.updated_at, t.state_changed_at, t.account_id as author_id,
       coalesce(ra.name, ra.username) as author, ra.avatar_color as author_color, ra.avatar_url as author_avatar,
       t.assignee_id, coalesce(aa.name, aa.username) as assignee,
       aa.avatar_color as assignee_color, aa.avatar_url as assignee_avatar,
@@ -447,15 +446,14 @@ async function readTask(taskId, accountId) {
   return shapeTask(rows[0], accountId);
 }
 
-export async function createIdeaTask(ideaId, accountId, { title, detail, start_date, due_date, assignee_id, comment }) {
+export async function createIdeaTask(ideaId, accountId, { title, detail, assignee_id, comment }) {
   const name = (title || "").trim().slice(0, 200);
   if (!name) throw err(400, "A task name is required.");
   const rows = await sql`
-    insert into requests (idea_id, account_id, title, body, assignee_id, start_date, due_date, state, position)
+    insert into requests (idea_id, account_id, title, body, assignee_id, state, position)
     values (
       ${ideaId}, ${accountId}, ${name}, ${(detail || "").trim().slice(0, 4000)},
-      ${assignee_id || null}::uuid, ${asDate(start_date)}::date, ${asDate(due_date)}::date,
-      'pending_approval',
+      ${assignee_id || null}::uuid, 'pending_approval',
       (select coalesce(max(position), 0) + 1 from requests where idea_id = ${ideaId} and state = 'pending_approval')
     )
     returning id
@@ -475,8 +473,6 @@ export async function updateIdeaTask(taskId, accountId, isAdmin, patch) {
       title       = coalesce(${(patch.title || "").trim().slice(0, 200) || null}, t.title),
       body        = coalesce(${patch.detail === undefined ? null : (patch.detail || "").trim().slice(0, 4000)}, t.body),
       assignee_id = ${patch.assignee_id === undefined ? null : (patch.assignee_id || null)}::uuid,
-      start_date  = ${asDate(patch.start_date)}::date,
-      due_date    = ${asDate(patch.due_date)}::date,
       updated_at  = now()
     where t.id = ${taskId}
       and ( t.account_id = ${accountId}
@@ -508,6 +504,7 @@ export async function moveIdeaTask(taskId, state, accountId, isAdmin) {
       state = ${state},
       position = (select coalesce(max(position), 0) + 1 from requests p
                   where p.idea_id = (select idea_id from t) and p.state = ${state}),
+      state_changed_at = now(),
       updated_at = now()
     from t
     where r.id = t.id
