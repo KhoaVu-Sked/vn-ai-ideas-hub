@@ -398,6 +398,10 @@ export async function leaveTeam(ideaId, accountId) {
 
 // ── task board + comments (migration 018) ──────────────────────
 
+// Empty string from an unset date input must become NULL, not ''::date —
+// Postgres rejects the latter. Anything not exactly YYYY-MM-DD is discarded.
+const asDate = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : null);
+
 // ── task board (an idea's requests) ───────────────────────────
 // Both shapes are built for <Avatar person={…} />.
 function shapeTask(x, accountId) {
