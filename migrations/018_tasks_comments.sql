@@ -1,17 +1,25 @@
--- Migration 018 — split requests into tasks + comments
--- SAFE for your data: additive columns, one new table, and a state remap.
--- No row is deleted. Run in the Neon SQL editor.
+-- Migration 018 — split requests into a task board and a comment thread
 --
--- The `requests` table now backs the Jira-style Task board on an idea:
---   title       short card label (the only thing the card shows)
---   body        the detail, revealed when you open the card
+-- The existing `requests` rows are free-text discussion, not tracked work — the
+-- old input box literally said "write a request or comment". So they move to
+-- `comments` and the board starts empty, rather than becoming a column of
+-- one-line cards nobody wrote as tasks.
+--
+-- `requests` keeps its table but changes meaning: it now backs the board.
+--   title       short card label (all the card shows)
+--   body        the detail, revealed when the card is opened
 --   assignee_id who's doing it
 --   start/due   scheduled window, bounded by the idea's own window
---   position    order within a board column
+--   position    order within a column
 --   seq         human number → T-007
 --
--- Free-text discussion moves to the new `comments` table. One table serves both
--- the idea's Overview thread (request_id is null) and a thread on a single task.
+-- `comments` serves both the idea's Overview thread (request_id null) and the
+-- thread on a single card.
+--
+-- NOTE: triage state is not carried over. An "accepted" request becomes an
+-- ordinary comment — the verdict was about text that is no longer a request.
+
+begin;
 
 alter table requests add column if not exists title       text;
 alter table requests add column if not exists assignee_id uuid references accounts(id) on delete set null;
@@ -22,23 +30,17 @@ alter table requests add column if not exists seq         bigserial;
 
 create index if not exists requests_board_idx on requests (idea_id, state, position);
 
--- Existing rows have no title — take the opening of their text, and mark it so
--- it's obvious these came from the old free-text list.
-update requests
-set title = case when length(body) > 60 then left(body, 57) || '…' else body end
-where title is null or title = '';
-
--- Old states → board columns. 'accepted' and 'declined' already match.
-update requests set state = 'pending_approval' where state in ('open', 'under_discussion');
-update requests set state = 'done'             where state = 'closed';
-
--- Give each idea's existing cards a stable order.
-with ordered as (
-  select id, row_number() over (partition by idea_id, state order by created_at) as rn
-  from requests
-)
-update requests r set position = ordered.rn
-from ordered where ordered.id = r.id and r.position = 0;
+-- An older database may carry an unrelated `comments` table (author as free
+-- text, no account_id). Drop it ONLY if it is that one — never the real table.
+do $$
+begin
+  if exists (select 1 from information_schema.tables  where table_name = 'comments')
+     and not exists (select 1 from information_schema.columns
+                     where table_name = 'comments' and column_name = 'request_id')
+  then
+    drop table comments;
+  end if;
+end $$;
 
 create table if not exists comments (
   id         uuid primary key default gen_random_uuid(),
@@ -51,3 +53,14 @@ create table if not exists comments (
 );
 create index if not exists comments_idea_idx    on comments (idea_id, created_at);
 create index if not exists comments_request_idx on comments (request_id, created_at);
+
+-- Every existing request becomes an idea-level comment, keeping its author and
+-- its original timestamp so the thread reads in the order it was written.
+insert into comments (idea_id, request_id, account_id, body, created_at)
+select idea_id, null, account_id, body, created_at
+from requests;
+
+-- The board starts empty. Nothing is lost — every row was copied above.
+delete from requests;
+
+commit;

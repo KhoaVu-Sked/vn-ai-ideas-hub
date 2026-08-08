@@ -265,7 +265,7 @@ export default function IdeaPage() {
   };
 
   return (
-    <Shell onNewIdea={() => setShowSubmit(true)}>
+    <Shell onNewIdea={() => setShowSubmit(true)} wide={tab === "tasks"}>
       {showSubmit && <SubmitModal onClose={() => setShowSubmit(false)} onCreated={(project) => router.push(`/idea/${project.id}`)} />}
       {taskModal && (
         <TaskModal
@@ -295,7 +295,7 @@ export default function IdeaPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 300px", gap: 20, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: tab === "tasks" ? "minmax(0, 1fr)" : "minmax(0, 1fr) 300px", gap: 20, alignItems: "start" }}>
         {/* ── Main column ── */}
         <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "22px 26px" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
@@ -484,7 +484,8 @@ export default function IdeaPage() {
           )}
         </div>
 
-        {/* ── Sidebar ── */}
+        {/* ── Sidebar — idea metadata, nothing to say about tasks ── */}
+        {tab !== "tasks" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 18px" }}>
             <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 12 }}>Team &amp; roles</div>
@@ -521,6 +522,7 @@ export default function IdeaPage() {
             {isAdmin && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Admin: change a role, or set someone as {LEAD_ROLE} to transfer the lead. There can be one {LEAD_ROLE} and one {INITIATOR_ROLE} per idea.</div>}
           </div>
         </div>
+        )}
       </div>
 
       {showRoles && (
@@ -551,11 +553,13 @@ export default function IdeaPage() {
   );
 }
 
-function Shell({ onNewIdea, children }) {
+// 1060 is a comfortable reading width for the Overview tab. A five-column board
+// is not prose and needs the room, so the Tasks tab gets a wider page.
+function Shell({ onNewIdea, wide, children }) {
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <AppHeader onNewIdea={onNewIdea} />
-      <main style={{ maxWidth: 1060, margin: "0 auto", padding: "20px 22px 0" }}>{children}</main>
+      <main style={{ maxWidth: wide ? 1360 : 1060, margin: "0 auto", padding: "20px 22px 0" }}>{children}</main>
     </div>
   );
 }

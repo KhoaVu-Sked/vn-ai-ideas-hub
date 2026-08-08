@@ -272,10 +272,17 @@ alter table requests add column if not exists due_date date;
 alter table requests add column if not exists position integer not null default 0;
 alter table requests add column if not exists seq bigserial;
 create index if not exists requests_board_idx on requests (idea_id, state, position);
-update requests set title = case when length(body) > 60 then left(body, 57) || '…' else body end
-  where title is null or title = '';
-update requests set state = 'pending_approval' where state in ('open', 'under_discussion');
-update requests set state = 'done' where state = 'closed';
+-- An older database may carry an unrelated `comments` table (author as free
+-- text, no account_id). Drop it ONLY if it is that one — never the real table.
+do $$
+begin
+  if exists (select 1 from information_schema.tables  where table_name = 'comments')
+     and not exists (select 1 from information_schema.columns
+                     where table_name = 'comments' and column_name = 'request_id')
+  then
+    drop table comments;
+  end if;
+end $$;
 
 -- Merge "Project Lead" + "Initiator / Idea Lead" into "Initiator / Project Lead".
 -- The old index has the same NAME but the old predicate, so `if not exists`
