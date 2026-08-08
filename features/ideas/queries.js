@@ -2,7 +2,7 @@
 // requests, and everything under engagement (likes, follows, requests, team).
 
 import { err, lightProject, sql, toArray, toBool, toJsonArray, ymd } from "@/lib/sql";
-import { INITIATOR_ROLE, LEAD_ROLE, REQUEST_STATES, ROLES, STATUSES } from "./constants";
+import { INITIATOR_ROLE, LEAD_ROLE, ROLES, STATUSES, TASK_STATES } from "./constants";
 
 // ── board ─────────────────────────────────────────────────────
 export async function listProjects(accountId) {
@@ -187,10 +187,27 @@ export async function getIdea(id, accountId) {
                   'username', a.username, 'avatar_color', a.avatar_color, 'avatar_url', a.avatar_url,
                   'region', a.region, 'timezone', a.timezone, 'roles', m.roles) order by m.created_at)
                 from idea_members m join accounts a on a.id = m.account_id where m.idea_id = i.id), '[]'::json) as members,
-      coalesce((select json_agg(json_build_object('id', r.id, 'body', r.body, 'state', r.state, 'created_at', r.created_at,
-                  'updated_at', r.updated_at, 'author', coalesce(ra.name, ra.username), 'author_id', r.account_id,
-                  'author_color', ra.avatar_color, 'author_avatar', ra.avatar_url) order by r.created_at)
-                from requests r join accounts ra on ra.id = r.account_id where r.idea_id = i.id), '[]'::json) as requests,
+      coalesce((select json_agg(json_build_object(
+                  'id', t.id, 'number', 'T-' || lpad(coalesce(t.seq, 0)::text, 3, '0'),
+                  'title', coalesce(nullif(t.title, ''), left(t.body, 60)), 'detail', t.body,
+                  'state', t.state, 'position', t.position,
+                  'start_date', t.start_date, 'due_date', t.due_date, 'updated_at', t.updated_at,
+                  'created_at', t.created_at, 'author_id', t.account_id,
+                  'author', coalesce(ra.name, ra.username), 'author_color', ra.avatar_color, 'author_avatar', ra.avatar_url,
+                  'assignee_id', t.assignee_id, 'assignee', coalesce(aa.name, aa.username),
+                  'assignee_color', aa.avatar_color, 'assignee_avatar', aa.avatar_url,
+                  'comment_count', (select count(*) from comments c where c.request_id = t.id)::int
+                ) order by t.position, t.created_at)
+                from requests t
+                join accounts ra on ra.id = t.account_id
+                left join accounts aa on aa.id = t.assignee_id
+                where t.idea_id = i.id), '[]'::json) as tasks,
+      coalesce((select json_agg(json_build_object('id', c.id, 'body', c.body, 'created_at', c.created_at,
+                  'updated_at', c.updated_at, 'author_id', c.account_id,
+                  'author', coalesce(ca.name, ca.username), 'author_color', ca.avatar_color, 'author_avatar', ca.avatar_url)
+                order by c.created_at)
+                from comments c join accounts ca on ca.id = c.account_id
+                where c.idea_id = i.id and c.request_id is null), '[]'::json) as comments,
       coalesce((select json_agg(json_build_object('id', at.id, 'filename', at.filename, 'url', at.url, 'size', at.size,
                   'uploader', coalesce(ua.name, ua.username), 'uploader_id', at.account_id) order by at.created_at)
                 from attachments at join accounts ua on ua.id = at.account_id where at.idea_id = i.id), '[]'::json) as attachments
@@ -209,6 +226,7 @@ export async function getIdea(id, accountId) {
       tags: toArray(r.tags),
       initiator: r.initiator_name || r.initiator_username || null,
       submitted: ymd(r.created_at),
+      created_at: r.created_at,
       target_date: r.target_date || null,
       context: r.context || "",
       pain_points: r.pain_points || "",
@@ -216,12 +234,8 @@ export async function getIdea(id, accountId) {
       extra: typeof r.extra === "string" ? JSON.parse(r.extra) : (r.extra || {}),
     },
     members: toJsonArray(r.members).map((m) => ({ ...m, roles: toArray(m.roles) })),
-    requests: toJsonArray(r.requests).map((x) => ({
-      id: x.id, body: x.body, state: x.state, date: ymd(x.created_at), edited: !!x.updated_at,
-      mine: x.author_id === accountId,
-      // Shaped for <Avatar person={…} />
-      author: { id: x.author_id, name: x.author, avatar_color: x.author_color, avatar_url: x.author_avatar },
-    })),
+    tasks: toJsonArray(r.tasks).map((x) => shapeTask(x, accountId)),
+    comments: toJsonArray(r.comments).map((x) => shapeComment(x, accountId)),
     attachments: toJsonArray(r.attachments).map((x) => ({
       id: x.id, filename: x.filename, url: x.url, size: Number(x.size),
       uploader: x.uploader, mine: x.uploader_id === accountId,
@@ -310,68 +324,7 @@ export async function toggleFollow(ideaId, accountId) {
   return { following: rows[0].inserted > 0 };
 }
 
-export async function addRequest(ideaId, accountId, body) {
-  const clean = (body || "").trim().slice(0, 2000);
-  if (!clean) throw err(400, "Request text is required.");
-  const rows = await sql`
-    with ins as (
-      insert into requests (idea_id, account_id, body)
-      values (${ideaId}, ${accountId}, ${clean})
-      returning id, account_id, body, state, created_at
-    )
-    select ins.id, ins.body, ins.state, ins.created_at, ins.account_id,
-           coalesce(a.name, a.username) as author, a.avatar_color, a.avatar_url
-    from ins join accounts a on a.id = ins.account_id
-  `;
-  const r = rows[0];
-  return {
-    id: r.id, body: r.body, state: r.state, date: ymd(r.created_at), edited: false, mine: true,
-    author: { id: r.account_id, name: r.author, avatar_color: r.avatar_color, avatar_url: r.avatar_url },
-  };
-}
 
-// Author can delete their own; a moderator (idea lead or admin) can delete any.
-export async function deleteRequest(reqId, accountId, isAdmin) {
-  const rows = await sql`
-    delete from requests r
-    where r.id = ${reqId}
-      and ( r.account_id = ${accountId}
-         or ${isAdmin}
-         or exists (select 1 from idea_members m where m.idea_id = r.idea_id and m.account_id = ${accountId} and m.roles @> array['Project Lead']) )
-    returning id
-  `;
-  if (rows.length === 0) throw err(403, "You can't remove this request.");
-  return { ok: true };
-}
-
-// The author (or an admin) can reword their own request. Editing sends it back
-// to 'open' — a triage verdict was about the old text, not this one.
-export async function updateRequestBody(reqId, body, accountId, isAdmin) {
-  const clean = (body || "").trim().slice(0, 2000);
-  if (!clean) throw err(400, "Request text is required.");
-  const rows = await sql`
-    update requests set body = ${clean}, state = 'open', updated_at = now()
-    where id = ${reqId} and (account_id = ${accountId} or ${isAdmin})
-    returning id, body, state
-  `;
-  if (rows.length === 0) throw err(403, "You can only edit your own request.");
-  const r = rows[0];
-  return { id: r.id, body: r.body, state: r.state, edited: true };
-}
-
-// Only the idea's lead (or admin) can triage a request's state.
-export async function setRequestState(reqId, state, accountId, isAdmin) {
-  if (!REQUEST_STATES.includes(state)) throw err(400, "Invalid request state.");
-  const rows = await sql`
-    update requests r set state = ${state}
-    where r.id = ${reqId}
-      and ( ${isAdmin}
-         or exists (select 1 from idea_members m where m.idea_id = r.idea_id and m.account_id = ${accountId} and m.roles @> array['Project Lead']) )
-    returning id, state
-  `;
-  if (rows.length === 0) throw err(403, "Only the project lead can triage requests.");
-  return { id: rows[0].id, state: rows[0].state };
-}
 
 // Join (or update your own membership) with one or more roles.
 function cleanRoles(roles) {
@@ -440,5 +393,203 @@ export async function removeMember(ideaId, accountId) {
 
 export async function leaveTeam(ideaId, accountId) {
   await sql`delete from idea_members where idea_id = ${ideaId} and account_id = ${accountId}`;
+  return { ok: true };
+}
+
+// ── task board + comments (migration 018) ──────────────────────
+
+// ── task board (an idea's requests) ───────────────────────────
+// Both shapes are built for <Avatar person={…} />.
+function shapeTask(x, accountId) {
+  return {
+    id: x.id, number: x.number, title: x.title || "Untitled", detail: x.detail || "",
+    state: x.state, position: x.position,
+    start_date: x.start_date ? ymd(x.start_date) : "", due_date: x.due_date ? ymd(x.due_date) : "",
+    date: ymd(x.created_at), edited: !!x.updated_at, commentCount: x.comment_count || 0,
+    mine: x.author_id === accountId,
+    mineToDo: x.assignee_id === accountId,
+    author: { id: x.author_id, name: x.author, avatar_color: x.author_color, avatar_url: x.author_avatar },
+    assignee: x.assignee_id
+      ? { id: x.assignee_id, name: x.assignee, avatar_color: x.assignee_color, avatar_url: x.assignee_avatar }
+      : null,
+  };
+}
+
+function shapeComment(x, accountId) {
+  return {
+    id: x.id, body: x.body, date: ymd(x.created_at), edited: !!x.updated_at,
+    mine: x.author_id === accountId,
+    author: { id: x.author_id, name: x.author, avatar_color: x.author_color, avatar_url: x.author_avatar },
+  };
+}
+
+// Read one task back with its author/assignee joined — used after every write so
+// the client never has to guess the shape.
+async function readTask(taskId, accountId) {
+  const rows = await sql`
+    select t.id, 'T-' || lpad(coalesce(t.seq, 0)::text, 3, '0') as number,
+      coalesce(nullif(t.title, ''), left(t.body, 60)) as title, t.body as detail,
+      t.state, t.position, t.start_date, t.due_date, t.created_at, t.updated_at, t.account_id as author_id,
+      coalesce(ra.name, ra.username) as author, ra.avatar_color as author_color, ra.avatar_url as author_avatar,
+      t.assignee_id, coalesce(aa.name, aa.username) as assignee,
+      aa.avatar_color as assignee_color, aa.avatar_url as assignee_avatar,
+      (select count(*) from comments c where c.request_id = t.id)::int as comment_count
+    from requests t
+    join accounts ra on ra.id = t.account_id
+    left join accounts aa on aa.id = t.assignee_id
+    where t.id = ${taskId}
+  `;
+  if (rows.length === 0) throw err(404, "That task no longer exists.");
+  return shapeTask(rows[0], accountId);
+}
+
+export async function createIdeaTask(ideaId, accountId, { title, detail, start_date, due_date, assignee_id, comment }) {
+  const name = (title || "").trim().slice(0, 200);
+  if (!name) throw err(400, "A task name is required.");
+  const rows = await sql`
+    insert into requests (idea_id, account_id, title, body, assignee_id, start_date, due_date, state, position)
+    values (
+      ${ideaId}, ${accountId}, ${name}, ${(detail || "").trim().slice(0, 4000)},
+      ${assignee_id || null}::uuid, ${asDate(start_date)}::date, ${asDate(due_date)}::date,
+      'pending_approval',
+      (select coalesce(max(position), 0) + 1 from requests where idea_id = ${ideaId} and state = 'pending_approval')
+    )
+    returning id
+  `;
+  const id = rows[0].id;
+  const note = (comment || "").trim();
+  if (note) await addComment(ideaId, accountId, note, id);
+  return readTask(id, accountId);
+}
+
+// Author or lead/admin may edit the fields. Unlike the old free-text request,
+// editing does NOT reset the state — a task's stage is about progress, not about
+// whether the wording was approved.
+export async function updateIdeaTask(taskId, accountId, isAdmin, patch) {
+  const rows = await sql`
+    update requests t set
+      title       = coalesce(${(patch.title || "").trim().slice(0, 200) || null}, t.title),
+      body        = coalesce(${patch.detail === undefined ? null : (patch.detail || "").trim().slice(0, 4000)}, t.body),
+      assignee_id = ${patch.assignee_id === undefined ? null : (patch.assignee_id || null)}::uuid,
+      start_date  = ${asDate(patch.start_date)}::date,
+      due_date    = ${asDate(patch.due_date)}::date,
+      updated_at  = now()
+    where t.id = ${taskId}
+      and ( t.account_id = ${accountId}
+         or ${isAdmin}
+         or exists (select 1 from idea_members m
+                    where m.idea_id = t.idea_id and m.account_id = ${accountId}
+                      and m.roles @> array['Initiator / Project Lead']) )
+    returning t.id
+  `;
+  if (rows.length === 0) throw err(403, "You can't edit this task.");
+  return readTask(taskId, accountId);
+}
+
+// Drop a card into a column. Moving in or out of Pending approval / Declined is
+// an approval decision (lead or admin); the assignee may move their own card
+// between the working columns. Cards land at the end of the target column.
+export async function moveIdeaTask(taskId, state, accountId, isAdmin) {
+  if (!TASK_STATES.includes(state)) throw err(400, "Unknown task stage.");
+  const gated = state === "pending_approval" || state === "declined";
+  const rows = await sql`
+    with t as (
+      select r.id, r.idea_id, r.state as from_state, r.assignee_id,
+        (${isAdmin} or exists (select 1 from idea_members m
+             where m.idea_id = r.idea_id and m.account_id = ${accountId}
+               and m.roles @> array['Initiator / Project Lead'])) as is_lead
+      from requests r where r.id = ${taskId}
+    )
+    update requests r set
+      state = ${state},
+      position = (select coalesce(max(position), 0) + 1 from requests p
+                  where p.idea_id = (select idea_id from t) and p.state = ${state}),
+      updated_at = now()
+    from t
+    where r.id = t.id
+      and ( t.is_lead
+         or ( not ${gated}::boolean
+              and t.from_state not in ('pending_approval', 'declined')
+              and t.assignee_id = ${accountId}::uuid ) )
+    returning r.id
+  `;
+  if (rows.length === 0) throw err(403, "Only the project lead can move a task in or out of this stage.");
+  return readTask(taskId, accountId);
+}
+
+// Author can delete their own; lead or admin can delete any.
+export async function deleteIdeaTask(taskId, accountId, isAdmin) {
+  const rows = await sql`
+    delete from requests r
+    where r.id = ${taskId}
+      and ( r.account_id = ${accountId}
+         or ${isAdmin}
+         or exists (select 1 from idea_members m
+                    where m.idea_id = r.idea_id and m.account_id = ${accountId}
+                      and m.roles @> array['Initiator / Project Lead']) )
+    returning id
+  `;
+  if (rows.length === 0) throw err(403, "You can't remove this task.");
+  return { ok: true };
+}
+
+export async function getIdeaTaskParent(taskId) {
+  const rows = await sql`select idea_id, title from requests where id = ${taskId}`;
+  return rows[0] || null;
+}
+
+// ── comments ──────────────────────────────────────────────────
+// requestId null → the idea's Overview thread; set → a thread on one task.
+export async function addComment(ideaId, accountId, body, requestId = null) {
+  const clean = (body || "").trim().slice(0, 4000);
+  if (!clean) throw err(400, "Write something first.");
+  const rows = await sql`
+    with ins as (
+      insert into comments (idea_id, request_id, account_id, body)
+      values (${ideaId}, ${requestId}::uuid, ${accountId}, ${clean})
+      returning id, account_id, body, created_at, updated_at
+    )
+    select ins.id, ins.body, ins.created_at, ins.updated_at, ins.account_id as author_id,
+      coalesce(a.name, a.username) as author, a.avatar_color as author_color, a.avatar_url as author_avatar
+    from ins join accounts a on a.id = ins.account_id
+  `;
+  return shapeComment(rows[0], accountId);
+}
+
+export async function listTaskComments(taskId, accountId) {
+  const rows = await sql`
+    select c.id, c.body, c.created_at, c.updated_at, c.account_id as author_id,
+      coalesce(a.name, a.username) as author, a.avatar_color as author_color, a.avatar_url as author_avatar
+    from comments c join accounts a on a.id = c.account_id
+    where c.request_id = ${taskId} order by c.created_at
+  `;
+  return rows.map((x) => shapeComment(x, accountId));
+}
+
+export async function updateComment(commentId, accountId, isAdmin, body) {
+  const clean = (body || "").trim().slice(0, 4000);
+  if (!clean) throw err(400, "Write something first.");
+  const rows = await sql`
+    update comments set body = ${clean}, updated_at = now()
+    where id = ${commentId} and (account_id = ${accountId} or ${isAdmin})
+    returning id, body
+  `;
+  if (rows.length === 0) throw err(403, "You can only edit your own comment.");
+  return { id: rows[0].id, body: rows[0].body, edited: true };
+}
+
+// Author, or a moderator (lead/admin).
+export async function deleteComment(commentId, accountId, isAdmin) {
+  const rows = await sql`
+    delete from comments c
+    where c.id = ${commentId}
+      and ( c.account_id = ${accountId}
+         or ${isAdmin}
+         or exists (select 1 from idea_members m
+                    where m.idea_id = c.idea_id and m.account_id = ${accountId}
+                      and m.roles @> array['Initiator / Project Lead']) )
+    returning id
+  `;
+  if (rows.length === 0) throw err(403, "You can't remove this comment.");
   return { ok: true };
 }
