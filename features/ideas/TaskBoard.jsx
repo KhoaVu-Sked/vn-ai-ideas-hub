@@ -29,7 +29,15 @@ export default function TaskBoard({ tasks, canModerate, isAdmin, onOpen, onMove 
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`, gap: 10, alignItems: "start" }}>
+    // A column narrower than this wraps titles to two or three words a line.
+    // Below ~1200px the board scrolls sideways instead of shrinking further —
+    // the same thing Jira and Trello do, and for the same reason.
+    <div style={{ overflowX: "auto", paddingBottom: 4, margin: "0 -2px" }}>
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: `repeat(${columns.length}, minmax(228px, 1fr))`,
+      gap: 10, alignItems: "start", minWidth: "min-content", padding: "0 2px",
+    }}>
       {columns.map((col) => {
         const meta = TASK_META[col];
         const cards = tasks.filter((t) => t.state === col);
@@ -70,7 +78,10 @@ export default function TaskBoard({ tasks, canModerate, isAdmin, onOpen, onMove 
                     opacity: dragId === t.id ? 0.4 : 1,
                   }}
                 >
-                  <div className="breakable" style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", lineHeight: 1.35, marginBottom: 8 }}>
+                  <div className="breakable" style={{
+                    fontSize: 13, fontWeight: 600, color: "var(--ink)", lineHeight: 1.4, marginBottom: 8,
+                    display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}>
                     {t.title}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -92,6 +103,7 @@ export default function TaskBoard({ tasks, canModerate, isAdmin, onOpen, onMove 
           </div>
         );
       })}
+    </div>
     </div>
   );
 }
