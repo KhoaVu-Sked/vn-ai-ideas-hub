@@ -175,3 +175,16 @@ a {
     transition: none !important;
   }
 }
+
+/* ── Tab switch on an idea ────────────────────────────────────────
+   Overview reads at 1060px; the task board needs 1360. Snapping between
+   the two is jarring, so the page width eases and the incoming panel
+   fades up rather than appearing fully formed. The reduced-motion block
+   above disables all of this.                                        */
+.tab-panel {
+  animation: phantomIn 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes phantomIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}

@@ -295,7 +295,13 @@ export default function IdeaPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: tab === "tasks" ? "minmax(0, 1fr)" : "minmax(0, 1fr) 300px", gap: 20, alignItems: "start" }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: tab === "tasks" ? "minmax(0, 1fr) 0px" : "minmax(0, 1fr) 300px",
+        gap: tab === "tasks" ? 0 : 20,
+        alignItems: "start",
+        transition: "grid-template-columns 500ms cubic-bezier(0.22, 1, 0.36, 1), gap 500ms cubic-bezier(0.22, 1, 0.36, 1)",
+      }}>
         {/* ── Main column ── */}
         <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "22px 26px" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
@@ -354,6 +360,7 @@ export default function IdeaPage() {
             ))}
           </div>
 
+          <div key={tab} className="tab-panel">
           {tab === "overview" ? (
             <>
           {/* Content sections */}
@@ -482,11 +489,21 @@ export default function IdeaPage() {
               />
             </div>
           )}
+          </div>
         </div>
 
         {/* ── Sidebar — idea metadata, nothing to say about tasks ── */}
-        {tab !== "tasks" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div aria-hidden={tab === "tasks"} style={{
+          display: "flex", flexDirection: "column", gap: 16,
+          opacity: tab === "tasks" ? 0 : 1,
+          visibility: tab === "tasks" ? "hidden" : "visible",
+          pointerEvents: tab === "tasks" ? "none" : "auto",
+          overflow: "hidden",
+          // Delay visibility only on the way out, so it fades before being
+          // removed from the tab order. Coming back it must apply at once, or
+          // the sidebar stays invisible for the whole fade-in.
+          transition: `opacity 320ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear ${tab === "tasks" ? "320ms" : "0s"}`,
+        }}>
           <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 18px" }}>
             <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 12 }}>Team &amp; roles</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -522,7 +539,6 @@ export default function IdeaPage() {
             {isAdmin && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Admin: change a role, or set someone as {LEAD_ROLE} to transfer the lead. There can be one {LEAD_ROLE} and one {INITIATOR_ROLE} per idea.</div>}
           </div>
         </div>
-        )}
       </div>
 
       {showRoles && (
@@ -559,7 +575,7 @@ function Shell({ onNewIdea, wide, children }) {
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <AppHeader onNewIdea={onNewIdea} />
-      <main style={{ maxWidth: wide ? 1360 : 1060, margin: "0 auto", padding: "20px 22px 0" }}>{children}</main>
+      <main style={{ maxWidth: wide ? 1360 : 1060, margin: "0 auto", padding: "20px 22px 0", transition: "max-width 500ms cubic-bezier(0.22, 1, 0.36, 1)" }}>{children}</main>
     </div>
   );
 }
