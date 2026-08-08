@@ -28,14 +28,27 @@ export const LEAD_ROLE = "Project Lead";
 export const ROLES = [
   INITIATOR_ROLE, LEAD_ROLE, "AI Design", "Form / UX Design", "Data / Ops", "Tester", "Observer",
 ];
-export const REQUEST_STATES = ["open", "accepted", "under_discussion", "declined", "closed"];
 
-export const REQUEST_STATE_META = {
-  open: { label: "Open", bg: "#eef1f5", fg: "#5a6a82" },
-  accepted: { label: "Accepted by idea lead", bg: "#e3f4e8", fg: "#2f9e44" },
-  under_discussion: { label: "Under discussion", bg: "#fdf1dd", fg: "#b7791f" },
-  declined: { label: "Declined", bg: "#fdeaea", fg: "#e03131" },
-  closed: { label: "Closed", bg: "#eceef1", fg: "#7b8494" },
-};
-// Closed is "done with", not a verdict — the whole card greys out.
 export const isClosed = (state) => state === "closed";
+
+// ── task board (migration 018) ─────────────────────────────────
+export const TASK_ORDER = ["pending_approval", "accepted", "in_progress", "done"];
+export const TASK_DECLINED = "declined";
+export const TASK_STATES = [...TASK_ORDER, TASK_DECLINED];
+
+export const TASK_META = {
+  pending_approval: { label: "Pending approval", bg: "#eef1f5", fg: "#5a6a82" },
+  accepted:         { label: "Accepted",         bg: "#e3f4ee", fg: "#147a5a" },
+  in_progress:      { label: "In progress",      bg: "#e6f2ff", fg: "#0070cc" },
+  done:             { label: "Done",             bg: "#d9f2df", fg: "#2b8a3e" },
+  declined:         { label: "Declined",         bg: "#eceef1", fg: "#7b8494" },
+};
+
+// Moving in or out of these is an approval decision — lead/admin only.
+// The other columns can also be moved by the card's assignee.
+const GATED = new Set(["pending_approval", TASK_DECLINED]);
+export function canMoveTask({ from, to, isLead, isAdmin, isAssignee }) {
+  if (isLead || isAdmin) return true;
+  if (GATED.has(from) || GATED.has(to)) return false;
+  return isAssignee;
+}

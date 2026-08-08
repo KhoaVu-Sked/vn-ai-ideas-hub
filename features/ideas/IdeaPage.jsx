@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { tagPill } from "@/features/admin/tagColors";
-import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, REQUEST_STATE_META, ROLES, STATUS_META, STATUS_ORDER, isClosed } from "@/features/ideas/constants";
+import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, ROLES, STATUS_META, STATUS_ORDER } from "@/features/ideas/constants";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
+import { ideaWindow } from "@/features/ideas/ideaWindow";
 import Avatar from "@/components/Avatar";
 import TagChip from "@/components/TagChip";
 import FieldInput from "@/components/FieldInput";
@@ -13,6 +14,9 @@ import AppHeader from "@/components/AppHeader";
 import SubmitModal from "@/features/ideas/SubmitModal";
 import Loading from "@/components/Loading";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
+import TaskBoard from "@/features/ideas/TaskBoard";
+import TaskModal from "@/features/ideas/TaskModal";
+import TaskDrawer from "@/features/ideas/TaskDrawer";
 import { api } from "@/lib/apiClient";
 
 
@@ -62,7 +66,10 @@ export default function IdeaPage() {
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState("");
   const [actionErr, setActionErr] = useState("");
-  const [reqText, setReqText] = useState("");
+  const [tab, setTab] = useState("overview");     // overview | tasks
+  const [commentText, setCommentText] = useState("");
+  const [taskModal, setTaskModal] = useState(null); // { task } | {} while open
+  const [openTask, setOpenTask] = useState(null);
   const [showRoles, setShowRoles] = useState(false);
   const [pickedRoles, setPickedRoles] = useState([]);
   const [editing, setEditing] = useState(false);
@@ -70,7 +77,6 @@ export default function IdeaPage() {
   const [tagCatalog, setTagCatalog] = useState([]);
   const [formFields, setFormFields] = useState([]);
   const [showSubmit, setShowSubmit] = useState(false);
-  const [editReq, setEditReq] = useState(null);   // { id, body } while rewording a request
 
   const load = useCallback(async () => {
     setBusy(true); setErr("");
@@ -91,7 +97,7 @@ export default function IdeaPage() {
       setData(d);
     } catch { /* leave the current view alone */ }
   }, [id]);
-  useRevalidateOnFocus(refresh, { enabled: !editing && !showSubmit && !showRoles && !editReq });
+  useRevalidateOnFocus(refresh, { enabled: !editing && !showSubmit && !showRoles && !taskModal && !openTask });
   useEffect(() => { api("/api/tags").then(({ tags }) => setTagCatalog(tags || [])).catch(() => {}); }, []);
   useEffect(() => { api("/api/form-fields").then(({ fields }) => setFormFields(fields || [])).catch(() => {}); }, []);
 
@@ -103,12 +109,14 @@ export default function IdeaPage() {
   if (err) return <Shell><div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>{err} <button onClick={load} style={{ ...btnBase, marginLeft: 8 }}>Retry</button></div></Shell>;
   if (!data) return null;
 
-  const { idea, members, requests, attachments, likeCount, likedByMe, followedByMe, myRoles, meId, isAdmin, deleteRequested, deleteReason } = data;
+  const { idea, members, tasks, comments, attachments, likeCount, likedByMe, followedByMe, myRoles, meId, isAdmin, deleteRequested, deleteReason } = data;
   const isLead = (myRoles || []).includes(LEAD_ROLE);
   // Derived, not read from the payload — joining, leaving or a role change
   // must flip this immediately.
   const canEdit = isAdmin || isLead;
   const sm = STATUS_META[idea.status] || STATUS_META.Submitted;
+  // Tasks must be scheduled inside the idea's own window — see lib/ideaWindow.
+  const win = ideaWindow({ created: idea.created_at, target_date: idea.target_date });
   const leadMember = members.find((m) => (m.roles || []).includes(LEAD_ROLE)) || null;
   const hasLead = !!leadMember;
   const initiator = members.find((m) => (m.roles || []).includes(INITIATOR_ROLE)) || null;
@@ -130,25 +138,53 @@ export default function IdeaPage() {
     run(async () => { const r = await api(`/api/ideas/${id}/follow`, { method: "POST" }); patch({ followedByMe: r.following }); },
         () => patch({ followedByMe }));
   };
-  const postRequest = () => {
-    const body = reqText.trim();
+  const postComment = () => {
+    const body = commentText.trim();
     if (!body) return;
-    setReqText("");
+    setCommentText("");
     run(async () => {
-      const { request } = await api(`/api/ideas/${id}/requests`, { method: "POST", body: JSON.stringify({ body }) });
-      patch((d) => ({ requests: [...d.requests, { ...request, mine: true }] }));
-    }, () => setReqText(body));
+      const { comment } = await api(`/api/ideas/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
+      patch((d) => ({ comments: [...d.comments, comment] }));
+    }, () => setCommentText(body));
   };
-  const removeRequest = (reqId) => {
-    const prev = requests;
-    patch((d) => ({ requests: d.requests.filter((r) => r.id !== reqId) })); // optimistic
-    run(() => api(`/api/ideas/${id}/requests/${reqId}`, { method: "DELETE" }), () => patch({ requests: prev }));
+  const removeComment = (cid) => {
+    const prev = comments;
+    patch((d) => ({ comments: d.comments.filter((c) => c.id !== cid) })); // optimistic
+    run(() => api(`/api/ideas/${id}/comments/${cid}`, { method: "DELETE" }), () => patch({ comments: prev }));
   };
-  const setReqState = (reqId, state) => {
-    const prev = requests;
-    patch((d) => ({ requests: d.requests.map((r) => (r.id === reqId ? { ...r, state } : r)) })); // optimistic
-    run(() => api(`/api/ideas/${id}/requests/${reqId}`, { method: "PATCH", body: JSON.stringify({ state }) }), () => patch({ requests: prev }));
+
+  const upsertTask = (t) => patch((d) => ({
+    tasks: d.tasks.some((x) => x.id === t.id) ? d.tasks.map((x) => (x.id === t.id ? t : x)) : [...d.tasks, t],
+  }));
+  const saveTask = async (formValues) => {
+    const editingTask = taskModal?.task;
+    const { task } = await api(
+      editingTask ? `/api/ideas/${id}/tasks/${editingTask.id}` : `/api/ideas/${id}/tasks`,
+      { method: editingTask ? "PATCH" : "POST", body: JSON.stringify(formValues) },
+    );
+    upsertTask(task);
+    setTaskModal(null);
+    setOpenTask((o) => (o && o.id === task.id ? task : o));
+    setTab("tasks");
   };
+  const moveTask = (t, state) => {
+    const prev = tasks;
+    patch((d) => ({ tasks: d.tasks.map((x) => (x.id === t.id ? { ...x, state } : x)) })); // optimistic
+    setOpenTask((o) => (o && o.id === t.id ? { ...o, state } : o));
+    run(async () => {
+      const { task } = await api(`/api/ideas/${id}/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ state }) });
+      upsertTask(task);
+      setOpenTask((o) => (o && o.id === task.id ? task : o));
+    }, () => { patch({ tasks: prev }); setOpenTask((o) => (o && o.id === t.id ? t : o)); });
+  };
+  const removeTask = (t) => {
+    if (!confirm(`Delete ${t.number} "${t.title}"?`)) return;
+    const prev = tasks;
+    patch((d) => ({ tasks: d.tasks.filter((x) => x.id !== t.id) })); // optimistic
+    setOpenTask(null);
+    run(() => api(`/api/ideas/${id}/tasks/${t.id}`, { method: "DELETE" }), () => patch({ tasks: prev }));
+  };
+
   const changeStatus = (status) => {
     const prev = idea.status;
     patch((d) => ({ idea: { ...d.idea, status } })); // optimistic
@@ -200,16 +236,6 @@ export default function IdeaPage() {
       setEditing(false);
     });
   };
-  const saveReqBody = () => {
-    const body = (editReq?.body || "").trim();
-    if (!body) return;
-    const id_ = editReq.id;
-    setEditReq(null);
-    run(async () => {
-      const { request } = await api(`/api/ideas/${id}/requests/${id_}`, { method: "PATCH", body: JSON.stringify({ body }) });
-      patch((d) => ({ requests: d.requests.map((r) => (r.id === id_ ? { ...r, ...request } : r)) }));
-    });
-  };
   const deleteIdea = () => {
     if (!confirm("Delete this idea permanently? This also removes its team, likes, requests, and files.")) return;
     run(async () => { await api(`/api/ideas/${id}`, { method: "DELETE" }); router.push("/"); });
@@ -241,6 +267,20 @@ export default function IdeaPage() {
   return (
     <Shell onNewIdea={() => setShowSubmit(true)}>
       {showSubmit && <SubmitModal onClose={() => setShowSubmit(false)} onCreated={(project) => router.push(`/idea/${project.id}`)} />}
+      {taskModal && (
+        <TaskModal
+          task={taskModal.task} members={members} window={win}
+          onClose={() => setTaskModal(null)} onSave={saveTask}
+        />
+      )}
+      {openTask && (
+        <TaskDrawer
+          ideaId={id} task={openTask} canModerate={canEdit} isAdmin={isAdmin}
+          onClose={() => setOpenTask(null)}
+          onEdit={(t) => { setOpenTask(null); setTaskModal({ task: t }); }}
+          onMove={moveTask} onDelete={removeTask}
+        />
+      )}
       {actionErr && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 14 }}>{actionErr}</div>}
 
       {deleteRequested && (
@@ -293,10 +333,29 @@ export default function IdeaPage() {
                 {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             )}
+            <button onClick={() => setTaskModal({})} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none" }}>+ Add request</button>
             {isAdmin && <button onClick={deleteIdea} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Delete idea</button>}
             {!isAdmin && isLead && !deleteRequested && <button onClick={requestDeletion} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Request deletion</button>}
           </div>
 
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)", margin: "18px 0 4px" }}>
+            {[["overview", "Overview"], ["tasks", `Tasks (${tasks.length})`]].map(([key, text]) => (
+              <button
+                key={key} onClick={() => setTab(key)}
+                style={{
+                  border: "none", background: "none", cursor: "pointer",
+                  padding: "8px 14px", fontSize: 13, fontWeight: 700,
+                  color: tab === key ? "var(--blue)" : "var(--muted)",
+                  borderBottom: `2px solid ${tab === key ? "var(--blue)" : "transparent"}`,
+                  marginBottom: -1,
+                }}
+              >{text}</button>
+            ))}
+          </div>
+
+          {tab === "overview" ? (
+            <>
           {/* Content sections */}
           {canEdit && (
             <div style={{ marginTop: 16 }}>
@@ -374,76 +433,55 @@ export default function IdeaPage() {
           </label>
           <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>Word, Excel, PDF, or images · max 5 MB each.</div>
 
-          {/* Requests & input */}
-          <div style={{ ...sectionLabel, marginTop: 26 }}>Requests &amp; input ({requests.length})</div>
+          {/* Comments — the Overview thread */}
+          <div style={{ ...sectionLabel, marginTop: 26 }}>Comments ({comments.length})</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {requests.map((r) => {
-              const st = REQUEST_STATE_META[r.state] || REQUEST_STATE_META.open;
-              const closed = isClosed(r.state);
-              const mineToEdit = r.mine || isAdmin;
-              const beingEdited = editReq?.id === r.id;
-              return (
-                <div key={r.id} style={{
-                  background: closed ? "#f1f3f5" : "#f8fafc",
-                  border: `1px solid ${closed ? "#e0e3e8" : "var(--line)"}`,
-                  borderRadius: 10, padding: "10px 14px",
-                  // Closed is "dealt with" — the whole card recedes.
-                  opacity: closed ? 0.65 : 1,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                    <Avatar person={r.author} size={24} />
-                    <span className="breakable" style={{ fontSize: 12.5, fontWeight: 700, color: closed ? "var(--muted)" : "var(--ink)" }}>{r.author?.name}</span>
-                    <span style={{ fontSize: 11, color: "var(--faint)" }}>{r.date}{r.edited ? " · edited" : ""}</span>
-                    {mineToEdit && !beingEdited && (
-                      <button onClick={() => setEditReq({ id: r.id, body: r.body })} style={{ marginLeft: "auto", border: "none", background: "none", color: "var(--blue)", cursor: "pointer", fontSize: 11.5, fontWeight: 700 }}>Edit</button>
-                    )}
-                    {(r.mine || canEdit) && (
-                      <button onClick={() => removeRequest(r.id)} title="Remove" style={{ marginLeft: mineToEdit && !beingEdited ? 0 : "auto", border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>
-                    )}
-                  </div>
-
-                  {beingEdited ? (
-                    <>
-                      <textarea
-                        value={editReq.body} autoFocus rows={3}
-                        onChange={(e) => setEditReq((v) => ({ ...v, body: e.target.value }))}
-                        style={{ width: "100%", border: "1px solid #dde3ec", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "inherit", lineHeight: 1.5, outline: "none", resize: "vertical" }}
-                      />
-                      <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
-                        <button onClick={saveReqBody} disabled={!editReq.body.trim()} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none", padding: "6px 12px", fontSize: 12 }}>Save</button>
-                        <button onClick={() => setEditReq(null)} style={{ ...btnBase, padding: "6px 12px", fontSize: 12 }}>Cancel</button>
-                        <span style={{ fontSize: 11, color: "var(--faint)" }}>Saving reopens this request.</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="breakable" style={{ fontSize: 13, color: closed ? "var(--muted)" : "var(--body)", lineHeight: 1.5 }}>{r.body}</div>
-                  )}
-
-                  {!beingEdited && (
-                    <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      {r.state !== "open" && <Pill bg={st.bg} fg={st.fg}>{st.label}</Pill>}
-                      {closed
-                        ? canEdit && <button onClick={() => setReqState(r.id, "open")} style={{ ...btnBase, padding: "4px 10px", fontSize: 11.5 }}>Reopen</button>
-                        : canEdit && (
-                          <select value={r.state} onChange={(e) => setReqState(r.id, e.target.value)} style={{ fontSize: 11.5, border: "1px solid #dde3ec", borderRadius: 6, padding: "3px 6px", color: "#5a6a82", background: "#fff" }}>
-                            {Object.entries(REQUEST_STATE_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                          </select>
-                        )}
-                    </div>
+            {comments.map((c) => (
+              <div key={c.id} style={{ background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                  <Avatar person={c.author} size={24} />
+                  <span className="breakable" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{c.author?.name}</span>
+                  <span style={{ fontSize: 11, color: "var(--faint)" }}>{c.date}{c.edited ? " · edited" : ""}</span>
+                  {(c.mine || canEdit) && (
+                    <button onClick={() => removeComment(c.id)} title="Remove" style={{ marginLeft: "auto", border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>
                   )}
                 </div>
-              );
-            })}
-            {requests.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No requests yet — add the first.</div>}
+                <div className="breakable" style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{c.body}</div>
+              </div>
+            ))}
+            {comments.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No comments yet — start the discussion.</div>}
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <input id="req-box" value={reqText} onChange={(e) => setReqText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && postRequest()} placeholder="Write a request or comment — the idea lead will be notified and follow up" style={{ flex: 1, border: "1px solid #dde3ec", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, outline: "none" }} />
-            <button onClick={postRequest} disabled={!reqText.trim()} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none" }}>Post</button>
+            <input
+              value={commentText} onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && postComment()}
+              placeholder="Add a comment — members and followers are notified"
+              style={{ flex: 1, border: "1px solid #dde3ec", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, outline: "none" }}
+            />
+            <button onClick={postComment} disabled={!commentText.trim()} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none" }}>Post</button>
           </div>
 
           {/* Progress timeline */}
           <div style={{ ...sectionLabel, marginTop: 28 }}>Progress timeline</div>
           <ProgressBar status={idea.status} />
+            </>
+          ) : (
+            <div style={{ marginTop: 16 }}>
+              {tasks.length === 0 ? (
+                <div style={{ fontSize: 13, color: "var(--muted)", padding: "10px 0 16px" }}>
+                  No tasks yet. Use <b>+ Add request</b> above — it lands in Pending approval for the project lead.
+                </div>
+              ) : (
+                <div style={{ fontSize: 11.5, color: "var(--faint)", marginBottom: 10 }}>
+                  Drag a card to move it. Click one to see its detail and comments.
+                </div>
+              )}
+              <TaskBoard
+                tasks={tasks} canModerate={canEdit} isAdmin={isAdmin}
+                onOpen={setOpenTask} onMove={moveTask}
+              />
+            </div>
+          )}
         </div>
 
         {/* ── Sidebar ── */}
