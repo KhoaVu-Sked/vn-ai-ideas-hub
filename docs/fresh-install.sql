@@ -101,17 +101,39 @@ create table if not exists likes (
   primary key (idea_id, account_id)
 );
 
--- Requests / input — task-like items on an idea; author can remove, lead can triage.
+-- Board cards on an idea. Columns: pending_approval → accepted → in_progress
+-- → done, plus declined. Free-text discussion lives in `comments`, not here.
 create table if not exists requests (
-  id         uuid primary key default gen_random_uuid(),
-  idea_id    uuid not null references ideas(id) on delete cascade,
-  account_id uuid not null references accounts(id) on delete cascade,
-  body       text not null,
-  state      text not null default 'open',   -- open | accepted | under_discussion | declined | closed
-  created_at timestamptz not null default now(),
-  updated_at timestamptz                     -- set when the author edits the body
+  id          uuid primary key default gen_random_uuid(),
+  idea_id     uuid not null references ideas(id) on delete cascade,
+  account_id  uuid not null references accounts(id) on delete cascade,
+  title       text,                            -- the card label
+  body        text not null,                   -- the detail, shown when opened
+  state       text not null default 'pending_approval',
+  assignee_id uuid references accounts(id) on delete set null,
+  start_date  date,
+  due_date    date,
+  position    integer not null default 0,      -- order within a column
+  seq         bigserial,                       -- human number → T-007
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz
 );
 create index if not exists requests_idea_id_idx on requests (idea_id);
+create index if not exists requests_board_idx   on requests (idea_id, state, position);
+
+-- Comments. One table serves the idea's Overview thread (request_id null) and
+-- the thread on a single card.
+create table if not exists comments (
+  id         uuid primary key default gen_random_uuid(),
+  idea_id    uuid not null references ideas(id) on delete cascade,
+  request_id uuid references requests(id) on delete cascade,
+  account_id uuid not null references accounts(id) on delete cascade,
+  body       text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz
+);
+create index if not exists comments_idea_idx    on comments (idea_id, created_at);
+create index if not exists comments_request_idx on comments (request_id, created_at);
 
 -- Follows — notify members on updates (email wiring comes later).
 create table if not exists follows (
