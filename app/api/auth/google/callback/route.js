@@ -50,7 +50,15 @@ export async function GET(request) {
     return res;
   } catch (e) {
     console.error("google callback failed", e);
-    // The domain rejection is worth showing; anything else stays generic.
-    return fail(/skedulo\.com|verified email/i.test(e.message || "") ? "domain" : "failed");
+    if (/skedulo\.com|verified email/i.test(e.message || "")) return fail("domain");
+    // A schema error here means the migration hasn't been run on this database.
+    // It is worth its own message: the symptom (works for you, fails for
+    // everyone else) otherwise points nowhere near the cause.
+    //   42703 undefined column · 42P01 undefined table · 23502 not-null violation
+    if (["42703", "42P01", "23502"].includes(e?.code)
+        || /column .* does not exist|relation .* does not exist|null value in column/i.test(e.message || "")) {
+      return fail("db");
+    }
+    return fail("failed");
   }
 }

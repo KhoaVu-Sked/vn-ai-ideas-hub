@@ -25,6 +25,7 @@ function LoginForm() {
         : "Google sign-in isn't set up yet — ask an admin to finish configuring it.",
       domain: "Sign in with your @skedulo.com Google account.",
       cancelled: "Google sign-in was cancelled.",
+      db: "Google sign-in is set up, but this site's database is missing a migration. An admin needs to run it — see migrations/.",
       state: "That sign-in attempt expired. Please try again.",
     }[sso] || "Google sign-in didn't work. Please try again.");
     else if (searchParams.get("changed") === "1") setNotice("Password changed. Sign in with your new one.");

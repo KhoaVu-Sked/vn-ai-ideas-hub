@@ -6,6 +6,13 @@
 // the same one the password flow produces, so single-session, the idle timeout
 // and requireUser() all keep working untouched.
 //
+// Pasting a credential out of the Google console picks up a trailing newline
+// often enough to be worth defending against — it surfaces as "The provided
+// client secret is invalid", which sends you looking at the wrong thing.
+const clientId = () => (process.env.GOOGLE_CLIENT_ID || "").trim();
+const clientSecret = () => (process.env.GOOGLE_CLIENT_SECRET || "").trim();
+
+
 // Needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, plus the callback URL
 // registered in the Google Cloud console for each environment.
 
@@ -23,7 +30,7 @@ function googleKeys() {
 }
 
 export const googleConfigured = () =>
-  Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  Boolean(clientId() && clientSecret());
 
 // The callback must match a registered redirect URI exactly, so it's derived
 // from the request's own origin rather than a guess.
@@ -31,7 +38,7 @@ export const callbackUrl = (origin) => `${origin}/api/auth/google/callback`;
 
 export function authUrl({ origin, state }) {
   const p = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID,
+    client_id: clientId(),
     redirect_uri: callbackUrl(origin),
     response_type: "code",
     scope: "openid email profile",
@@ -51,8 +58,8 @@ async function exchangeCode({ code, origin }) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      client_id: clientId(),
+      client_secret: clientSecret(),
       redirect_uri: callbackUrl(origin),
       grant_type: "authorization_code",
     }),
@@ -73,7 +80,7 @@ export async function identityFromCode({ code, origin }) {
   // client id — a token minted for a different app must not be accepted.
   const { payload } = await jwtVerify(idToken, googleKeys(), {
     issuer: ["https://accounts.google.com", "accounts.google.com"],
-    audience: process.env.GOOGLE_CLIENT_ID,
+    audience: clientId(),
   });
 
   const email = String(payload.email || "").trim().toLowerCase();
