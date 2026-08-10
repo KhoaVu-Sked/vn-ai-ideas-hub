@@ -592,7 +592,19 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
     <section id="s7">
       <p class="sec-num">Section 07</p>
       <h2>Inside an idea</h2>
-      <p class="lede">One page per idea. Everything about it lives here.</p>
+      <p class="lede">One page per idea, split across two tabs.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:22%">Tab</th><th>What is on it</th></tr></thead>
+          <tbody>
+            <tr><td><b>Overview</b></td><td>What the idea is: context, pain points, expected benefit, files, the team, and the comment thread. This is the tab you land on.</td></tr>
+            <tr><td><b>Tasks</b></td><td>The work. A board of cards in five columns, with the number of cards shown beside the tab name.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The page gets wider when you open <b>Tasks</b> and the team sidebar steps out of the way, because a five-column board needs the room. Switching back brings it straight back.</p>
 
       <figure>
         <div class="ui">
@@ -662,7 +674,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
     <section id="s8">
       <p class="sec-num">Section 08</p>
       <h2>Taking part</h2>
-      <p class="lede">Four things anyone can do on any idea.</p>
+      <p class="lede">Five things anyone can do on any idea.</p>
 
       <h3>Like</h3>
       <p>One like per person, click again to remove it. Likes are the cheapest signal of interest and leads use them to gauge appetite.</p>
@@ -670,30 +682,38 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <h3>Follow updates</h3>
       <p>Press <b>Follow updates</b> and the button becomes <b>✓ Following</b>. You will be emailed when the idea changes — see <a href="#s10">section 10</a>. Following does not put you on the team and carries no obligation.</p>
 
+      <h3>Comment</h3>
+      <p>The comment box sits at the bottom of the <b>Overview</b> tab. Use it for anything you would say out loud: a question, a reaction, a bit of context somebody else is missing. Comments are a conversation — nobody has to action them, and nothing is tracked.</p>
+      <p>If what you want is for <em>somebody to do something</em>, that is a request, not a comment.</p>
+
       <h3>Add a request</h3>
-      <p><b>+ Add request</b> jumps you to the box at the bottom of the page. Use it for a question, a suggestion or an offer of help. The project lead is notified and triages each one:</p>
-      <figure>
-        <div class="ui">
-          <div class="ui-body">
-            <div class="ui-panel" style="background:#f8fafc">
-              <div class="ui-row" style="margin-bottom:5px">
-                <span class="ui-av" style="width:22px;height:22px;font-size:9px;background:#7950f2">TV</span>
-                <b style="font-size:11.5px;color:#0b1e49">Trung Vo</b>
-                <span class="ui-meta ui-faint" style="font-size:10px">2026-07-30</span>
-                <span style="margin-left:auto;font-size:10.5px;font-weight:700;color:#0055ff">Edit</span>
-                <span class="ui-faint" style="font-size:11px">✕</span>
-              </div>
-              <p style="font-size:11.5px;margin:0 0 7px;color:#2e3640">Could we start with only Critical tickets, so the sample stays small enough to check by hand?</p>
-              <div class="ui-row">
-                <span class="ui-pill" style="background:#e3f4e8;color:#2f9e44">Accepted by idea lead</span>
-                <span class="ui-input" style="font-size:10.5px;padding:3px 7px">Accepted by idea lead ▾</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <figcaption><b>A request</b> — with the lead's triage control</figcaption>
-      </figure>
-      <p>A request can be <b>Open</b>, <b>Accepted by idea lead</b>, <b>Under discussion</b>, <b>Declined</b> or <b>Closed</b>. Closed requests grey out and gain a <b>Reopen</b> button. You can <b>Edit</b> your own wording at any time — doing so returns the request to Open, because the lead's verdict was about the previous text.</p>
+      <p>Open the <b>Tasks</b> tab and press <b>+ Add request</b>. Give it a short name, and as much detail as you like. Your request becomes a card in the first column, and the project lead is notified.</p>
+      <p>Requests move left to right across five columns:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:26%">Column</th><th>What it means</th></tr></thead>
+          <tbody>
+            <tr><td><b>Pending approval</b></td><td>Raised, not yet decided on. Everything starts here.</td></tr>
+            <tr><td><b>Accepted</b></td><td>The lead has agreed it should happen.</td></tr>
+            <tr><td><b>In progress</b></td><td>Someone is actively working on it.</td></tr>
+            <tr><td><b>Done</b></td><td>Finished.</td></tr>
+            <tr><td><b>Declined</b></td><td>The team decided not to do it. The card stays, so the decision is on the record.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="note__tag">Who can move a card</span>
+        <p>Moving a card <b>into or out of</b> Pending approval or Declined is a decision, so only the project lead or an admin can do it. If a card is assigned to you, you can move it between <b>Accepted</b>, <b>In progress</b> and <b>Done</b> yourself as the work proceeds.</p>
+      </div>
+
+      <h4>Opening a card</h4>
+      <p>Click any card and a panel slides in from the right. It holds the full detail, who raised it, who it is assigned to, and its own comment thread — so discussion about one piece of work stays with that piece of work instead of scrolling past in the main thread.</p>
+
+      <h4>The little clock on each card</h4>
+      <p>Every card shows how long it has been sitting in its current column — <code>2d</code>, <code>3w</code>. The clock restarts each time the card moves, so it answers one question: <b>is this actually moving?</b></p>
+      <p>It turns amber after a week in the same column and red after two. That is a nudge, not a deadline — there are no due dates to set, and nothing is ever late. A card going red just means it has been sitting still long enough to be worth a conversation.</p>
 
       <h3>Join the team</h3>
       <p><b>Join the team as…</b> opens a role picker. Choose one or more roles, then <b>Join</b>. The sidebar updates immediately and you start receiving that idea's emails. <b>Leave team</b> steps back off.</p>
@@ -703,7 +723,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
           <thead><tr><th style="width:200px">Role</th><th>What you are taking on</th></tr></thead>
           <tbody>
             <tr><td><b>Initiator</b></td><td>Credited with raising the idea. <b>One per idea</b> — the option disappears from this list once somebody holds it.</td></tr>
-            <tr><td><b>Project Lead</b></td><td>Accountable for the idea. Edits content, moves the status, triages requests. <b>One per idea</b>, and transferable by an admin.</td></tr>
+            <tr><td><b>Project Lead</b></td><td>Accountable for the idea. Edits content, moves the status, decides which requests are accepted. <b>One per idea</b>, and transferable by an admin.</td></tr>
             <tr><td><b>AI Design</b></td><td>Shapes the prompt, model or agent behaviour.</td></tr>
             <tr><td><b>Form / UX Design</b></td><td>Designs the interface or the intake flow.</td></tr>
             <tr><td><b>Data / Ops</b></td><td>Data sources, pipelines, integration and rollout.</td></tr>
