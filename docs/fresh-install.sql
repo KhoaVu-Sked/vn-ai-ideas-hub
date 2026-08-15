@@ -223,6 +223,15 @@ create index if not exists feedback_created_at_idx on feedback (created_at desc)
 -- existing database the column has to be added first.)
 create unique index if not exists accounts_email_lower_key on accounts (lower(email));
 
+-- Runtime settings, one row per key. An absent row means the default, so this
+-- starts empty. Currently just email_notifications (on | off).
+create table if not exists app_settings (
+  key        text primary key,
+  value      text not null,
+  updated_at timestamptz not null default now(),
+  updated_by uuid
+);
+
 -- ── Seeds ─────────────────────────────────────────────────────────
 
 insert into time_frames (name, position) values
