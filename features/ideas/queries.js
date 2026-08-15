@@ -479,7 +479,7 @@ export async function updateIdeaTask(taskId, accountId, isAdmin, patch) {
          or ${isAdmin}
          or exists (select 1 from idea_members m
                     where m.idea_id = t.idea_id and m.account_id = ${accountId}
-                      and m.roles @> array['Initiator / Project Lead']) )
+                      and m.roles @> array['Project Lead']) )
     returning t.id
   `;
   if (rows.length === 0) throw err(403, "You can't edit this task.");
@@ -497,7 +497,7 @@ export async function moveIdeaTask(taskId, state, accountId, isAdmin) {
       select r.id, r.idea_id, r.state as from_state, r.assignee_id,
         (${isAdmin} or exists (select 1 from idea_members m
              where m.idea_id = r.idea_id and m.account_id = ${accountId}
-               and m.roles @> array['Initiator / Project Lead'])) as is_lead
+               and m.roles @> array['Project Lead'])) as is_lead
       from requests r where r.id = ${taskId}
     )
     update requests r set
@@ -527,7 +527,7 @@ export async function deleteIdeaTask(taskId, accountId, isAdmin) {
          or ${isAdmin}
          or exists (select 1 from idea_members m
                     where m.idea_id = r.idea_id and m.account_id = ${accountId}
-                      and m.roles @> array['Initiator / Project Lead']) )
+                      and m.roles @> array['Project Lead']) )
     returning id
   `;
   if (rows.length === 0) throw err(403, "You can't remove this task.");
@@ -588,7 +588,7 @@ export async function deleteComment(commentId, accountId, isAdmin) {
          or ${isAdmin}
          or exists (select 1 from idea_members m
                     where m.idea_id = c.idea_id and m.account_id = ${accountId}
-                      and m.roles @> array['Initiator / Project Lead']) )
+                      and m.roles @> array['Project Lead']) )
     returning id
   `;
   if (rows.length === 0) throw err(403, "You can't remove this comment.");
