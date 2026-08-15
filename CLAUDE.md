@@ -12,6 +12,29 @@ I'm Khoa Vu, a Technical Support Engineer at Skedulo. I lead an internal initiat
 - **Data lives in Neon Postgres**, reached only from server-side API routes. Raw parameterised SQL via `@neondatabase/serverless` — no ORM.
 - Built and in use: the board, the full `/idea/[id]` page with engagement, auth with email verification, profiles, the leader dashboard, admin tooling (tags, form fields, accounts, feedback, delete requests, tasks, activity log), and email notifications.
 
+## Before changing anything — read this first
+
+**Read [`docs/change-map.md`](docs/change-map.md) before editing code.** It lists
+what else has to change when you change a table, a role name, a user-facing
+screen, or an env var. Every entry is a mistake this project has already made.
+
+**Run `bun run check` before claiming a change is done.** It catches couplings
+`next build` cannot see: role names written inside SQL strings, `schema.sql` vs
+`docs/fresh-install.sql`, migrations that never reached `schema.sql`, guides
+describing retired vocabulary. A clean `next build` is *not* verification —
+it resolves imports and nothing else.
+
+**The database and the code deploy separately.** Vercel ships on merge; nothing
+waits for Neon. Run the migration first, then merge. New code against an old
+database throws `column ... does not exist` and shows a Retry that can never
+work. This has happened three times.
+
+**Old branches carry dead vocabulary.** `feature/idea-tasks-board` sat unmerged
+for 23 commits and still tested for the role `Initiator / Project Lead`, which
+migration 012 had split in two — so the board's permission check matched nobody.
+Before porting anything old, run `bun run check` and diff its constants against
+`features/ideas/constants.js`.
+
 ## Architecture decisions already made (don't relitigate without reason)
 
 1. **The browser never touches the database.** Vercel serverless API routes own all data access; `DATABASE_URL` is a server env var and the client only calls `/api/*`.
