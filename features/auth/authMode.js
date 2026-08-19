@@ -5,7 +5,7 @@
 // Keep it a plain constant, not an env var: middleware, server routes and the
 // login page all need it, and an env var would have to be NEXT_PUBLIC_ to reach
 // the browser, which makes it two things to keep in step instead of one.
-export const PASSWORD_LOGIN = false;
+export const PASSWORD_LOGIN = true;
 
 // Break-glass: /skedadmin keeps the old username + password form so there is a
 // way in that doesn't depend on Google. Restricted to accounts whose role is
