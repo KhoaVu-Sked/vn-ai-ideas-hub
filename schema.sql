@@ -118,6 +118,7 @@ create table if not exists course_assignments (
   target_date date,
   status      text not null default 'not_started'
                 check (status in ('not_started', 'in_progress', 'complete', 'skipped')),
+  position    integer,  -- learner's own display order within a position tier
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (account_id, course_id)
@@ -474,3 +475,6 @@ alter table requests alter column state_changed_at set default now();
 alter table requests alter column state_changed_at set not null;
 alter table requests drop column if exists start_date;
 alter table requests drop column if exists due_date;
+
+-- ── migration 024: course_assignments.position ──
+alter table course_assignments add column if not exists position integer;

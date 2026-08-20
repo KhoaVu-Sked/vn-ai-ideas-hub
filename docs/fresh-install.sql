@@ -118,6 +118,7 @@ create table if not exists course_assignments (
   target_date date,
   status      text not null default 'not_started'
                 check (status in ('not_started', 'in_progress', 'complete', 'skipped')),
+  position    integer,  -- learner's own display order within a position tier
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (account_id, course_id)

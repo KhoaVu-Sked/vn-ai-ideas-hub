@@ -42,10 +42,11 @@ export async function getTrackWithCourses(trackId, accountId) {
 }
 
 // Your Journey: every course across every track the account is enrolled in
-// (via account_tracks), flattened into one list — ordered by track, then
-// stage, then when the course was added. No real cross-track sequence exists
-// yet, so this is the closest honest ordering; target_date is only ever
-// non-null once something actually writes course_assignments.
+// (via account_tracks), flattened into one list — ordered by position tier,
+// then the learner's own custom order within that tier (course_assignments.
+// position, if they've ever reordered it), then track/stage/created_at as
+// the fallback before that. target_date is only ever non-null once
+// something actually writes course_assignments.
 export async function getJourney(accountId) {
   return sql`
     select c.id, c.title, c.stage, c.platform, c.est_hours, c.link, c.outcome,
@@ -62,8 +63,35 @@ export async function getJourney(accountId) {
         when 'intern' then 0 when 'junior' then 1 when 'middle' then 2
         when 'senior' then 3 when 'principal' then 4 else 5
       end,
-      t.name asc, c.stage asc, c.created_at asc
+      coalesce(ca.position, 2147483647), t.name asc, c.stage asc, c.created_at asc
   `;
+}
+
+// Reorder the courses within one position tier, for this account only —
+// someone else's ordering of the same tier is untouched. Writes position
+// for every course in that tier at once (not just the ones that moved), so
+// the tier never ends up with a mix of set/unset positions. Scoped to
+// courses actually in that tier and reachable via the account's enrolled
+// tracks, so a tampered courseId list can't write positions cross-tier.
+export async function reorderStage(accountId, position, courseIds) {
+  const rows = await sql`
+    with ord as (
+      select course_id, ord - 1 as position
+      from unnest(${courseIds}::uuid[]) with ordinality as t(course_id, ord)
+    ),
+    valid as (
+      select o.course_id, o.position
+      from ord o
+      join courses c on c.id = o.course_id
+      join account_tracks acct on acct.track_id = c.track_id and acct.account_id = ${accountId}
+      where c.expected_by_position = ${position}
+    )
+    insert into course_assignments (account_id, course_id, position)
+    select ${accountId}::uuid, course_id, position from valid
+    on conflict (account_id, course_id) do update set position = excluded.position, updated_at = now()
+    returning course_id
+  `;
+  return { reordered: rows.length };
 }
 
 // "Skip prerequisite" on a locked course: rather than marking that one

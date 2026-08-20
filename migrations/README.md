@@ -26,7 +26,7 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `009_signup_codes.sql` — OTP codes for email verification at sign-up.
 - `010_profiles.sql` — profile fields (avatar, colour, region, timezone) + `requests.updated_at`.
 - `011_tasks_comments.sql` — requests become Task-board cards (title, assignee, dates, position, seq); new `comments` table for discussion.
-- `020_user_role_position.sql` — add `user_role` table: one seniority `position` per account, for the AI Learning roadmap work.
-- `021_fix_position_values.sql` — correct `user_role.position` to intern/junior/middle/senior/principal (020 shipped `manager` by mistake).
+- `020_user_role_position.sql` — add `user_role` table: one seniority `position` (intern/junior/middle/senior/principal) per account, for the AI Learning roadmap work.
 - `022_learning_tracks_courses.sql` — add `tracks`, `account_tracks`, `courses`, `course_assignments` for the AI Learning roadmap work.
 - `023_fix_courses_ai_track_seed.sql` — fix for UAT: adds `courses.stage/cost/outcome` (022 shipped without them) and seeds the AI Track's 23 real courses from the roadmap spreadsheet.
+- `024_course_assignments_position.sql` — add `course_assignments.position`, so a learner can reorder courses within one position tier on their own Journey view.
