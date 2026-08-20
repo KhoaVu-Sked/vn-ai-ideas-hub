@@ -372,9 +372,9 @@ export default function JourneyPage() {
           <Loading label="Loading your journey" />
         ) : (
           <section style={card}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 4 }}>
                   <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: 0 }}>Your Journey</h1>
                   {journey.length > 0 && (
                     <select
@@ -393,7 +393,7 @@ export default function JourneyPage() {
                 </p>
               </div>
               {journey.length > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, maxWidth: "100%" }}>
                   <button
                     onClick={resetJourney}
                     disabled={resetting}
