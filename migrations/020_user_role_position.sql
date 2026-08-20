@@ -9,7 +9,7 @@ create table if not exists user_role (
   id          uuid primary key default gen_random_uuid(),
   account_id  uuid not null unique references accounts(id) on delete cascade,
   position    text not null
-                check (position in ('junior', 'middle', 'senior', 'manager', 'principal')),
+                check (position in ('intern', 'junior', 'middle', 'senior', 'principal')),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
