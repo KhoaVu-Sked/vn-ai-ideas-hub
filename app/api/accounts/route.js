@@ -17,16 +17,16 @@ export async function GET() {
   }
 }
 
-// POST /api/accounts { username, email, name, password, role } → create (admin)
+// POST /api/accounts { username, email, name, password, role, position } → create (admin)
 export async function POST(request) {
   try {
     const admin = await requireAdmin();
-    const { username, email, name, password, role } = await request.json();
+    const { username, email, name, password, role, position } = await request.json();
     if (PASSWORD_LOGIN && !password?.trim()) return Response.json({ error: "An initial password is required." }, { status: 400 });
     // Google-only: the row is created without a hash and the person signs in
     // with Google. Setting one would just be a credential that never works.
     const password_hash = PASSWORD_LOGIN ? await hashPassword(password) : null;
-    const account = await createAccount({ username, email, name, password_hash, role });
+    const account = await createAccount({ username, email, name, password_hash, role, position });
     const base = new URL(request.url).origin;
     const who = admin.name || admin.username;
     after(() => adminEvent({

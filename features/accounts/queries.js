@@ -2,43 +2,69 @@
 
 import { err, sql, uniqueViolation, ymd } from "@/lib/sql";
 import { findOrCreateSsoAccount } from "@/features/auth/queries";
+import { POSITIONS } from "@/features/accounts/constants";
+
+// Seniority level, stored in user_role rather than on accounts directly.
+const validPosition = (position) => (POSITIONS.includes(position) ? position : null);
 
 // ── accounts (admin management) ───────────────────────────────
 export async function listAccounts() {
   const rows = await sql`
-    select id, username, email, name, role, avatar_color, avatar_url, region, timezone, created_at
-    from accounts order by created_at asc
+    select a.id, a.username, a.email, a.name, a.role, a.avatar_color, a.avatar_url,
+           a.region, a.timezone, a.created_at, ur.position
+    from accounts a
+    left join user_role ur on ur.account_id = a.id
+    order by a.created_at asc
   `;
   return rows.map((r) => ({ ...r, created: ymd(r.created_at) }));
 }
 
 
-export async function createAccount({ username, email, name, password_hash, role }) {
+export async function createAccount({ username, email, name, password_hash, role, position }) {
   const u = (username || "").trim();
   // Stored lowercase because that is what findOrCreateSsoAccount looks up.
   const em = (email || "").trim().toLowerCase() || null;
   if (!u) throw err(400, "Username is required.");
+  const pos = validPosition(position);
   try {
     const rows = await sql`
-      insert into accounts (username, email, name, password_hash, role, auth_provider)
-      values (${u}, ${em}, ${(name || "").trim() || null}, ${password_hash || null},
-              ${role === "admin" ? "admin" : "member"}, ${password_hash ? "password" : "google"})
-      returning id, username, email, name, role, created_at
+      with acc as (
+        insert into accounts (username, email, name, password_hash, role, auth_provider)
+        values (${u}, ${em}, ${(name || "").trim() || null}, ${password_hash || null},
+                ${role === "admin" ? "admin" : "member"}, ${password_hash ? "password" : "google"})
+        returning id, username, email, name, role, created_at
+      ),
+      pos as (
+        insert into user_role (account_id, position)
+        select acc.id, ${pos} from acc where ${pos} is not null
+      )
+      select acc.*, ${pos}::text as position from acc
     `;
     return { ...rows[0], created: ymd(rows[0].created_at) };
   } catch (e) { throw uniqueViolation(e); }
 }
 
-export async function updateAccount(id, { username, email, name, role }) {
+export async function updateAccount(id, { username, email, name, role, position }) {
+  const pos = validPosition(position);
   try {
     const rows = await sql`
-      update accounts set
-        username = coalesce(${(username || "").trim() || null}, username),
-        email = ${(email || "").trim().toLowerCase() || null},
-        name = ${(name || "").trim() || null},
-        role = ${role === "admin" ? "admin" : "member"}
-      where id = ${id}
-      returning id, username, email, name, role, created_at
+      with upd as (
+        update accounts set
+          username = coalesce(${(username || "").trim() || null}, username),
+          email = ${(email || "").trim().toLowerCase() || null},
+          name = ${(name || "").trim() || null},
+          role = ${role === "admin" ? "admin" : "member"}
+        where id = ${id}
+        returning id, username, email, name, role, created_at
+      ),
+      pos as (
+        insert into user_role (account_id, position)
+        select upd.id, ${pos} from upd where ${pos} is not null
+        on conflict (account_id) do update set position = excluded.position, updated_at = now()
+      )
+      select upd.*, ur.position
+      from upd
+      left join user_role ur on ur.account_id = upd.id
     `;
     if (rows.length === 0) throw err(404, "Account not found.");
     return { ...rows[0], created: ymd(rows[0].created_at) };

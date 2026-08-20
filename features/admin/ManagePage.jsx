@@ -29,7 +29,7 @@ function ManagePage() {
   const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState("");
   const [accounts, setAccounts] = useState([]);
-  const [creating, setCreating] = useState({ username: "", email: "", name: "", password: "", role: "member" });
+  const [creating, setCreating] = useState({ username: "", email: "", name: "", password: "", role: "member", position: "" });
   const [feedback, setFeedback] = useState([]);
   const [fields, setFields] = useState([]);
   const [newField, setNewField] = useState({ label: "", type: "text", options: "", required: false });
@@ -86,7 +86,7 @@ function ManagePage() {
       for (const id of ids) {
         const a = accounts.find((x) => x.id === id);
         if (!a) continue;
-        const { account } = await api(`/api/accounts/${a.id}`, { method: "PATCH", body: JSON.stringify({ username: a.username, email: a.email, name: a.name, role: a.role }) });
+        const { account } = await api(`/api/accounts/${a.id}`, { method: "PATCH", body: JSON.stringify({ username: a.username, email: a.email, name: a.name, role: a.role, position: a.position }) });
         setAccounts((as) => as.map((x) => (x.id === a.id ? { ...x, ...account } : x)));
       }
       setDirty({});
@@ -97,7 +97,7 @@ function ManagePage() {
   const createAcct = () => run(async () => {
     const { account } = await api("/api/accounts", { method: "POST", body: JSON.stringify(creating) });
     setAccounts((as) => [...as, account]);
-    setCreating({ username: "", email: "", name: "", password: "", role: "member" });
+    setCreating({ username: "", email: "", name: "", password: "", role: "member", position: "" });
   });
 
   const setFbStatus = (id, status) => run(async () => { await api(`/api/feedback/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }); setFeedback((fs) => fs.map((f) => (f.id === id ? { ...f, status } : f))); });
