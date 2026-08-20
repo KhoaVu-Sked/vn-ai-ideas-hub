@@ -306,6 +306,7 @@ export default function JourneyPage() {
   const [skipping, setSkipping] = useState(false);
   const [skipErr, setSkipErr] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState("all");
 
   const load = useCallback(async () => {
     setErr("");
@@ -314,6 +315,16 @@ export default function JourneyPage() {
 
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
+
+  // Derived straight from the journey data already on hand — no extra fetch.
+  const trackOptions = Array.from(new Map(journey.map((c) => [c.track_id, c.track_name])).entries())
+    .map(([id, name]) => ({ id, name }));
+  // If the previously selected track was un-enrolled (reset, or dropped a
+  // track), fall back to "all" rather than silently showing nothing.
+  useEffect(() => {
+    if (selectedTrack !== "all" && !trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack("all");
+  }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
 
   const resetJourney = async () => {
     if (!confirm("Reset your journey back to the original track? This clears all recorded progress and skips — every course reverts to not started (only Intern stays unlocked).")) return;
@@ -371,6 +382,14 @@ export default function JourneyPage() {
               </div>
               {journey.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <select
+                    value={selectedTrack}
+                    onChange={(e) => setSelectedTrack(e.target.value)}
+                    style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}
+                  >
+                    <option value="all">All tracks</option>
+                    {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
                   <button
                     onClick={resetJourney}
                     disabled={resetting}
@@ -386,10 +405,12 @@ export default function JourneyPage() {
             {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
             {journey.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing here yet — enroll in a track from the Learning Hub to start your journey.</div>
+            ) : filteredJourney.length === 0 ? (
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>No courses in this track.</div>
             ) : view === "list" ? (
-              <JourneyTable courses={journey} onReorder={reorderStage} />
+              <JourneyTable courses={filteredJourney} onReorder={reorderStage} />
             ) : (
-              <JourneyMindMap courses={journey} onRequestSkip={(c) => { setSkipErr(""); setSkipTarget(c); }} />
+              <JourneyMindMap courses={filteredJourney} onRequestSkip={(c) => { setSkipErr(""); setSkipTarget(c); }} />
             )}
           </section>
         )}
