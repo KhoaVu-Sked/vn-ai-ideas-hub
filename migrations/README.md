@@ -29,3 +29,4 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `020_user_role_position.sql` — add `user_role` table: one seniority `position` per account, for the AI Learning roadmap work.
 - `021_fix_position_values.sql` — correct `user_role.position` to intern/junior/middle/senior/principal (020 shipped `manager` by mistake).
 - `022_learning_tracks_courses.sql` — add `tracks`, `account_tracks`, `courses`, `course_assignments` for the AI Learning roadmap work.
+- `023_fix_courses_ai_track_seed.sql` — fix for UAT: adds `courses.stage/cost/outcome` (022 shipped without them) and seeds the AI Track's 23 real courses from the roadmap spreadsheet.

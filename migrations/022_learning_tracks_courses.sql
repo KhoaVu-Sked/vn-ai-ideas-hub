@@ -25,17 +25,21 @@ create table if not exists account_tracks (
 create table if not exists courses (
   id                    uuid primary key default gen_random_uuid(),
   track_id              uuid references tracks(id) on delete set null,
+  stage                 text,                          -- roadmap stage label, e.g. 'L0 — Foundations'
   title                 text not null,
   focus_area            text,                          -- skill/competency this course maps to
   platform              text,                          -- e.g. Udemy Business, Anthropic Academy
   est_hours             numeric,
+  cost                  text,                          -- 'Free', 'Udemy Business', 'Free (DevRev)', ...
+  outcome               text,                          -- "what you can do after" completing it
   priority              text not null default 'optional'
                           check (priority in ('core', 'optional')),
   link                  text,
   expected_by_position  text
                           check (expected_by_position in ('intern', 'junior', 'middle', 'senior', 'principal')),
   created_at            timestamptz not null default now(),
-  updated_at            timestamptz not null default now()
+  updated_at            timestamptz not null default now(),
+  unique (track_id, title)
 );
 create index if not exists courses_track_id_idx on courses (track_id);
 
