@@ -59,6 +59,17 @@ create table if not exists accounts (
 -- (the accounts_email unique index is created in the migration block below, after
 --  ALTER ... ADD COLUMN email — so it works on both fresh and existing databases)
 
+-- Seniority level per account (junior..principal). Separate from accounts.role
+-- (workspace permission) and idea_members.roles (per-idea contribution role).
+create table if not exists user_role (
+  id          uuid primary key default gen_random_uuid(),
+  account_id  uuid not null unique references accounts(id) on delete cascade,
+  position    text not null
+                check (position in ('junior', 'middle', 'senior', 'manager', 'principal')),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
 -- Tags catalog — admin-managed list of allowed tags (with a display color).
 create table if not exists tags (
   id         uuid primary key default gen_random_uuid(),
