@@ -3,7 +3,7 @@
 
 import { sql } from "@/lib/sql";
 
-// Suggested-tracks cards on My Learning — name, course count, and whether
+// Suggested-tracks cards on the Learning Hub — name, course count, and whether
 // this account is already assigned to it.
 export async function listTracks(accountId) {
   return sql`
