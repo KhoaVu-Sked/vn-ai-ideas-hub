@@ -65,10 +65,60 @@ create table if not exists user_role (
   id          uuid primary key default gen_random_uuid(),
   account_id  uuid not null unique references accounts(id) on delete cascade,
   position    text not null
-                check (position in ('junior', 'middle', 'senior', 'manager', 'principal')),
+                check (position in ('intern', 'junior', 'middle', 'senior', 'principal')),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+-- A track (AI Track, Core Competency) a course belongs to. One track per
+-- course, but an account can be assigned more than one track — see
+-- account_tracks below.
+create table if not exists tracks (
+  id         uuid primary key default gen_random_uuid(),
+  name       text unique not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists account_tracks (
+  account_id uuid not null references accounts(id) on delete cascade,
+  track_id   uuid not null references tracks(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (account_id, track_id)
+);
+
+-- Course catalog. target date and completion status are NOT here — they
+-- differ per learner taking the same course, so they live on
+-- course_assignments instead.
+create table if not exists courses (
+  id                    uuid primary key default gen_random_uuid(),
+  track_id              uuid references tracks(id) on delete set null,
+  title                 text not null,
+  focus_area            text,
+  platform              text,
+  est_hours             numeric,
+  priority              text not null default 'optional'
+                          check (priority in ('core', 'optional')),
+  link                  text,
+  expected_by_position  text
+                          check (expected_by_position in ('intern', 'junior', 'middle', 'senior', 'principal')),
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
+);
+create index if not exists courses_track_id_idx on courses (track_id);
+
+-- One row per (account, course): a learner's target date and progress.
+create table if not exists course_assignments (
+  id          uuid primary key default gen_random_uuid(),
+  account_id  uuid not null references accounts(id) on delete cascade,
+  course_id   uuid not null references courses(id) on delete cascade,
+  target_date date,
+  status      text not null default 'not_started'
+                check (status in ('not_started', 'in_progress', 'complete', 'skipped')),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (account_id, course_id)
+);
+create index if not exists course_assignments_account_id_idx on course_assignments (account_id);
 
 -- Tags catalog — admin-managed list of allowed tags (with a display color).
 create table if not exists tags (
@@ -247,6 +297,9 @@ create table if not exists app_settings (
 
 insert into time_frames (name, position) values
   ('1-2 weeks', 1), ('3-4 weeks', 2), ('4-8 weeks', 3), ('1 quarter', 4)
+on conflict (name) do nothing;
+
+insert into tracks (name) values ('AI Track'), ('Core Competency')
 on conflict (name) do nothing;
 
 insert into tags (name, color) values

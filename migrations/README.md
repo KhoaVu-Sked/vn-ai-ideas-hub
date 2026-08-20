@@ -26,4 +26,6 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `009_signup_codes.sql` — OTP codes for email verification at sign-up.
 - `010_profiles.sql` — profile fields (avatar, colour, region, timezone) + `requests.updated_at`.
 - `011_tasks_comments.sql` — requests become Task-board cards (title, assignee, dates, position, seq); new `comments` table for discussion.
-- `020_user_role_position.sql` — add `user_role` table: one seniority `position` (junior/middle/senior/manager/principal) per account, for the AI Learning roadmap work.
+- `020_user_role_position.sql` — add `user_role` table: one seniority `position` per account, for the AI Learning roadmap work.
+- `021_fix_position_values.sql` — correct `user_role.position` to intern/junior/middle/senior/principal (020 shipped `manager` by mistake).
+- `022_learning_tracks_courses.sql` — add `tracks`, `account_tracks`, `courses`, `course_assignments` for the AI Learning roadmap work.
