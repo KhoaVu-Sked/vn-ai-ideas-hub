@@ -1,7 +1,11 @@
 "use client";
 
 // Your Journey: every course across the tracks you're enrolled in.
-// List view: ordered intern -> principal, scrolled after ~7 rows.
+// List view: ordered intern -> principal, scrolled after ~7 rows. Rows are
+// drag-reorderable (persisted per account on course_assignments.position) —
+// a drop only lands on a row in the same position tier, so a drag can never
+// move a course into a different stage. This is the ONLY place reordering
+// happens; Mind map just displays whatever order the query already returns.
 // Mind map view: columns by expected_by_position, each node explicitly
 // linked to the next in list order within a column. A course is Locked
 // until every course in the tier below it is complete or skipped — a tier
@@ -10,9 +14,6 @@
 // every course in the tier below it 'skipped' (satisfying the gate) and
 // every course in its own tier 'not_started' — unlocking the whole tier
 // into its normal, un-started state rather than a synthetic status.
-// Nodes are also draggable within a column to reorder them — persisted per
-// account on course_assignments.position, never crossing tiers (the array
-// a drag reorders is scoped to one column).
 
 import { useCallback, useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
@@ -26,11 +27,26 @@ const VISIBLE_ROWS = 7;
 const ROW_H = 42;
 const HEADER_H = 34;
 
-function JourneyRow({ course, index, expanded, onToggle }) {
+// Draggable row (native HTML5 DnD, no library) — drop is only accepted onto
+// a row in the SAME position tier (checked in JourneyTable.handleDrop), so a
+// drag can never move a course into a different stage.
+function JourneyRow({ course, index, expanded, onToggle, drag }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
   return (
     <>
-      <tr style={{ borderTop: "1px solid var(--line)", cursor: "pointer" }} onClick={onToggle}>
+      <tr
+        draggable
+        onDragStart={drag.onDragStart}
+        onDragOver={drag.onDragOver}
+        onDrop={drag.onDrop}
+        onDragEnd={drag.onDragEnd}
+        onClick={onToggle}
+        style={{
+          borderTop: "1px solid var(--line)", cursor: "grab",
+          opacity: drag.dragging ? 0.4 : 1,
+          outline: drag.dropTarget ? "2px dashed var(--blue)" : "none", outlineOffset: -2,
+        }}
+      >
         <td style={{ ...td, color: "var(--faint)" }}>{index}</td>
         <td style={{ ...td, fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{course.title}</td>
         <td style={td}>{course.track_name}</td>
@@ -59,8 +75,34 @@ function JourneyRow({ course, index, expanded, onToggle }) {
 }
 
 // Scrolls after ~7 rows; header stays pinned while the body scrolls.
-function JourneyTable({ courses }) {
+// Rows are drag-reorderable, but a drop only lands if the dragged row and
+// the drop target share the same expected_by_position — the ordering this
+// table already has (tier first) puts same-tier rows in one contiguous
+// block, so reordering can only ever happen within a stage.
+function JourneyTable({ courses, onReorder }) {
+  const [order, setOrder] = useState(courses.map((c) => c.id));
+  const [dragId, setDragId] = useState(null);
+  const [overId, setOverId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  useEffect(() => { setOrder(courses.map((c) => c.id)); }, [courses]);
+
+  const byId = new Map(courses.map((c) => [c.id, c]));
+  const ordered = order.map((id) => byId.get(id)).filter(Boolean);
+  const draggingCourse = dragId ? byId.get(dragId) : null;
+
+  const handleDrop = (targetId) => {
+    setOverId(null);
+    const target = byId.get(targetId);
+    if (!dragId || dragId === targetId || !draggingCourse || !target) { setDragId(null); return; }
+    if (draggingCourse.expected_by_position !== target.expected_by_position) { setDragId(null); return; } // different stage — reject
+    const next = order.filter((id) => id !== dragId);
+    next.splice(next.indexOf(targetId), 0, dragId); // drop before the target's current slot
+    setOrder(next);
+    setDragId(null);
+    const tierIds = next.filter((id) => byId.get(id)?.expected_by_position === target.expected_by_position);
+    onReorder(target.expected_by_position, tierIds);
+  };
+
   return (
     <div style={{ overflow: "auto", maxHeight: HEADER_H + VISIBLE_ROWS * ROW_H, border: "1px solid var(--line)", borderRadius: 10 }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -77,8 +119,22 @@ function JourneyTable({ courses }) {
           </tr>
         </thead>
         <tbody>
-          {courses.map((c, i) => (
-            <JourneyRow key={c.id} course={c} index={i + 1} expanded={expandedId === c.id} onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))} />
+          {ordered.map((c, i) => (
+            <JourneyRow
+              key={c.id}
+              course={c}
+              index={i + 1}
+              expanded={expandedId === c.id}
+              onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))}
+              drag={{
+                dragging: dragId === c.id,
+                dropTarget: overId === c.id && dragId && dragId !== c.id && draggingCourse?.expected_by_position === c.expected_by_position,
+                onDragStart: () => setDragId(c.id),
+                onDragOver: (e) => { e.preventDefault(); if (overId !== c.id) setOverId(c.id); },
+                onDrop: () => handleDrop(c.id),
+                onDragEnd: () => { setDragId(null); setOverId(null); },
+              }}
+            />
           ))}
         </tbody>
       </table>
@@ -131,56 +187,23 @@ function MindMapNode({ course, index, locked, onRequestSkip }) {
   );
 }
 
-// Each node explicitly links to the next in list order — course 1 -> course
-// 2 -> course 3 — via a dot-line-arrow-dot connector, the only "sequence"
-// this data actually has (no per-course prerequisite links exist).
-//
-// Drag a node to reorder it — dropping calls onReorder(position, courseIds)
-// with the tier's new full order. Native HTML5 drag/drop (no library):
-// each node is `draggable` and the array boundary IS the tier boundary, so a
-// drag can only ever reorder within the column it started in.
-function NodeRail({ position, courses, locked, onRequestSkip, onReorder }) {
-  const [order, setOrder] = useState(courses.map((c) => c.id));
-  const [dragId, setDragId] = useState(null);
-  const [overId, setOverId] = useState(null);
-  useEffect(() => { setOrder(courses.map((c) => c.id)); }, [courses]);
-
-  const byId = new Map(courses.map((c) => [c.id, c]));
-  const ordered = order.map((id) => byId.get(id)).filter(Boolean);
-
-  const handleDrop = (targetId) => {
-    setOverId(null);
-    if (!dragId || dragId === targetId) { setDragId(null); return; }
-    const next = order.filter((id) => id !== dragId);
-    next.splice(next.indexOf(targetId), 0, dragId); // drop before the target's current slot
-    setOrder(next);
-    setDragId(null);
-    onReorder(position, next);
-  };
-
+// Each node explicitly links to the next — course 1 -> course 2 -> course 3
+// — via a dot-line-arrow-dot connector. Purely a display of whatever order
+// the courses arrive in; the order itself is set on the List view's table
+// (drag-reorder lives there), not here, so there's only one place that
+// implements reordering.
+function NodeRail({ courses, locked, onRequestSkip }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      {ordered.map((c, i) => (
+      {courses.map((c, i) => (
         <div key={c.id}>
-          <div
-            draggable
-            onDragStart={() => setDragId(c.id)}
-            onDragOver={(e) => { e.preventDefault(); if (overId !== c.id) setOverId(c.id); }}
-            onDragLeave={() => setOverId((id) => (id === c.id ? null : id))}
-            onDrop={() => handleDrop(c.id)}
-            onDragEnd={() => { setDragId(null); setOverId(null); }}
-            style={{
-              display: "flex", gap: 10, cursor: "grab",
-              opacity: dragId === c.id ? 0.4 : 1,
-              outline: overId === c.id && dragId && dragId !== c.id ? "2px dashed var(--blue)" : "none", outlineOffset: 3,
-            }}
-          >
+          <div style={{ display: "flex", gap: 10 }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: locked.get(c.id) ? "#c9d3e6" : "var(--blue)", flexShrink: 0, marginTop: 6 }} />
             <div style={{ flex: 1 }}>
               <MindMapNode course={c} index={i + 1} locked={locked.get(c.id)} onRequestSkip={onRequestSkip} />
             </div>
           </div>
-          {i < ordered.length - 1 && (
+          {i < courses.length - 1 && (
             <div style={{ display: "flex", justifyContent: "flex-start", width: 8 }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 8 }}>
                 <div style={{ width: 2, height: 10, background: "var(--line)" }} />
@@ -201,7 +224,7 @@ function NodeRail({ position, courses, locked, onRequestSkip, onReorder }) {
 // required. This is a tier gate (all of one position before the next),
 // not a per-course prerequisite graph — nothing here models individual
 // course-to-course dependencies.
-function JourneyMindMap({ courses, onRequestSkip, onReorder }) {
+function JourneyMindMap({ courses, onRequestSkip }) {
   const groups = POSITION_ORDER
     .map((pos) => ({ position: pos, courses: courses.filter((c) => c.expected_by_position === pos) }))
     .filter((g) => g.courses.length > 0);
@@ -222,16 +245,7 @@ function JourneyMindMap({ courses, onRequestSkip, onReorder }) {
                 {g.position ? POSITION_LABEL[g.position] : "Other"}
               </div>
               <div style={{ maxHeight: colMaxHeight, overflowY: "auto", paddingRight: 4 }}>
-                {g.position ? (
-                  <NodeRail position={g.position} courses={g.courses} locked={locked} onRequestSkip={onRequestSkip} onReorder={onReorder} />
-                ) : (
-                  // "Other" (no expected_by_position) has no tier to reorder within.
-                  g.courses.map((c, i) => (
-                    <div key={c.id} style={{ marginBottom: i < g.courses.length - 1 ? 20 : 0 }}>
-                      <MindMapNode course={c} index={i + 1} locked={locked.get(c.id)} onRequestSkip={onRequestSkip} />
-                    </div>
-                  ))
-                )}
+                <NodeRail courses={g.courses} locked={locked} onRequestSkip={onRequestSkip} />
               </div>
             </div>
             {i < groups.length - 1 && (
@@ -315,9 +329,9 @@ export default function JourneyPage() {
     }
   };
 
-  // NodeRail already reordered itself locally for instant feedback; this
+  // JourneyTable already reordered itself locally for instant feedback; this
   // just persists it. No reload — a stale-order fetch racing the drop would
-  // visibly snap the cards back, and the local order is already correct.
+  // visibly snap the rows back, and the local order is already correct.
   const reorderStage = (position, courseIds) => {
     api("/api/journey/reorder", { method: "POST", body: JSON.stringify({ position, courseIds }) })
       .catch((e) => setErr(e.message));
@@ -352,7 +366,7 @@ export default function JourneyPage() {
                 <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Your Journey</h1>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
                   Ordered intern → principal, across every track you're enrolled in.
-                  {view === "mindmap" && " Drag a card to reorder it within its stage."}
+                  {view === "list" && " Drag a row to reorder it within its stage."}
                 </p>
               </div>
               {journey.length > 0 && (
@@ -373,9 +387,9 @@ export default function JourneyPage() {
             {journey.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing here yet — enroll in a track from the Learning Hub to start your journey.</div>
             ) : view === "list" ? (
-              <JourneyTable courses={journey} />
+              <JourneyTable courses={journey} onReorder={reorderStage} />
             ) : (
-              <JourneyMindMap courses={journey} onRequestSkip={(c) => { setSkipErr(""); setSkipTarget(c); }} onReorder={reorderStage} />
+              <JourneyMindMap courses={journey} onRequestSkip={(c) => { setSkipErr(""); setSkipTarget(c); }} />
             )}
           </section>
         )}
