@@ -1,228 +1,173 @@
 # AI Learning Platform — Requirements
 
-**Status:** Draft for dev team
+**Status:** In progress — Learning Hub and Your Journey are built and live in this repo; the agent layer (Planner, Knowledge Builder, Scheduler) and Manager Dashboard are not.
 **Owner:** The Kiet
-**Purpose:** A single project that runs three connected agents on top of role-based learning roadmaps (Junior → Principal, plus a separate AI Track), so team members get a personalized plan, materials that make each course stick, and a schedule that keeps them moving — all tracked on one dashboard.
+**Purpose:** One place for a learner to see the tracks available to them, enroll, and work through a roadmap of courses by seniority level (Intern → Principal) — currently self-serve and manual; the original plan to automate planning, note-generation, and scheduling with agents is still ahead, not behind, this build.
+
+This file describes what the AI Learning feature actually is today, section by section, each tagged:
+- ✅ **Built** — live in this repo, in real use
+- 🚧 **Partial** — a UI shell exists, but no real logic or data behind it yet
+- ⬜ **Not started** — neither UI nor data exists
 
 ---
 
 ## 1. Architecture overview
 
-| Layer | Tool | Role |
+| Layer | Reality | Status |
 |---|---|---|
-| Course catalog (editorial content) | **Google Sheets** | Human-edited list of courses per skill/level; source of truth for what courses exist |
-| Application data (users, assignments, progress) | **Neon DB** | Structured, queryable data the app and agents read/write |
-| Web app / dashboards | **Vercel** (Next.js) | Hosts the Learner and Manager dashboards; hosts the catalog sync API route |
-| Course Planner & Progress Monitor | **Claude** | Turns a roadmap into a sequenced plan; tracks completion |
-| Knowledge Builder | **NotebookLM** | Generates mind map, summary, and exam per completed course |
-| Scheduler & Reminders | **Claude + Google Calendar** | Places study time on the calendar; sends reminders |
+| Application data (accounts, tracks, courses, progress) | **Neon Postgres** — the same database as the rest of this app (`vn-ai-ideas-hub`), not a separate Supabase project | ✅ Built |
+| Course catalog | Lives directly in the `courses` table. The AI Track's 23 real courses were one-time imported from a spreadsheet via a migration — there is no live Google Sheets integration, no sync button, no editorial workflow for non-technical editors to add or change courses | ✅ Built (as data), ⬜ (as an editable catalog workflow) |
+| Web app / dashboards | **Next.js on Vercel**, same deployment as the Ideas Hub. Two pages: `/learning-hub` and `/learning-hub/journey` | ✅ Built |
+| Course Planner & Progress Monitor | Would read a learner's roadmap and sequence it with target dates | ⬜ Not started — no agent, no automated sequencing. The only "order" that exists is course insertion order plus a learner's own manual drag-reorder within a stage |
+| Knowledge Builder (NotebookLM) | Would generate a mind map, summary, and exam per completed course | ⬜ Not started — the "Knowledge artifacts" card exists on Your Journey but is intentionally empty; no schema, no generation |
+| Scheduler & Reminders (Claude + Google Calendar) | Would place study time on a calendar and send reminders | ⬜ Not started — the "Up next" card and its "Auto Schedule" button are placeholders; nothing writes a target date or talks to Google Calendar |
 
-**Why this split:** Google Sheets was chosen for the catalog because it's already proven (existing AI Track roadmap), needs no new tool, and is easy for non-technical people to bulk-edit. Notion Enterprise was considered but is currently org-blocked pending approval, and Notion Free carries a 1,000-block cap that risks breaking mid-pilot — so it's deferred, not ruled out permanently. n8n was considered for the catalog sync but dropped since it's internally public-facing and this team wants sync logic to live in the app's own codebase instead. Supabase + Vercel were chosen because they're free, pair naturally, and fit the relational/transactional needs of progress and assignment data.
+**What changed from the original plan, and why:** the original architecture spread data across Google Sheets (catalog) and Supabase (progress), synced by a Vercel route. In practice, this got built as one Neon Postgres database shared with the existing Ideas Hub app — simpler to operate, and the catalog is small enough (23 courses today) that a one-time SQL import was faster to ship than building a Sheets-sync pipeline. That pipeline (Section 2.2) is not built and isn't currently planned; if the catalog grows past what's comfortable to edit via SQL migrations, that's the point to revisit it.
 
 ---
 
-## 2. Feature: Competency Model & Course Catalog (data foundation)
+## 2. Feature: Course catalog
 
-### 2.1 Course catalog storage
-**What:** Every course suggestion, for every skill across every level (Junior→Principal) and the AI Track, lives in a Google Sheet — one file, multiple tabs (`Read Me`, `AI Roadmap`, `Competency Roadmap`, `Role Expectations`, `Progress Tracker`).
+### 2.1 Course catalog storage — ✅ Built (differently than planned)
+**What actually exists:** the `courses` table (Neon), one row per course:
 
-**Schema (per row):**
-
-| Field | Notes |
+| Column | Notes |
 |---|---|
-| `course_id` | Stable unique key (e.g. `AI-L1-03`) — required so syncs match on ID, not title text |
-| Level/Role | Junior / Mid / Senior / Principal |
-| Competency/Skill | Which skill this course maps to (required for the Competency Roadmap tab; the AI Track tab is single-track so this can default to "AI") |
-| Recommended Course / Resource | Title |
-| Platform / Source | e.g. Udemy Business, Anthropic Academy |
-| Audience | Who it applies to |
-| Priority | Core vs. optional |
-| Est. Hours | Feeds the Scheduler agent's calendar slotting |
-| Cost | Free / paid |
-| What you can do after | Applied outcome, shown in the dashboard's expanded course view |
-| Expected by (role) | Target completion point tied to level |
-| Link | Direct URL to the course |
+| `track_id` | Which track (AI Track, Core Competency, ...) this course belongs to — one track per course |
+| `stage` | A display-only grouping label, e.g. `"L0 — Foundations"` — not used for any gating logic |
+| `title` | Course name |
+| `focus_area` | Skill/competency this course maps to |
+| `platform` | e.g. Anthropic Academy, Udemy Business, DevRev University |
+| `est_hours` | Numeric estimate |
+| `cost` | Free-text, e.g. `"Free"`, `"Udemy Business"`, `"Free (DevRev)"` |
+| `outcome` | "What you can do after" — shown in the List view's expanded row, and as the headline text on Mind map nodes |
+| `priority` | `core` or `optional` — feeds the profile strip's "N of M core courses complete" |
+| `expected_by_position` | `intern` / `junior` / `middle` / `senior` / `principal` — the seniority ladder a course belongs to; this is what tier-gating and the Mind map's columns are built on |
+| `link` | Direct URL to the course |
+
+No `course_id`-style stable business key exists — the primary key is a plain `uuid`, and seeding is idempotent on `(track_id, title)` instead.
 
 **Acceptance criteria:**
-- [ ] Every skill in the Confluence competency model (Junior→Principal) has ≥1 course row with all required fields filled in
-- [ ] AI Track tab reviewed against the same field standard
-- [ ] Every row has a unique `course_id`
+- [x] AI Track has all 23 real courses from the roadmap spreadsheet, every field filled in
+- [ ] Core Competency track has any courses at all (currently zero — the track exists, but nothing has been seeded into it)
+- [x] Seeding is idempotent (`on conflict (track_id, title) do nothing`), safe to re-run
 
-### 2.2 Catalog sync (Sheets → Supabase)
-**What:** A manual "Sync Courses" button on the Manager Dashboard triggers a Vercel API route that reads the Sheet via the Google Sheets API and upserts into Supabase's `courses_ref` table.
-
-**Functional requirements:**
-- Sync is manual (button-triggered), not scheduled — course edits are infrequent, so a cron job isn't justified yet
-- Sync route lives in the app's own codebase (no third-party workflow tool)
-- Upsert keyed on `course_id`, not row position or title text
-- Validates each row (required fields present, hours is numeric, link is a valid URL); invalid rows are skipped and reported, not allowed to fail the whole sync
-- Result is shown as a toast: counts of updated / added / skipped rows, plus reasons for any skipped rows
-- `last_synced_at` timestamp is stored and displayed near the button
-
-**Acceptance criteria:**
-- [ ] Clicking "Sync Courses" updates `courses_ref` to match the current Sheet state
-- [ ] Malformed rows are skipped with a visible reason, not silently dropped or fatal to the whole sync
-- [ ] `last_synced_at` updates and displays correctly after a successful sync
+### 2.2 Catalog sync (Sheets → DB) — ⬜ Not started
+No Google Sheets integration exists. No sync button, no `last_synced_at`, no validation-and-report flow. Adding or changing a course today means writing and running a SQL migration by hand. This is a real gap if the catalog needs frequent, non-technical edits — flagged here rather than pretended-away.
 
 ---
 
-## 3. Feature: Competency Model Upload → Auto-Assigned Roadmap
+## 3. Feature: Track enrollment (replaces "Competency Model Upload → Auto-Assigned Roadmap")
 
-*(Full detail already captured in `requirements-competency-upload-roadmap.md` — summarized here for completeness; that document is the source of truth for this feature.)*
+The original plan (auto-generate a roadmap from an uploaded `.xlsx` competency model, matched against a hard-coded `skill_course_map`) was never built, and nothing here builds toward it. What replaced it is much simpler:
 
-**What:** A learner with no roadmap yet uploads their competency model file (`.xlsx`). The system matches each skill/requirement in that file against a pre-existing, hard-coded skill→course mapping, and auto-generates the learner's roadmap from the matches.
+**What's built — ✅:**
+- A learner browses all tracks on `/learning-hub` ("Suggested tracks" — every track, with a course count and whether they're already enrolled).
+- Clicking a track opens a preview of its full roadmap (courses grouped by `stage`).
+- An **Enroll** / **Enrolled ✓** toggle button self-assigns the learner to that track (`account_tracks`, many-to-many — a learner can enroll in more than one track). No manager approval step exists; it's fully self-serve.
+- Enrolled tracks show as their own cards under "Your tracks," with an "Enrolled" badge.
 
-**Key requirements:**
-- Learners start in an `unassigned` roadmap state — no manually pre-seeded roadmap
-- Upload accepts `.xlsx` only, must conform to a required template (see below)
-- Matching is against a hard-coded `skill_course_map` table — not fuzzy/AI matching in v1
-- Skills already marked `Qualified` in the uploaded file are assumed to skip course assignment (needs product confirmation before build)
-- Unmatched skills don't block roadmap generation; they're logged and surfaced to managers for review
-- A required standard upload template must be defined and enforced — the two sample files reviewed had incompatible structures, and supporting both would require significantly more parsing logic for no real benefit
-
-**Data model additions:** `roadmap_status` on `users`; new tables `competency_uploads`, `skill_course_map`, `unmatched_skills`.
-
-**Acceptance criteria:** see `requirements-competency-upload-roadmap.md` Section 10.
+**Not built:**
+- No `roadmap_status` concept (unassigned/assigned) — a learner with zero enrolled tracks just sees empty states, not a blocked/gated screen.
+- No competency-file upload, no skill-matching, no `skill_course_map` / `unmatched_skills` tables.
+- No manager approval or per-role capacity limits on joining a track.
 
 ---
 
-## 4. Feature: Learner Dashboard
+## 4. Feature: Your Journey (the learner's roadmap view)
 
-**What:** A learner's personal view of their roadmap and progress.
+Lives at `/learning-hub/journey`. Replaces the originally-planned "Learner Dashboard" section.
 
-### 4.1 Empty state (new)
-- Shown when `roadmap_status = 'unassigned'`
-- Prompts the upload flow described in Section 3
-- Blocks access to the normal roadmap view until a roadmap exists
+### 4.1 Empty states — ✅ Built
+- Zero enrolled tracks: "Nothing here yet — enroll in a track from the Learning Hub to start your journey," profile strip shows only name + position (no track tags), progress shows **N/A** instead of a bar.
+- Enrolled, but the selected track filter has no courses: "No courses in this track."
 
-### 4.2 Header / identity strip
-- Name, avatar, current level, track (AI Track / Core Competency / both)
-- Overall progress: "X of Y core courses complete" with a progress bar
+### 4.2 Profile strip — ✅ Built
+- Avatar, name, a position badge (`user_role.position` — Intern/Junior/Mid level/Senior/Principal), and one tag per enrolled track (or just the selected one, if the dropdown isn't on "All tracks").
+- Progress: **"N of M core courses complete"** + bar, `priority = 'core'` only, scoped to whatever the track dropdown currently shows.
 
-### 4.3 Roadmap view
-- Two view modes: **List** (table) and **Map** (visual node graph showing course sequence and prerequisite links)
-- List view columns: order, course title, platform, target date, status (`Complete` / `In progress` / `Not started` / `Skipped`)
-- Map view: nodes positioned per sequence, edges colored by whether the prerequisite is satisfied
-- **Prerequisites / locking:** a course is locked if its prerequisite(s) aren't yet Complete or Skipped; locked courses are visually distinct and show which course is blocking them
-- **Skip flow:** if a learner wants to move past a locked prerequisite, a confirmation modal explains what's being skipped and records the skip — visible to their manager
-- Clicking a course row/node expands it to show: link, "what you can do after" description, and (if complete) links to generated knowledge artifacts
+### 4.3 Track filter — ✅ Built
+A dropdown next to the "Your Journey" title: "All tracks" or one specific enrolled track. Filters both the List and Mind map views and the profile strip's progress count. Falls back to "All tracks" automatically if the selected track is un-enrolled out from under it (e.g. after a Reset).
 
-### 4.4 Up next panel
-- Shows the next 1–2 courses that are `In progress` or `Not started`, mirroring what the Scheduler agent would place on the calendar
+### 4.4 Roadmap view — ✅ Built, two modes
+- **List**: table (`#`, Course, Track, Platform, Est. hrs, Target, Status), ordered Intern → Principal then by the learner's own custom order within a tier (see 4.6), scrollable after ~7 rows with a pinned header. A row expands to show the course link, its "after this course" outcome, and a placeholder **Wrap-up** button (see 4.7).
+- **Mind map**: one column per position tier that actually has courses in it, nodes rendered as an explicit chain (course 1 → 2 → 3) within a column via a dot/line rail, headline text is the course's `outcome` (not its title — hover for the real title via a native tooltip).
 
-### 4.5 Knowledge artifacts section
-- For each completed course: mind map link, summary link, exam score (generated by NotebookLM)
-- Toggleable via a `showArtifacts` setting
+**Difference from the original plan:** the original Map view described per-course prerequisite arrows (course A requires specifically course B). That data doesn't exist — there's no `course_prerequisites` table, only the position ladder. What's built instead is a **tier gate**: a course is Locked until every course in the tier below it is `complete` or `skipped`, and the connector between columns names the tier requirement ("Requires all Intern courses") rather than a specific course.
+
+### 4.5 Locking and Skip prerequisite — ✅ Built
+- A course is **Locked** (Mind map only) until every course in the tier below it is `complete`/`skipped`. An empty or missing lower tier can't block anything.
+- **Skip prerequisite** on a locked course: marks every course in the tier *below* it `skipped`, and every course in *its own* tier `not_started` — unlocking the whole tier at once, not just the clicked course. Confirms first, with the exact wording: *"Previous courses are required before "{title}". Skipping lets you move on now. The skip is recorded on your roadmap and visible to your manager."* (No manager view reads this yet — the data is recorded correctly, just nothing surfaces it to a manager today.)
+- **Reset**: clears all `course_assignments` rows for the account, reverting everything to `not_started` — same effect as never having touched the journey.
+
+### 4.6 Reordering — ✅ Built
+Rows in the **List** view are drag-reorderable, persisted per-account (`course_assignments.position`) — a drop only lands on a row in the same position tier, so a course can never be dragged into a different stage. The Mind map view is read-only display of whatever order the query returns; there's only one place reordering happens.
+
+### 4.7 Up next — 🚧 Partial (sidebar card)
+Shows the next 1–2 courses with a `target_date` set that aren't complete/skipped, soonest first. Since nothing in this app ever writes `target_date` (no Scheduler agent — see Section 8), this card is realistically empty for every learner today, showing: *"Please plan the timeline for your courses, or click Auto Schedule so we plan it for you."* **Auto Schedule** is a button with no logic behind it yet.
+
+### 4.8 Knowledge artifacts — 🚧 Partial (sidebar card)
+Header ("Knowledge artifacts" / "Generated by NotebookLM on completion") with **no list underneath** — deliberately. No knowledge-artifact data exists anywhere in this schema; nothing is faked here to look more finished than it is.
+
+### 4.9 Wrap-up — 🚧 Partial
+A **Wrap-up** button in each List-row's expanded panel. No questionnaire, no results, no data model yet — it's a placeholder until the wrap-up questionnaire itself is designed.
 
 **Acceptance criteria:**
-- [ ] A learner with `unassigned` status sees the empty state, never a broken/empty roadmap
-- [ ] Locked courses cannot be marked complete without either satisfying the prerequisite or explicitly skipping it
-- [ ] Skipped courses are visibly distinct from Complete/In progress/Not started
-- [ ] Knowledge artifacts only appear for completed courses
+- [x] A learner with zero enrolled tracks sees the empty state, never a broken roadmap
+- [x] Locked courses (Mind map) can't be worked around without Skip prerequisite
+- [x] Skipped and not-started are visibly distinct from Complete/In progress
+- [x] Reordering never crosses a stage boundary
+- [ ] Knowledge artifacts appear for completed courses *(no artifacts exist to appear — not started)*
+- [ ] Up next reflects a real scheduled plan *(shows the empty-state message for everyone — not started)*
 
 ---
 
-## 5. Feature: Manager Dashboard
+## 5. Feature: Manager Dashboard — ⬜ Not started
 
-**What:** A roll-up view of the whole team's progress, with drill-down into any individual.
-
-### 5.1 Team overview table
-- One row per team member: name, level, track, % complete, courses in progress, last activity
-- Learners with `unassigned` roadmap status show a "No roadmap yet" indicator instead of a % complete
-- Filterable by track (All / AI Track / AI + Core / Core Competency); sortable by % complete (asc/desc) or name
-
-### 5.2 Drill-down
-- Clicking a team member's row opens their full roadmap table (read-only version of the Learner Dashboard's roadmap view)
-
-### 5.3 Team summary stats
-- Stat cards: total learners, how many on each track, and similar at-a-glance counts
-
-### 5.4 Unmatched skills review
-- Surfaces skills flagged during the competency-model-upload matching process (Section 3) that couldn't be matched to a course, so a manager/admin can add a mapping without requiring the learner to re-upload
-
-### 5.5 Sync Courses control
-- The "Sync Courses" button and `last_synced_at` display (Section 2.2) live here, visible only to managers/admins
-
-**Acceptance criteria:**
-- [ ] Manager can filter/sort the team table without a page reload
-- [ ] Drilling into a team member shows their real roadmap data, read-only
-- [ ] Unmatched skills are visible and actionable (can be resolved without a re-upload)
+None of this exists: no team overview table, no per-learner drill-down, no team summary stats, no unmatched-skills review, no catalog-sync control. The "visible to your manager" language in the Skip prerequisite copy (4.5) describes what the *data* supports — `course_assignments.status` is recorded correctly and could be read by a manager view — not a screen that exists today.
 
 ---
 
-## 6. Feature: Course Planner & Progress Monitor (agent)
+## 6. Feature: Course Planner & Progress Monitor (agent) — ⬜ Not started
 
-**What:** Takes a learner's assigned roadmap (from catalog matches) and turns it into an ordered, sequenced plan with rough timing; tracks completion as courses finish.
-
-**Functional requirements:**
-- Reads: matched courses (from the upload/matching flow), `courses_ref` (for hours/metadata), existing `assignments`
-- Writes: `assignments` (sequence order, target start/end dates)
-- Re-plans when: a course is marked complete out of order, a target date is missed, or a new course is added to a learner's plan
-- Respects prerequisite relationships when sequencing (a course can't be sequenced before its prerequisite unless explicitly skipped)
-
-**Acceptance criteria:**
-- [ ] A freshly matched set of courses is turned into a sequenced `assignments` list with target dates
-- [ ] Marking a course complete updates `progress` and is reflected on the dashboard without manual intervention
-- [ ] A missed target date triggers a visible re-plan (exact re-plan behavior/thresholds to be defined in a follow-up spec)
+No agent reads a roadmap and sequences it. The only ordering a learner has control over is the manual drag-reorder within a stage (4.6); there's no automatic re-planning, no target-date generation, and completion tracking is the plain `course_assignments.status` writes described above — not an agent-driven process.
 
 ---
 
-## 7. Feature: Knowledge Builder (NotebookLM)
+## 7. Feature: Knowledge Builder (NotebookLM) — ⬜ Not started
 
-**What:** For each course a learner completes, generates a mind map, a concise summary, and a tailored exam.
-
-**Functional requirements:**
-- Triggered when a course's `progress.status` becomes `Complete`
-- Inputs: the course's source materials (link/content from `courses_ref`)
-- Outputs stored and linked back to the course: `mind_map_url`, `summary_url`, `exam_score`, `exam_completed_at` (in `knowledge_artifacts`)
-- Dashboard reads these to populate the Knowledge Artifacts section (Section 4.5)
-
-**Acceptance criteria:**
-- [ ] Completing a course triggers generation without manual steps
-- [ ] Generated artifacts are correctly linked to the specific user + course pair
-- [ ] Exam score is captured and displayed on the dashboard
+No generation pipeline, no `mind_map_url`/`summary_url`/`exam_score` fields, nothing triggered on course completion. The Knowledge artifacts card (4.8) is the only trace of this feature in the product today, and it's intentionally empty.
 
 ---
 
-## 8. Feature: Scheduler & Reminders (agent)
+## 8. Feature: Scheduler & Reminders (agent) — ⬜ Not started
 
-**What:** Turns the sequenced plan into calendar time and sends reminders, so learning gets a real slot in the week.
-
-**Functional requirements:**
-- Reads: `assignments` (sequence, target dates, est. hours)
-- Writes: Google Calendar events; `schedule_events` table (`calendar_event_id`, `scheduled_date`, `status`)
-- Reminder logic: sends a reminder ahead of a scheduled session (exact timing/channel TBD)
-- Handles missed sessions: flips `schedule_events.status` to `Missed` and signals the Planner agent to consider a re-plan
-
-**Acceptance criteria:**
-- [ ] A learner's sequenced plan results in real Google Calendar events
-- [ ] Reminders fire ahead of scheduled sessions
-- [ ] A missed session is detected and reflected in `schedule_events`, not silently ignored
+No Google Calendar integration, no reminder logic, no `schedule_events`/`reminders_log` tables. The Up next card and its Auto Schedule button (4.7) are the only UI for this feature; neither does anything yet.
 
 ---
 
-## 9. Data model (Supabase — full reference)
+## 9. Data model (Neon Postgres — what actually exists)
+
+All of these live in the same database as the rest of `vn-ai-ideas-hub` (see `schema.sql`), not a separate Supabase project.
 
 | Table | Purpose |
 |---|---|
-| `users` | Identity, assigned level/track, `roadmap_status` |
-| `courses_ref` | Cached mirror of the Sheet catalog (synced manually) |
-| `assignments` | A learner's sequenced plan (Planner agent output) |
-| `progress` | Per-course completion status per learner |
-| `knowledge_artifacts` | NotebookLM outputs per completed course |
-| `schedule_events` | Calendar events placed by the Scheduler agent |
-| `reminders_log` | Reminder history, for tuning timing/effectiveness |
-| `competency_uploads` | Record of each uploaded competency file |
-| `skill_course_map` | Hard-coded skill → course mapping used for auto-assignment |
-| `unmatched_skills` | Skills from an upload that couldn't be matched, pending review |
+| `accounts` | Existing app-wide identity table (not learning-specific) — username, email, role, etc. |
+| `user_role` | One seniority `position` per account: `intern` / `junior` / `middle` / `senior` / `principal` |
+| `tracks` | Reference list of tracks (`AI Track`, `Core Competency`) |
+| `account_tracks` | Many-to-many: which accounts are enrolled in which tracks |
+| `courses` | The catalog — see Section 2.1 for columns |
+| `course_assignments` | One row per (account, course): `status` (`not_started`/`in_progress`/`complete`/`skipped`), `target_date` (unused — nothing writes it), `position` (the learner's own drag-reorder within a tier) |
+
+**Not built, and not currently planned:** `courses_ref`, `assignments`, `progress`, `knowledge_artifacts`, `schedule_events`, `reminders_log`, `competency_uploads`, `skill_course_map`, `unmatched_skills`, any `roadmap_status` column. If the upload/matching flow (old Section 3) or the agent layer (Sections 6–8) get built later, expect new tables — don't assume these old names are what they'll be called.
 
 ---
 
 ## 10. Explicitly out of scope (current phase)
 
-- Fuzzy/AI-based skill-text matching (v1 is exact/normalized match only)
-- Manual editing of an auto-generated roadmap after creation
-- Re-uploading an updated competency model to refresh an existing roadmap
-- File formats other than `.xlsx` for the competency model upload
-- Scheduled (automatic) catalog sync — manual button only for now
-- Migrating the course catalog off Google Sheets (revisit if agent write-back at scale becomes necessary, or if Notion Enterprise access is later approved)
+- Anything under Sections 5–8 (Manager Dashboard, Planner agent, Knowledge Builder, Scheduler agent) — all unstarted, not merely deferred mid-build
+- Competency-model file upload and skill-matching (old Section 3) — replaced by simple self-serve track enrollment; not being built toward
+- Per-course prerequisite links (course A requires specifically course B) — only tier-level gating (all of tier N before tier N+1) is built; would need a new `course_prerequisites`-style table
+- A Google Sheets catalog-sync workflow — catalog edits are SQL migrations for now
+- Manager approval on joining a track, or per-role capacity limits
+- Real content behind Wrap-up, Up next, and Knowledge artifacts — all three are placeholder UI with no backing data or logic
