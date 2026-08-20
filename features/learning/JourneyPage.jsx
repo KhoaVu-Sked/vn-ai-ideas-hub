@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
+import Avatar from "@/components/Avatar";
 import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
@@ -302,6 +303,51 @@ function ViewToggle({ view, onChange }) {
   );
 }
 
+// Name, position badge, track tag(s) (one per enrolled track shown when the
+// dropdown is on "All tracks", just the one otherwise), and core-course
+// progress scoped to whatever the dropdown currently shows. "N/A" instead
+// of a progress bar when the account isn't enrolled in any track yet —
+// not just when the current filter happens to have zero core courses.
+function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTotal }) {
+  const pct = coreTotal ? Math.round((coreComplete / coreTotal) * 100) : 0;
+  return (
+    <section style={{ ...card, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <Avatar person={me} size={44} />
+        <div>
+          <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)" }}>{me.name || me.username}</div>
+          {(position || trackTags.length > 0) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              {position && (
+                <span style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: "#ece9fb", color: "#5c4ea3" }}>
+                  {POSITION_LABEL[position] || position}
+                </span>
+              )}
+              {trackTags.map((name) => (
+                <span key={name} style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: "#e8f0ff", color: "var(--blue)" }}>{name}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ minWidth: 220, textAlign: "right" }}>
+        {hasTracks ? (
+          <>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>
+              <strong style={{ color: "var(--ink)" }}>{coreComplete} of {coreTotal}</strong> core courses complete
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: "var(--bg)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: "var(--blue)", borderRadius: 999 }} />
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 13, color: "var(--muted)", fontWeight: 700 }}>N/A</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function JourneyPage() {
   const { user: me } = useSession();
   const [journey, setJourney] = useState([]);
@@ -313,10 +359,15 @@ export default function JourneyPage() {
   const [skipErr, setSkipErr] = useState("");
   const [resetting, setResetting] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState("all");
+  const [position, setPosition] = useState(null);
 
   const load = useCallback(async () => {
     setErr("");
-    try { const { courses } = await api("/api/journey"); setJourney(courses); } catch (e) { setErr(e.message); } finally { setReady(true); }
+    try {
+      const { courses, position: pos } = await api("/api/journey");
+      setJourney(courses);
+      setPosition(pos);
+    } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
 
   useEffect(() => { if (me) load(); }, [me, load]);
@@ -331,6 +382,12 @@ export default function JourneyPage() {
     if (selectedTrack !== "all" && !trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack("all");
   }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
   const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
+  // Core-course progress for the profile strip, scoped to whatever the
+  // track dropdown currently shows.
+  const coreCourses = filteredJourney.filter((c) => c.priority === "core");
+  const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
+  // "All tracks" shows a tag per enrolled track; one specific track shows just that one.
+  const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
   const resetJourney = async () => {
     if (!confirm("Reset your journey back to the original track? This clears all recorded progress and skips — every course reverts to not started (only Intern stays unlocked).")) return;
@@ -377,7 +434,16 @@ export default function JourneyPage() {
         {me === undefined || (me && !ready) ? (
           <Loading label="Loading your journey" />
         ) : (
-          <section style={card}>
+          <>
+            <ProfileStrip
+              me={me}
+              position={position}
+              trackTags={trackTags}
+              hasTracks={journey.length > 0}
+              coreComplete={coreComplete}
+              coreTotal={coreCourses.length}
+            />
+            <section style={card}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
               <div>
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 4 }}>
@@ -423,6 +489,7 @@ export default function JourneyPage() {
               <JourneyMindMap courses={filteredJourney} onRequestSkip={(c) => { setSkipErr(""); setSkipTarget(c); }} />
             )}
           </section>
+          </>
         )}
       </main>
 

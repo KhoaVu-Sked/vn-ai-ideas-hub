@@ -50,7 +50,7 @@ export async function getTrackWithCourses(trackId, accountId) {
 export async function getJourney(accountId) {
   return sql`
     select c.id, c.title, c.stage, c.platform, c.est_hours, c.link, c.outcome,
-      c.expected_by_position,
+      c.expected_by_position, c.priority,
       t.id as track_id, t.name as track_name,
       coalesce(ca.status, 'not_started') as status, ca.target_date
     from account_tracks acct
@@ -65,6 +65,14 @@ export async function getJourney(accountId) {
       end,
       coalesce(ca.position, 2147483647), t.name asc, c.stage asc, c.created_at asc
   `;
+}
+
+// The account's own seniority level (user_role.position), for the Journey
+// page's profile strip — null if no row exists yet (nothing back-fills this
+// for existing accounts, per migration 020's own comment).
+export async function getUserPosition(accountId) {
+  const rows = await sql`select position from user_role where account_id = ${accountId}`;
+  return rows[0]?.position || null;
 }
 
 // Reorder the courses within one position tier, for this account only —
