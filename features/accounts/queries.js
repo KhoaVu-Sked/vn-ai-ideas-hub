@@ -36,7 +36,7 @@ export async function createAccount({ username, email, name, password_hash, role
       ),
       pos as (
         insert into user_role (account_id, position)
-        select acc.id, ${pos} from acc where ${pos} is not null
+        select acc.id, ${pos} from acc where ${pos}::text is not null
       )
       select acc.*, ${pos}::text as position from acc
     `;
@@ -59,7 +59,7 @@ export async function updateAccount(id, { username, email, name, role, position 
       ),
       pos as (
         insert into user_role (account_id, position)
-        select upd.id, ${pos} from upd where ${pos} is not null
+        select upd.id, ${pos} from upd where ${pos}::text is not null
         on conflict (account_id) do update set position = excluded.position, updated_at = now()
       )
       select upd.*, ur.position
