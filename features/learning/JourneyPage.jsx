@@ -244,6 +244,7 @@ export default function JourneyPage() {
   const [skipTarget, setSkipTarget] = useState(null);
   const [skipping, setSkipping] = useState(false);
   const [skipErr, setSkipErr] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   const load = useCallback(async () => {
     setErr("");
@@ -252,6 +253,20 @@ export default function JourneyPage() {
 
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
+
+  const resetJourney = async () => {
+    if (!confirm("Reset your journey back to the original track? This clears all recorded progress and skips — every course reverts to not started (only Intern stays unlocked).")) return;
+    setResetting(true);
+    setErr("");
+    try {
+      await api("/api/journey/reset", { method: "POST" });
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   // Completes every course in the tier below the clicked one, not just that
   // course — so a full reload rather than a single-row patch.
@@ -282,7 +297,19 @@ export default function JourneyPage() {
                 <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Your Journey</h1>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>Ordered intern → principal, across every track you're enrolled in.</p>
               </div>
-              {journey.length > 0 && <ViewToggle view={view} onChange={setView} />}
+              {journey.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    onClick={resetJourney}
+                    disabled={resetting}
+                    title="Clear all recorded progress and skips"
+                    style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 14px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--muted)", cursor: resetting ? "wait" : "pointer", whiteSpace: "nowrap" }}
+                  >
+                    {resetting ? "Resetting…" : "Reset"}
+                  </button>
+                  <ViewToggle view={view} onChange={setView} />
+                </div>
+              )}
             </div>
             {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
             {journey.length === 0 ? (

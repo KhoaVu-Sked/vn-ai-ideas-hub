@@ -107,6 +107,16 @@ export async function skipPrerequisiteFor(courseId, accountId) {
   return { updated: rows.length };
 }
 
+// Reset a journey: deletes every course_assignments row for this account, so
+// every course reverts to its default 'not_started' (coalesce in the reads
+// above). With nothing recorded, only the Intern tier's gate is open — that
+// tier has no tier below it — so everything past it shows Locked again,
+// exactly the track's original state.
+export async function resetJourney(accountId) {
+  const rows = await sql`delete from course_assignments where account_id = ${accountId} returning course_id`;
+  return { reset: rows.length };
+}
+
 // Toggle "I'm on this track" — same delete-first-else-insert idiom as
 // toggleFollow in features/ideas/queries.js.
 export async function toggleTrackAssignment(trackId, accountId) {
