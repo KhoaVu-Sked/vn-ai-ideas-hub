@@ -1,5 +1,4 @@
-// AI Learning: tracks + their course roadmap. Read-only for now — nothing
-// writes course_assignments yet (that's the Planner agent's job later).
+// AI Learning: tracks + their course roadmap.
 
 import { sql } from "@/lib/sql";
 
@@ -65,6 +64,20 @@ export async function getJourney(accountId) {
       end,
       t.name asc, c.stage asc, c.created_at asc
   `;
+}
+
+// Mark one course 'skipped' for this account — used when the previous
+// position tier isn't complete yet and the learner chooses to move on
+// anyway. Recorded like any other status (course_assignments.status), so
+// it's the same data a manager view would read.
+export async function skipCourse(courseId, accountId) {
+  const rows = await sql`
+    insert into course_assignments (account_id, course_id, status)
+    values (${accountId}, ${courseId}, 'skipped')
+    on conflict (account_id, course_id) do update set status = 'skipped', updated_at = now()
+    returning status
+  `;
+  return { status: rows[0].status };
 }
 
 // Toggle "I'm on this track" — same delete-first-else-insert idiom as
