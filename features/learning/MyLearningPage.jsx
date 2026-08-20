@@ -1,7 +1,7 @@
 "use client";
 
-// My Learning: pick a track, preview its roadmap. Read-only — nothing here
-// assigns a track to an account or writes progress yet.
+// My Learning: pick a track, preview its roadmap, get assigned to it.
+// Course-level progress (course_assignments) still isn't written anywhere.
 
 import { useCallback, useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
@@ -36,7 +36,10 @@ function TrackCard({ track, onPreview }) {
       <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--blue)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 14 }}>
         {track.name.slice(0, 1)}
       </div>
-      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)" }}>{track.name}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)" }}>{track.name}</div>
+        {track.assigned && <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "2px 8px", background: "#e6f4ea", color: "#1f7a3c" }}>Enrolled</span>}
+      </div>
       <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{track.course_count} course{track.course_count === 1 ? "" : "s"}</div>
       <div style={{ fontSize: 12.5, color: "var(--blue)", fontWeight: 700, marginTop: 4 }}>Preview roadmap →</div>
     </button>
@@ -70,10 +73,11 @@ function CourseRow({ course, index }) {
   );
 }
 
-function TrackPreview({ trackId, onClose }) {
+function TrackPreview({ trackId, onClose, onAssignedChange }) {
   const [track, setTrack] = useState(null);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -83,6 +87,19 @@ function TrackPreview({ trackId, onClose }) {
       .catch((e) => { if (live) { setErr(e.message); setReady(true); } });
     return () => { live = false; };
   }, [trackId]);
+
+  const toggleAssign = async () => {
+    setAssigning(true);
+    try {
+      const { assigned } = await api(`/api/tracks/${trackId}/assignment`, { method: "POST" });
+      setTrack((t) => ({ ...t, assigned }));
+      onAssignedChange(trackId, assigned);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const stages = track ? [...new Set(track.courses.map((c) => c.stage || "Other"))] : [];
   let running = 0;
@@ -100,7 +117,24 @@ function TrackPreview({ trackId, onClose }) {
               {track ? `Ordered by stage · ${track.courses.length} course${track.courses.length === 1 ? "" : "s"}` : " "}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--muted)", lineHeight: 1, padding: 4 }} aria-label="Close">×</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {track && (
+              <button
+                onClick={toggleAssign}
+                disabled={assigning}
+                title={track.assigned ? "Click to unenroll from this track" : "Enroll yourself in this track"}
+                style={{
+                  border: track.assigned ? "1px solid #bfe3c9" : "none", borderRadius: 8, padding: "8px 16px",
+                  fontSize: 13, fontWeight: 700, cursor: assigning ? "wait" : "pointer",
+                  background: track.assigned ? "#e6f4ea" : "var(--blue)", color: track.assigned ? "#1f7a3c" : "#fff",
+                  opacity: assigning ? 0.7 : 1, whiteSpace: "nowrap",
+                }}
+              >
+                {assigning ? "…" : track.assigned ? "Enrolled ✓" : "Enroll"}
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--muted)", lineHeight: 1, padding: 4 }} aria-label="Close">×</button>
+          </div>
         </div>
 
         <div style={{ padding: "22px 26px", maxHeight: "70vh", overflowY: "auto" }}>
@@ -153,7 +187,7 @@ export default function MyLearningPage() {
         ) : (
           <section style={card}>
             <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Suggested tracks</h1>
-            <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 18px" }}>Pick a track to preview its roadmap. Assigning yourself to one is coming later.</p>
+            <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 18px" }}>Pick a track to preview its roadmap, and enroll when you're ready to start it.</p>
             {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
             {tracks.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>No tracks yet.</div>
@@ -166,7 +200,13 @@ export default function MyLearningPage() {
         )}
       </main>
 
-      {previewId && <TrackPreview trackId={previewId} onClose={() => setPreviewId(null)} />}
+      {previewId && (
+        <TrackPreview
+          trackId={previewId}
+          onClose={() => setPreviewId(null)}
+          onAssignedChange={(id, assigned) => setTracks((ts) => ts.map((t) => (t.id === id ? { ...t, assigned } : t)))}
+        />
+      )}
     </div>
   );
 }

@@ -5,8 +5,8 @@ import { requireUser } from "@/features/auth/guard";
 // GET /api/tracks → suggested-tracks cards for My Learning (list only)
 export async function GET() {
   try {
-    await requireUser();
-    return Response.json({ tracks: await listTracks() });
+    const user = await requireUser();
+    return Response.json({ tracks: await listTracks(user.uid) });
   } catch (e) {
     return jsonError(e, "Could not load tracks.");
   }

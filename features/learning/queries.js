@@ -3,10 +3,12 @@
 
 import { sql } from "@/lib/sql";
 
-// Suggested-tracks cards on My Learning — name + how many courses each holds.
-export async function listTracks() {
+// Suggested-tracks cards on My Learning — name, course count, and whether
+// this account is already assigned to it.
+export async function listTracks(accountId) {
   return sql`
-    select t.id, t.name, count(c.id)::int as course_count
+    select t.id, t.name, count(c.id)::int as course_count,
+      exists(select 1 from account_tracks at2 where at2.track_id = t.id and at2.account_id = ${accountId}) as assigned
     from tracks t
     left join courses c on c.track_id = t.id
     group by t.id, t.name
@@ -16,11 +18,13 @@ export async function listTracks() {
 
 // One track's roadmap: its courses (ordered by stage, then when they were
 // added) plus the given account's own status per course, defaulting to
-// 'not_started' where no course_assignments row exists yet. One round trip —
-// json_agg folds the course list into the same query as the track lookup.
+// 'not_started' where no course_assignments row exists yet, plus whether the
+// account is assigned to the track itself. One round trip — json_agg folds
+// the course list into the same query as the track lookup.
 export async function getTrackWithCourses(trackId, accountId) {
   const rows = await sql`
     select t.id, t.name,
+      exists(select 1 from account_tracks at2 where at2.track_id = t.id and at2.account_id = ${accountId}) as assigned,
       coalesce(json_agg(
         json_build_object(
           'id', c.id, 'stage', c.stage, 'title', c.title, 'focus_area', c.focus_area,
@@ -36,4 +40,20 @@ export async function getTrackWithCourses(trackId, accountId) {
     group by t.id, t.name
   `;
   return rows[0] || null;
+}
+
+// Toggle "I'm on this track" — same delete-first-else-insert idiom as
+// toggleFollow in features/ideas/queries.js.
+export async function toggleTrackAssignment(trackId, accountId) {
+  const rows = await sql`
+    with del as (
+      delete from account_tracks where track_id = ${trackId} and account_id = ${accountId} returning 1
+    ), ins as (
+      insert into account_tracks (track_id, account_id)
+      select ${trackId}::uuid, ${accountId}::uuid where not exists (select 1 from del)
+      returning 1
+    )
+    select (select count(*) from ins)::int as inserted
+  `;
+  return { assigned: rows[0].inserted > 0 };
 }
