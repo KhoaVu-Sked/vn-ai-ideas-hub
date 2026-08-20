@@ -189,6 +189,35 @@ a {
   to   { opacity: 1; transform: none; }
 }
 
+/* ── Icon-only button hint ────────────────────────────────────────
+   For icon buttons with no visible label (e.g. Up next's edit/sync/
+   Auto Schedule). Content comes from data-tip so no extra markup is
+   needed; native `title` isn't used alongside this to avoid a second,
+   slower browser tooltip stacking on top. */
+.icon-tip { position: relative; }
+.icon-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 30;
+}
+.icon-tip:hover::after,
+.icon-tip:focus-visible::after {
+  opacity: 1;
+}
+
 /* ── Task drawer ──────────────────────────────────────────────────
    The panel comes in from the right edge it is anchored to, so the
    motion matches where it lives. The scrim only fades — sliding it

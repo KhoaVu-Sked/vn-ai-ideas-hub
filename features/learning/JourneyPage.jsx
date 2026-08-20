@@ -373,14 +373,18 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <button
-            title="Auto Schedule — coming soon"
+            className="icon-tip"
+            data-tip="Auto Schedule — coming soon"
+            aria-label="Auto Schedule — coming soon"
             style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: "pointer" }}
           >
             🪄
           </button>
           <button
             onClick={() => setEditing(true)}
-            title="Suggest a target date for these courses"
+            className="icon-tip"
+            data-tip="Suggest a target date for these courses"
+            aria-label="Suggest a target date for these courses"
             style={{ border: "1px solid var(--line)", background: editing ? "var(--bg)" : "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: "pointer" }}
           >
             ✏️
@@ -388,7 +392,9 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
           {editing && (
             <button
               onClick={() => setEditing(false)}
-              title="Done"
+              className="icon-tip"
+              data-tip="Done editing"
+              aria-label="Done editing"
               style={{ border: "1px solid #bfe3c9", background: "#e6f4ea", color: "#1f7a3c", borderRadius: 6, width: 26, height: 26, fontSize: 13, lineHeight: 1, cursor: "pointer" }}
             >
               ✓
@@ -397,7 +403,9 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
           <button
             onClick={onSync}
             disabled={syncing}
-            title="Refresh which courses show here"
+            className="icon-tip"
+            data-tip="Refresh which courses show here"
+            aria-label="Refresh which courses show here"
             style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.6 : 1 }}
           >
             🔄
