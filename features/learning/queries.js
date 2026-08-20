@@ -50,6 +50,7 @@ export async function getTrackWithCourses(trackId, accountId) {
 export async function getJourney(accountId) {
   return sql`
     select c.id, c.title, c.stage, c.platform, c.est_hours, c.link, c.outcome,
+      c.expected_by_position,
       t.id as track_id, t.name as track_name,
       coalesce(ca.status, 'not_started') as status, ca.target_date
     from account_tracks acct
@@ -57,7 +58,12 @@ export async function getJourney(accountId) {
     join courses c on c.track_id = t.id
     left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
     where acct.account_id = ${accountId}
-    order by t.name asc, c.stage asc, c.created_at asc
+    order by
+      case c.expected_by_position
+        when 'intern' then 0 when 'junior' then 1 when 'middle' then 2
+        when 'senior' then 3 when 'principal' then 4 else 5
+      end,
+      t.name asc, c.stage asc, c.created_at asc
   `;
 }
 

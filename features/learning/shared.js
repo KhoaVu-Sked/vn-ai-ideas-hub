@@ -10,6 +10,7 @@ export const STATUS_META = {
   skipped: { label: "Skipped", bg: "#fff4e0", color: "#a15c00" },
 };
 export const POSITION_LABEL = { intern: "Intern", junior: "Junior", middle: "Mid level", senior: "Senior", principal: "Principal" };
+export const POSITION_ORDER = ["intern", "junior", "middle", "senior", "principal"];
 export const th = { padding: "6px 8px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 };
 export const td = { padding: "10px 8px", fontSize: 12.5, color: "var(--body)" };
 
