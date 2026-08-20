@@ -444,12 +444,9 @@ from (values
   ('L2 — Intermediate', 'Connecting AI to tools & data (concept)', 'Introduction to Model Context Protocol (MCP)', 'Anthropic Academy', 'core', 2.0, 'Free', 'Understand how agents connect to external tools and data sources.', 'middle', 'https://anthropic.skilljar.com/introduction-to-model-context-protocol'),
   ('L2 — Intermediate', 'Gemini fluency + Google AI Studio', 'Generative AI with Gemini and Google AI Studio for Beginners', 'Udemy Business', 'core', 6.0, 'Udemy Business', 'Deepen Gemini fluency (Gems, Deep Research, NotebookLM) and build a custom AI tool in Google AI Studio (bridges to L3).', 'senior', 'https://skedulo.udemy.com/course/google-bard-the-ultimate-guide-master-generative-ai/'),
   ('L3 — Advanced (Technical)', 'Claude API & tool use', 'Build with Claude (API)', 'Anthropic Academy', 'core', 6.0, 'Free', 'Call the Claude API and implement tool use in code.', 'principal', 'https://anthropic.skilljar.com/claude-with-the-anthropic-api'),
-  ('L3 — Advanced (Technical)', 'Build connectors (MCP development)', 'Model Context Protocol — build servers', 'Anthropic Academy', 'core', 6.0, 'Free', 'Build MCP servers so agents can use your tools and data.', 'principal', 'https://anthropic.skilljar.com/model-context-protocol-advanced-topics'),
   ('L3 — Advanced (Technical)', 'Coding with an AI agent', 'Claude Code 101', 'Anthropic Academy', 'core', 3.0, 'Free', 'Use Claude Code for real coding tasks (Explore -> Plan -> Code).', 'principal', 'https://anthropic.skilljar.com/claude-code-101'),
   ('L3 — Advanced (Technical)', 'Advanced agentic coding', 'Claude Code in Action', 'Anthropic Academy', 'core', 4.0, 'Free', 'Apply Claude Code to larger, multi-step workflows.', 'principal', 'https://anthropic.skilljar.com/claude-code-in-action'),
-  ('L3 — Advanced (Technical)', 'AI pair programming with GitHub Copilot (Enterprise)', 'GitHub Copilot Fundamentals (learning path, Part 1 & 2)', 'Microsoft Learn / GitHub', 'core', 8.0, 'Free (Copilot Enterprise)', 'Use GitHub Copilot across the SDLC: chat, agent mode, Copilot Cloud Agent, and the GitHub MCP server in an enterprise setup.', 'principal', 'https://learn.microsoft.com/en-us/training/paths/copilot/'),
   ('L3 — Advanced (Technical)', 'Multi-agent / subagent design (hands-on)', 'Introduction to subagents (applied)', 'Anthropic Academy', 'core', 3.0, 'Free', 'Design multi-agent systems that delegate and coordinate work.', 'principal', 'https://anthropic.skilljar.com/introduction-to-subagents'),
-  ('L3 — Advanced (Technical)', 'Capstone: build an LLM app', 'Generative AI + LLM App Development Bootcamp (opt. LangChain)', 'Udemy Business', 'core', 30.0, 'Udemy Business', 'Design and ship an agent / LLM application end-to-end.', 'principal', 'https://skedulo.udemy.com/course/bootcamp-generative-artificial-intelligence-and-llm-app-development/')
 ) as v(stage, focus_area, title, platform, priority, est_hours, cost, outcome, expected_by_position, link)
 on conflict (track_id, title) do nothing;
 
@@ -477,10 +474,3 @@ alter table requests alter column state_changed_at set default now();
 alter table requests alter column state_changed_at set not null;
 alter table requests drop column if exists start_date;
 alter table requests drop column if exists due_date;
-
--- ── migration 021: correct user_role.position values ──
-update user_role set position = 'principal', updated_at = now()
-where position = 'manager';
-alter table user_role drop constraint if exists user_role_position_check;
-alter table user_role add constraint user_role_position_check
-  check (position in ('intern', 'junior', 'middle', 'senior', 'principal'));
