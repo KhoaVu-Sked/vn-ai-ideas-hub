@@ -2,11 +2,13 @@
 
 // Your Journey: every course across the tracks you're enrolled in.
 // List view: ordered intern -> principal, scrolled after ~7 rows.
-// Mind map view: columns by expected_by_position, connected node-to-node in
-// list order within a column. A course is Locked until every course in the
-// tier below it is complete or skipped — a tier gate, not a per-course
-// prerequisite graph (this app has no course-to-course dependency data).
-// Skipping a locked course records status='skipped' on course_assignments.
+// Mind map view: columns by expected_by_position, each node explicitly
+// linked to the next in list order within a column. A course is Locked
+// until every course in the tier below it is complete or skipped — a tier
+// gate, not a per-course prerequisite graph (this app has no course-to-
+// course dependency data). "Skip prerequisite" on a locked course doesn't
+// mark that course itself — it completes every course in the tier below
+// it, which is what actually satisfies the gate and unlocks its whole tier.
 
 import { useCallback, useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
@@ -125,21 +127,29 @@ function MindMapNode({ course, index, locked, onRequestSkip }) {
   );
 }
 
-// A rail (vertical line + dot per node) connects nodes top-to-bottom within
-// a column, in list order — the only "sequence" this data actually has.
+// Each node explicitly links to the next in list order — course 1 -> course
+// 2 -> course 3 — via a dot-line-arrow-dot connector, the only "sequence"
+// this data actually has (no per-course prerequisite links exist).
 function NodeRail({ courses, locked, onRequestSkip }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       {courses.map((c, i) => (
-        <div key={c.id} style={{ display: "flex", gap: 10 }}>
-          <div style={{ width: 12, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-            {i > 0 && <div style={{ width: 2, flex: 1, minHeight: 10, background: "var(--line)" }} />}
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: locked.get(c.id) ? "#c9d3e6" : "var(--blue)", flexShrink: 0, margin: "4px 0" }} />
-            {i < courses.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 10, background: "var(--line)" }} />}
+        <div key={c.id}>
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: locked.get(c.id) ? "#c9d3e6" : "var(--blue)", flexShrink: 0, marginTop: 6 }} />
+            <div style={{ flex: 1 }}>
+              <MindMapNode course={c} index={i + 1} locked={locked.get(c.id)} onRequestSkip={onRequestSkip} />
+            </div>
           </div>
-          <div style={{ flex: 1, paddingBottom: 10 }}>
-            <MindMapNode course={c} index={i + 1} locked={locked.get(c.id)} onRequestSkip={onRequestSkip} />
-          </div>
+          {i < courses.length - 1 && (
+            <div style={{ display: "flex", justifyContent: "flex-start", width: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 8 }}>
+                <div style={{ width: 2, height: 10, background: "var(--line)" }} />
+                <div style={{ fontSize: 11, color: "var(--faint)", lineHeight: 1 }}>↓</div>
+                <div style={{ width: 2, height: 10, background: "var(--line)" }} />
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -242,12 +252,14 @@ export default function JourneyPage() {
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
 
+  // Completes every course in the tier below the clicked one, not just that
+  // course — so a full reload rather than a single-row patch.
   const confirmSkip = async () => {
     setSkipping(true);
     setSkipErr("");
     try {
-      const { status } = await api(`/api/courses/${skipTarget.id}/skip`, { method: "POST" });
-      setJourney((cs) => cs.map((c) => (c.id === skipTarget.id ? { ...c, status } : c)));
+      await api(`/api/courses/${skipTarget.id}/skip`, { method: "POST" });
+      await load();
       setSkipTarget(null);
     } catch (e) {
       setSkipErr(e.message);

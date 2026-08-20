@@ -66,18 +66,40 @@ export async function getJourney(accountId) {
   `;
 }
 
-// Mark one course 'skipped' for this account — used when the previous
-// position tier isn't complete yet and the learner chooses to move on
-// anyway. Recorded like any other status (course_assignments.status), so
-// it's the same data a manager view would read.
-export async function skipCourse(courseId, accountId) {
+// "Skip prerequisite" on a locked course: rather than marking that one
+// course skipped, this marks EVERY course in the position tier below it
+// 'complete' for this account (across all its enrolled tracks) — which is
+// what actually satisfies the tier gate in computeLocks and unlocks the
+// whole tier the clicked course belongs to, not just that one course.
+// Recorded on course_assignments like any other status, so it's the same
+// data a manager view would read.
+export async function skipPrerequisiteFor(courseId, accountId) {
   const rows = await sql`
+    with target as (
+      select expected_by_position from courses where id = ${courseId}
+    ),
+    prev_position as (
+      select case (select expected_by_position from target)
+        when 'junior' then 'intern'
+        when 'middle' then 'junior'
+        when 'senior' then 'middle'
+        when 'principal' then 'senior'
+        else null
+      end as position
+    ),
+    prev_courses as (
+      select distinct c.id
+      from account_tracks acct
+      join courses c on c.track_id = acct.track_id
+      where acct.account_id = ${accountId}
+        and c.expected_by_position = (select position from prev_position)
+    )
     insert into course_assignments (account_id, course_id, status)
-    values (${accountId}, ${courseId}, 'skipped')
-    on conflict (account_id, course_id) do update set status = 'skipped', updated_at = now()
-    returning status
+    select ${accountId}::uuid, id, 'complete' from prev_courses
+    on conflict (account_id, course_id) do update set status = 'complete', updated_at = now()
+    returning course_id
   `;
-  return { status: rows[0].status };
+  return { completed: rows.length };
 }
 
 // Toggle "I'm on this track" — same delete-first-else-insert idiom as
