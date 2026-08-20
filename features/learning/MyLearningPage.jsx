@@ -178,6 +178,8 @@ export default function MyLearningPage() {
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
 
+  const enrolledTracks = tracks.filter((t) => t.assigned);
+
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <AppHeader crumb="My Learning" />
@@ -185,18 +187,32 @@ export default function MyLearningPage() {
         {me === undefined || (me && !ready) ? (
           <Loading label="Loading tracks" />
         ) : (
-          <section style={card}>
-            <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Suggested tracks</h1>
-            <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 18px" }}>Pick a track to preview its roadmap, and enroll when you're ready to start it.</p>
-            {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
-            {tracks.length === 0 ? (
-              <div style={{ fontSize: 13, color: "var(--muted)" }}>No tracks yet.</div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
-                {tracks.map((t) => <TrackCard key={t.id} track={t} onPreview={setPreviewId} />)}
-              </div>
-            )}
-          </section>
+          <>
+            <section style={{ ...card, marginBottom: 18 }}>
+              <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Your tracks</h1>
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 18px" }}>Tracks you're enrolled in.</p>
+              {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
+              {enrolledTracks.length === 0 ? (
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>You don't have any tracks yet.</div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+                  {enrolledTracks.map((t) => <TrackCard key={t.id} track={t} onPreview={setPreviewId} />)}
+                </div>
+              )}
+            </section>
+
+            <section style={card}>
+              <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Suggested tracks</h1>
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 18px" }}>Pick a track to preview its roadmap, and enroll when you're ready to start it.</p>
+              {tracks.length === 0 ? (
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>No tracks yet.</div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+                  {tracks.map((t) => <TrackCard key={t.id} track={t} onPreview={setPreviewId} />)}
+                </div>
+              )}
+            </section>
+          </>
         )}
       </main>
 
