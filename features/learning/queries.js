@@ -102,6 +102,20 @@ export async function reorderStage(accountId, position, courseIds) {
   return { reordered: rows.length };
 }
 
+// Set (or clear, with target_date = null) a learner's own suggested target
+// date for a course — a suggestion, not an enforced deadline, so nothing
+// here checks status or locking. Past-date rejection happens in the route
+// (server's own "today"), not here.
+export async function setTargetDate(accountId, courseId, targetDate) {
+  const rows = await sql`
+    insert into course_assignments (account_id, course_id, target_date)
+    values (${accountId}, ${courseId}, ${targetDate})
+    on conflict (account_id, course_id) do update set target_date = excluded.target_date, updated_at = now()
+    returning target_date
+  `;
+  return { target_date: rows[0].target_date };
+}
+
 // "Skip prerequisite" on a locked course: rather than marking that one
 // course skipped, this marks EVERY course in the position tier below it
 // 'skipped' for this account (across all its enrolled tracks) — which is

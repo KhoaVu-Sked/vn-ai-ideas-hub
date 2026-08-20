@@ -348,16 +348,21 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
   );
 }
 
-// The next 1-2 courses with a target_date, not yet complete/skipped, in
-// date order. target_date is only ever set once something writes it —
-// nothing does yet (no Scheduler agent), so this is realistically empty
-// for everyone until that exists; "Auto Schedule" has no real logic behind
-// it yet either, it's a placeholder like the List view's Wrap-up button.
-function UpNextCard({ courses }) {
-  const upcoming = courses
-    .filter((c) => c.target_date && c.status !== "complete" && c.status !== "skipped")
-    .sort((a, b) => new Date(a.target_date) - new Date(b.target_date))
-    .slice(0, 2);
+// The next 2 courses, not yet complete/skipped: dated ones first (soonest
+// target_date first), then undated ones filling any remaining slots in the
+// roadmap's own order (courses arrives already sorted intern -> principal,
+// tier order, track/stage/created_at — that's the "order" fallback).
+// target_date is a suggestion the learner sets themselves via the edit
+// icon here, never an enforced deadline — editable anytime, no locking
+// check. Sync re-fetches in case editing elsewhere changed what qualifies.
+function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
+  const [editing, setEditing] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const eligible = courses.filter((c) => c.status !== "complete" && c.status !== "skipped");
+  const dated = eligible.filter((c) => c.target_date).sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
+  const undated = eligible.filter((c) => !c.target_date);
+  const upcoming = [...dated, ...undated].slice(0, 2);
 
   return (
     <section style={card}>
@@ -366,13 +371,27 @@ function UpNextCard({ courses }) {
           <span style={{ fontSize: 15 }}>📅</span>
           <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: 0 }}>Up next</h2>
         </div>
-        <button style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, color: "var(--blue)", cursor: "pointer", whiteSpace: "nowrap" }}>
-          Auto Schedule
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <button
+            onClick={() => setEditing((e) => !e)}
+            title="Suggest a target date for these courses"
+            style={{ border: "1px solid var(--line)", background: editing ? "var(--bg)" : "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: "pointer" }}
+          >
+            ✏️
+          </button>
+          <button
+            onClick={onSync}
+            disabled={syncing}
+            title="Refresh which courses show here"
+            style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.6 : 1 }}
+          >
+            🔄
+          </button>
+        </div>
       </div>
       {upcoming.length === 0 ? (
         <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0, lineHeight: 1.5 }}>
-          Please plan the timeline for your courses, or click Auto Schedule so we plan it for you.
+          Nothing left to plan — every course is complete or skipped.
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -383,7 +402,19 @@ function UpNextCard({ courses }) {
                 <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)", marginBottom: 6 }}>{c.title}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: status.bg, color: status.color, whiteSpace: "nowrap" }}>{status.label}</span>
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>Target {fmtDate(c.target_date)}{c.est_hours != null ? ` · ${c.est_hours} hrs` : ""}</span>
+                  {editing ? (
+                    <input
+                      type="date"
+                      min={today}
+                      value={c.target_date ? String(c.target_date).slice(0, 10) : ""}
+                      onChange={(e) => onSetTargetDate(c.id, e.target.value || null)}
+                      style={{ border: "1px solid var(--line)", borderRadius: 6, padding: "3px 6px", fontSize: 11.5, color: "var(--ink)" }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                      {c.target_date ? `Target ${fmtDate(c.target_date)}` : "No target set"}{c.est_hours != null ? ` · ${c.est_hours} hrs` : ""}
+                    </span>
+                  )}
                 </div>
               </div>
             );
@@ -417,6 +448,7 @@ export default function JourneyPage() {
   const [resetting, setResetting] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState("all");
   const [position, setPosition] = useState(null);
+  const [syncingUpNext, setSyncingUpNext] = useState(false);
 
   const load = useCallback(async () => {
     setErr("");
@@ -466,6 +498,19 @@ export default function JourneyPage() {
   const reorderStage = (position, courseIds) => {
     api("/api/journey/reorder", { method: "POST", body: JSON.stringify({ position, courseIds }) })
       .catch((e) => setErr(e.message));
+  };
+
+  // Optimistic — updates immediately so the date input doesn't feel laggy;
+  // resyncs from the server on failure rather than leaving a stale value.
+  const setCourseTarget = (courseId, dateStr) => {
+    setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, target_date: dateStr } : c)));
+    api(`/api/courses/${courseId}/target`, { method: "POST", body: JSON.stringify({ target_date: dateStr }) })
+      .catch((e) => { setErr(e.message); load(); });
+  };
+
+  const syncUpNext = async () => {
+    setSyncingUpNext(true);
+    try { await load(); } finally { setSyncingUpNext(false); }
   };
 
   // Completes every course in the tier below the clicked one, not just that
@@ -549,7 +594,7 @@ export default function JourneyPage() {
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
-            <UpNextCard courses={filteredJourney} />
+            <UpNextCard courses={filteredJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} />
             <KnowledgeArtifactsCard />
           </div>
           </div>
