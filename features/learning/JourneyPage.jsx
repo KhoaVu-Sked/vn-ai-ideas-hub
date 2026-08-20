@@ -166,12 +166,12 @@ function MindMapNode({ course, index, locked, onRequestSkip }) {
       border: locked ? "1px dashed #c9d3e6" : "1px solid var(--line)", borderRadius: 10, padding: "10px 12px",
       background: locked ? "var(--bg)" : "var(--card)", display: "flex", flexDirection: "column", gap: 6, opacity: locked ? 0.85 : 1,
     }}>
-      <div style={{ fontWeight: 700, fontSize: 13, color: locked ? "var(--muted)" : "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11, color: "var(--faint)", flexShrink: 0 }}>{index}</span>
+      <div style={{ fontWeight: 700, fontSize: 13, color: locked ? "var(--muted)" : "var(--ink)", display: "flex", alignItems: "flex-start", gap: 6 }} title={course.title}>
+        <span style={{ fontSize: 11, color: "var(--faint)", flexShrink: 0, marginTop: 1 }}>{index}</span>
         {course.status === "complete" && (
-          <span style={{ width: 16, height: 16, borderRadius: "50%", background: "#1f7a3c", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>✓</span>
+          <span style={{ width: 16, height: 16, borderRadius: "50%", background: "#1f7a3c", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>✓</span>
         )}
-        <span>{course.title}</span>
+        <span>{course.outcome || course.title}</span>
       </div>
       <div style={{ fontSize: 11, color: "var(--muted)" }}>{course.track_name}{course.platform ? ` · ${course.platform}` : ""}</div>
       <span style={{ alignSelf: "flex-start", fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "2px 9px", background: status.bg, color: status.color }}>{status.label}</span>
