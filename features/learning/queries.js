@@ -42,6 +42,25 @@ export async function getTrackWithCourses(trackId, accountId) {
   return rows[0] || null;
 }
 
+// Your Journey: every course across every track the account is enrolled in
+// (via account_tracks), flattened into one list — ordered by track, then
+// stage, then when the course was added. No real cross-track sequence exists
+// yet, so this is the closest honest ordering; target_date is only ever
+// non-null once something actually writes course_assignments.
+export async function getJourney(accountId) {
+  return sql`
+    select c.id, c.title, c.stage, c.platform, c.est_hours, c.link, c.outcome,
+      t.id as track_id, t.name as track_name,
+      coalesce(ca.status, 'not_started') as status, ca.target_date
+    from account_tracks acct
+    join tracks t on t.id = acct.track_id
+    join courses c on c.track_id = t.id
+    left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
+    where acct.account_id = ${accountId}
+    order by t.name asc, c.stage asc, c.created_at asc
+  `;
+}
+
 // Toggle "I'm on this track" — same delete-first-else-insert idiom as
 // toggleFollow in features/ideas/queries.js.
 export async function toggleTrackAssignment(trackId, accountId) {
