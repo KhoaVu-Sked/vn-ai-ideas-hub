@@ -68,18 +68,19 @@ export async function getJourney(accountId) {
 
 // "Skip prerequisite" on a locked course: rather than marking that one
 // course skipped, this marks EVERY course in the position tier below it
-// 'complete' for this account (across all its enrolled tracks) — which is
-// what actually satisfies the tier gate in computeLocks and unlocks the
-// whole tier the clicked course belongs to, not just that one course.
+// 'skipped' for this account (across all its enrolled tracks) — which is
+// what satisfies the tier gate in computeLocks — and every course in the
+// clicked course's own tier 'not_started', so the whole tier unlocks
+// showing its normal, un-started state rather than a synthetic status.
 // Recorded on course_assignments like any other status, so it's the same
 // data a manager view would read.
 export async function skipPrerequisiteFor(courseId, accountId) {
   const rows = await sql`
     with target as (
-      select expected_by_position from courses where id = ${courseId}
+      select expected_by_position as current_position from courses where id = ${courseId}
     ),
     prev_position as (
-      select case (select expected_by_position from target)
+      select case (select current_position from target)
         when 'junior' then 'intern'
         when 'middle' then 'junior'
         when 'senior' then 'middle'
@@ -87,19 +88,23 @@ export async function skipPrerequisiteFor(courseId, accountId) {
         else null
       end as position
     ),
-    prev_courses as (
-      select distinct c.id
+    affected as (
+      select c.id,
+        case
+          when c.expected_by_position = (select position from prev_position) then 'skipped'
+          when c.expected_by_position = (select current_position from target) then 'not_started'
+        end as new_status
       from account_tracks acct
       join courses c on c.track_id = acct.track_id
       where acct.account_id = ${accountId}
-        and c.expected_by_position = (select position from prev_position)
+        and c.expected_by_position in ((select position from prev_position), (select current_position from target))
     )
     insert into course_assignments (account_id, course_id, status)
-    select ${accountId}::uuid, id, 'complete' from prev_courses
-    on conflict (account_id, course_id) do update set status = 'complete', updated_at = now()
-    returning course_id
+    select ${accountId}::uuid, id, new_status from affected where new_status is not null
+    on conflict (account_id, course_id) do update set status = excluded.status, updated_at = now()
+    returning course_id, status
   `;
-  return { completed: rows.length };
+  return { updated: rows.length };
 }
 
 // Toggle "I'm on this track" — same delete-first-else-insert idiom as

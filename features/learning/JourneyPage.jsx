@@ -6,9 +6,10 @@
 // linked to the next in list order within a column. A course is Locked
 // until every course in the tier below it is complete or skipped — a tier
 // gate, not a per-course prerequisite graph (this app has no course-to-
-// course dependency data). "Skip prerequisite" on a locked course doesn't
-// mark that course itself — it completes every course in the tier below
-// it, which is what actually satisfies the gate and unlocks its whole tier.
+// course dependency data). "Skip prerequisite" on a locked course marks
+// every course in the tier below it 'skipped' (satisfying the gate) and
+// every course in its own tier 'not_started' — unlocking the whole tier
+// into its normal, un-started state rather than a synthetic status.
 
 import { useCallback, useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
