@@ -45,14 +45,16 @@ export async function getTrackWithCourses(trackId, accountId) {
 // (via account_tracks), flattened into one list — ordered by position tier,
 // then the learner's own custom order within that tier (course_assignments.
 // position, if they've ever reordered it), then track/stage/created_at as
-// the fallback before that. target_date is only ever non-null once
-// something actually writes course_assignments.
+// the fallback before that. target_date, wrap_up_url, and exam_score are
+// only ever non-null once something actually writes course_assignments —
+// nothing does for the latter two yet.
 export async function getJourney(accountId) {
   return sql`
     select c.id, c.title, c.stage, c.platform, c.est_hours, c.link, c.outcome,
       c.expected_by_position,
       t.id as track_id, t.name as track_name,
-      coalesce(ca.status, 'not_started') as status, ca.target_date
+      coalesce(ca.status, 'not_started') as status, ca.target_date,
+      ca.wrap_up_url, ca.exam_score
     from account_tracks acct
     join tracks t on t.id = acct.track_id
     join courses c on c.track_id = t.id

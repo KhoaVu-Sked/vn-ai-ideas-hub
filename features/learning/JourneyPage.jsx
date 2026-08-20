@@ -66,6 +66,23 @@ function JourneyRow({ course, index, expanded, onToggle, drag }) {
                 </a>
               )}
               {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
+              {(course.wrap_up_url || course.exam_score != null) && (
+                <div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>📄</span> Knowledge artifacts
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    {course.wrap_up_url && (
+                      <a href={course.wrap_up_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none" }}>Wrap-up</a>
+                    )}
+                    {course.exam_score != null && (
+                      <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: "#e6f4ea", color: "#1f7a3c" }}>
+                        Passed {course.exam_score}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </td>
         </tr>
