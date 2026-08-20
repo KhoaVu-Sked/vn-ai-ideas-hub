@@ -374,7 +374,19 @@ export default function JourneyPage() {
           <section style={card}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
               <div>
-                <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Your Journey</h1>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                  <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: 0 }}>Your Journey</h1>
+                  {journey.length > 0 && (
+                    <select
+                      value={selectedTrack}
+                      onChange={(e) => setSelectedTrack(e.target.value)}
+                      style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 28, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}
+                    >
+                      <option value="all">All tracks</option>
+                      {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  )}
+                </div>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
                   Ordered intern → principal, across every track you're enrolled in.
                   {view === "list" && " Drag a row to reorder it within its stage."}
@@ -382,14 +394,6 @@ export default function JourneyPage() {
               </div>
               {journey.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <select
-                    value={selectedTrack}
-                    onChange={(e) => setSelectedTrack(e.target.value)}
-                    style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}
-                  >
-                    <option value="all">All tracks</option>
-                    {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
                   <button
                     onClick={resetJourney}
                     disabled={resetting}
