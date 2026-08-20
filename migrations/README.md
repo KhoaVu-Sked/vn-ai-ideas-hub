@@ -30,4 +30,3 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `022_learning_tracks_courses.sql` — add `tracks`, `account_tracks`, `courses`, `course_assignments` for the AI Learning roadmap work.
 - `023_fix_courses_ai_track_seed.sql` — fix for UAT: adds `courses.stage/cost/outcome` (022 shipped without them) and seeds the AI Track's 23 real courses from the roadmap spreadsheet.
 - `024_course_assignments_position.sql` — add `course_assignments.position`, so a learner can reorder courses within one position tier on their own Journey view.
-- `025_course_assignments_knowledge_artifacts.sql` — add `course_assignments.wrap_up_url`/`exam_score` for the List view's expanded-row Knowledge Artifacts block (both stay null until something writes them).

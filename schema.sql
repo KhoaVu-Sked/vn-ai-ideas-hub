@@ -119,8 +119,6 @@ create table if not exists course_assignments (
   status      text not null default 'not_started'
                 check (status in ('not_started', 'in_progress', 'complete', 'skipped')),
   position    integer,  -- learner's own display order within a position tier
-  wrap_up_url text,     -- knowledge artifact: nothing writes this yet
-  exam_score  integer,  -- knowledge artifact: nothing writes this yet
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (account_id, course_id)
@@ -480,7 +478,3 @@ alter table requests drop column if exists due_date;
 
 -- ── migration 024: course_assignments.position ──
 alter table course_assignments add column if not exists position integer;
-
--- ── migration 025: course_assignments knowledge artifacts ──
-alter table course_assignments add column if not exists wrap_up_url text;
-alter table course_assignments add column if not exists exam_score integer;
