@@ -373,6 +373,12 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <button
+            title="Auto Schedule — coming soon"
+            style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: "pointer" }}
+          >
+            🪄
+          </button>
+          <button
             onClick={() => setEditing(true)}
             title="Suggest a target date for these courses"
             style={{ border: "1px solid var(--line)", background: editing ? "var(--bg)" : "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: "pointer" }}
