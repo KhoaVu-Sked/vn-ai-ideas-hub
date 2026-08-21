@@ -31,19 +31,19 @@ const HEADER_H = 34;
 // Draggable row (native HTML5 DnD, no library) — drop is only accepted onto
 // a row in the SAME position tier (checked in JourneyTable.handleDrop), so a
 // drag can never move a course into a different stage.
-function JourneyRow({ course, index, expanded, onToggle, drag }) {
+function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
   return (
     <>
       <tr
-        draggable
+        draggable={draggable}
         onDragStart={drag.onDragStart}
         onDragOver={drag.onDragOver}
         onDrop={drag.onDrop}
         onDragEnd={drag.onDragEnd}
         onClick={onToggle}
         style={{
-          borderTop: "1px solid var(--line)", cursor: "grab",
+          borderTop: "1px solid var(--line)", cursor: draggable ? "grab" : "pointer",
           opacity: drag.dragging ? 0.4 : 1,
           outline: drag.dropTarget ? "2px dashed var(--blue)" : "none", outlineOffset: -2,
         }}
@@ -67,12 +67,16 @@ function JourneyRow({ course, index, expanded, onToggle, drag }) {
                 </a>
               )}
               {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
-              {/* Placeholder only — no questionnaire or results exist yet. */}
-              <button
-                style={{ alignSelf: "flex-start", border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12.5, fontWeight: 700, color: "var(--body)", cursor: "pointer" }}
-              >
-                Wrap-up
-              </button>
+              {/* Own roadmap only — an admin viewing someone else's read-only
+                  drill-down shouldn't see an action button for someone else's
+                  wrap-up. Placeholder only either way — no questionnaire yet. */}
+              {draggable && (
+                <button
+                  style={{ alignSelf: "flex-start", border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12.5, fontWeight: 700, color: "var(--body)", cursor: "pointer" }}
+                >
+                  Wrap-up
+                </button>
+              )}
             </div>
           </td>
         </tr>
@@ -86,7 +90,7 @@ function JourneyRow({ course, index, expanded, onToggle, drag }) {
 // the drop target share the same expected_by_position — the ordering this
 // table already has (tier first) puts same-tier rows in one contiguous
 // block, so reordering can only ever happen within a stage.
-function JourneyTable({ courses, onReorder }) {
+export function JourneyTable({ courses, onReorder, readOnly = false }) {
   const [order, setOrder] = useState(courses.map((c) => c.id));
   const [dragId, setDragId] = useState(null);
   const [overId, setOverId] = useState(null);
@@ -98,6 +102,7 @@ function JourneyTable({ courses, onReorder }) {
   const draggingCourse = dragId ? byId.get(dragId) : null;
 
   const handleDrop = (targetId) => {
+    if (readOnly) return;
     setOverId(null);
     const target = byId.get(targetId);
     if (!dragId || dragId === targetId || !draggingCourse || !target) { setDragId(null); return; }
@@ -133,13 +138,14 @@ function JourneyTable({ courses, onReorder }) {
               index={i + 1}
               expanded={expandedId === c.id}
               onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))}
+              draggable={!readOnly}
               drag={{
-                dragging: dragId === c.id,
-                dropTarget: overId === c.id && dragId && dragId !== c.id && draggingCourse?.expected_by_position === c.expected_by_position,
-                onDragStart: () => setDragId(c.id),
-                onDragOver: (e) => { e.preventDefault(); if (overId !== c.id) setOverId(c.id); },
-                onDrop: () => handleDrop(c.id),
-                onDragEnd: () => { setDragId(null); setOverId(null); },
+                dragging: !readOnly && dragId === c.id,
+                dropTarget: !readOnly && overId === c.id && dragId && dragId !== c.id && draggingCourse?.expected_by_position === c.expected_by_position,
+                onDragStart: readOnly ? undefined : () => setDragId(c.id),
+                onDragOver: readOnly ? undefined : (e) => { e.preventDefault(); if (overId !== c.id) setOverId(c.id); },
+                onDrop: readOnly ? undefined : () => handleDrop(c.id),
+                onDragEnd: readOnly ? undefined : () => { setDragId(null); setOverId(null); },
               }}
             />
           ))}

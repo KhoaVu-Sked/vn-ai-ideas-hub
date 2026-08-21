@@ -2,6 +2,52 @@
 
 import { sql } from "@/lib/sql";
 
+// Team view (admin only): one row per account enrolled in at least one
+// track, with enough to render the roster table and the three stat cards
+// without a second query. "Stalled" = an in_progress course whose status
+// hasn't moved in 21+ days (course_assignments.updated_at); stalled_course
+// names the oldest such course, for the "In progress over 3 weeks" card's
+// example line. Drill-down reuses getJourney(accountId) below — it was
+// already generic on accountId, not hardcoded to the caller.
+export async function getTeamOverview() {
+  return sql`
+    with track_names as (
+      select acct.account_id, array_agg(distinct t.name order by t.name) as tracks
+      from account_tracks acct
+      join tracks t on t.id = acct.track_id
+      group by acct.account_id
+    ),
+    progress as (
+      select acct.account_id,
+        count(*) filter (where c.priority = 'core')::int as core_total,
+        count(*) filter (where c.priority = 'core' and ca.status = 'complete')::int as core_complete,
+        count(*) filter (where ca.status = 'in_progress')::int as in_progress_count,
+        max(ca.updated_at) as last_activity,
+        bool_or(ca.status = 'in_progress' and ca.updated_at < now() - interval '21 days') as stalled,
+        (array_agg(c.title order by ca.updated_at asc)
+          filter (where ca.status = 'in_progress' and ca.updated_at < now() - interval '21 days'))[1] as stalled_course
+      from account_tracks acct
+      join courses c on c.track_id = acct.track_id
+      left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
+      group by acct.account_id
+    )
+    select a.id, a.name, a.username, a.avatar_color, a.avatar_url,
+      ur.position, tn.tracks,
+      coalesce(p.core_total, 0) as core_total,
+      coalesce(p.core_complete, 0) as core_complete,
+      coalesce(p.in_progress_count, 0) as in_progress_count,
+      p.last_activity,
+      coalesce(p.stalled, false) as stalled,
+      p.stalled_course
+    from (select distinct account_id from account_tracks) e
+    join accounts a on a.id = e.account_id
+    left join user_role ur on ur.account_id = a.id
+    left join track_names tn on tn.account_id = a.id
+    left join progress p on p.account_id = a.id
+    order by a.name asc, a.username asc
+  `;
+}
+
 // Suggested-tracks cards on the Learning Hub — name, course count, and whether
 // this account is already assigned to it.
 export async function listTracks(accountId) {
