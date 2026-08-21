@@ -9,7 +9,8 @@ export async function GET(_request, { params }) {
   try {
     await requireAdmin();
     const { accountId } = await params;
-    return Response.json({ courses: await getJourney(accountId) });
+    const { courses } = await getJourney(accountId);
+    return Response.json({ courses });
   } catch (e) {
     return jsonError(e, "Could not load that learner's roadmap.");
   }

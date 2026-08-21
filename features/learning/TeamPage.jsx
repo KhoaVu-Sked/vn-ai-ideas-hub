@@ -23,11 +23,9 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, POSITION_LABEL } from "@/features/learning/shared";
+import { card, errBanner, POSITION_LABEL, th, td } from "@/features/learning/shared";
 import { JourneyTable } from "@/features/learning/JourneyPage";
-
-const th = { padding: "6px 8px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "left" };
-const td = { padding: "10px 8px", fontSize: 12.5, color: "var(--body)" };
+import ProgressBar from "@/features/learning/ProgressBar";
 
 function relTime(d) {
   if (!d) return "—";
@@ -71,9 +69,7 @@ function MemberRow({ member, onOpen }) {
       <td style={td}>{trackLabel(member.tracks)}</td>
       <td style={td}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 100, height: 6, borderRadius: 999, background: "var(--bg)", overflow: "hidden", flexShrink: 0 }}>
-            <div style={{ height: "100%", width: `${pct}%`, background: "var(--blue)", borderRadius: 999 }} />
-          </div>
+          <ProgressBar pct={pct} width={100} />
           <span>{pct}%</span>
         </div>
       </td>
@@ -114,7 +110,7 @@ function MemberDrilldown({ member, onClose }) {
         <button onClick={onClose} style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12.5, fontWeight: 700, color: "var(--body)", cursor: "pointer" }}>Close</button>
       </div>
       {err && <div style={errBanner}>{err}</div>}
-      {!err && (courses === null ? <Loading label="Loading roadmap" /> : <JourneyTable courses={courses} readOnly />)}
+      {!err && (courses === null ? <Loading label="Loading roadmap" /> : <JourneyTable courses={courses} readOnly ownRoadmap={false} />)}
     </section>
   );
 }

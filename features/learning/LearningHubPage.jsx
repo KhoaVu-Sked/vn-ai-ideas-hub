@@ -10,7 +10,7 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, STATUS_META, POSITION_LABEL } from "@/features/learning/shared";
+import { card, errBanner, STATUS_META, statusPill, POSITION_LABEL } from "@/features/learning/shared";
 
 function TrackCard({ track, onPreview }) {
   return (
@@ -47,7 +47,7 @@ function CourseRow({ course, index }) {
           {index}
         </div>
         <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)", flex: 1 }}>{course.title}</div>
-        <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: status.bg, color: status.color, whiteSpace: "nowrap" }}>{status.label}</span>
+        <span style={statusPill(course.status)}>{status.label}</span>
       </div>
       <div style={{ fontSize: 12, color: "var(--muted)", paddingLeft: 36 }}>
         {[course.platform, course.est_hours != null ? `${course.est_hours} hrs` : null, course.cost].filter(Boolean).join(" · ")}

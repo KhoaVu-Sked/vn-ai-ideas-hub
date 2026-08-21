@@ -6,6 +6,12 @@
 // a drop only lands on a row in the same position tier, so a drag can never
 // move a course into a different stage. This is the ONLY place reordering
 // happens; Mind map just displays whatever order the query already returns.
+// Reordering is disabled (readOnly) whenever a single track is selected in
+// the filter, rather than "All tracks": reorderStage writes position for
+// every course in a tier at once, but a tier can span more than one track —
+// dragging while filtered to one track would only see (and rewrite) that
+// track's slice of the tier, leaving the other track's same-tier courses
+// with stale positions.
 // Mind map view: columns by expected_by_position, each node explicitly
 // linked to the next in list order within a column. A course is Locked
 // until every course in the tier below it is complete or skipped — a tier
@@ -22,7 +28,8 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, STATUS_META, POSITION_LABEL, POSITION_ORDER, th, td, fmtDate } from "@/features/learning/shared";
+import { card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, th, td, fmtDate, toDateStr } from "@/features/learning/shared";
+import ProgressBar from "@/features/learning/ProgressBar";
 
 const VISIBLE_ROWS = 7;
 const ROW_H = 42;
@@ -31,7 +38,7 @@ const HEADER_H = 34;
 // Draggable row (native HTML5 DnD, no library) — drop is only accepted onto
 // a row in the SAME position tier (checked in JourneyTable.handleDrop), so a
 // drag can never move a course into a different stage.
-function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true }) {
+function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true, ownRoadmap = true }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
   return (
     <>
@@ -54,7 +61,7 @@ function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true 
         <td style={td}>{course.platform || "—"}</td>
         <td style={td}>{course.est_hours ?? "—"}</td>
         <td style={td}>{fmtDate(course.target_date)}</td>
-        <td style={td}><span style={{ fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: status.bg, color: status.color, whiteSpace: "nowrap" }}>{status.label}</span></td>
+        <td style={td}><span style={statusPill(course.status)}>{status.label}</span></td>
         <td style={{ ...td, textAlign: "right", color: "var(--muted)" }}>{expanded ? "︿" : "﹀"}</td>
       </tr>
       {expanded && (
@@ -69,8 +76,11 @@ function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true 
               {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
               {/* Own roadmap only — an admin viewing someone else's read-only
                   drill-down shouldn't see an action button for someone else's
-                  wrap-up. Placeholder only either way — no questionnaire yet. */}
-              {draggable && (
+                  wrap-up. Independent of `draggable`: filtering the List view
+                  to one track disables reordering but is still your own
+                  roadmap, so Wrap-up should stay visible there. Placeholder
+                  either way — no questionnaire yet. */}
+              {ownRoadmap && (
                 <button
                   style={{ alignSelf: "flex-start", border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12.5, fontWeight: 700, color: "var(--body)", cursor: "pointer" }}
                 >
@@ -90,12 +100,24 @@ function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true 
 // the drop target share the same expected_by_position — the ordering this
 // table already has (tier first) puts same-tier rows in one contiguous
 // block, so reordering can only ever happen within a stage.
-export function JourneyTable({ courses, onReorder, readOnly = false }) {
+export function JourneyTable({ courses, onReorder, readOnly = false, ownRoadmap = true }) {
   const [order, setOrder] = useState(courses.map((c) => c.id));
   const [dragId, setDragId] = useState(null);
   const [overId, setOverId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
-  useEffect(() => { setOrder(courses.map((c) => c.id)); }, [courses]);
+  // `courses` is a new array reference on every parent render (it's `journey.
+  // filter(...)`), including ones unrelated to a real reorder — e.g. an
+  // unrelated course's status flips via auto-start or a target-date edit, or
+  // a tab-focus revalidate. Resetting `order` on every reference change would
+  // snap a just-dragged row back to server order before the fire-and-forget
+  // reorderStage() POST (no reload, by design) has landed. Reset only when
+  // the actual SET of course ids changed — a real reload, or the track
+  // filter switching to a different subset — not merely the reference.
+  useEffect(() => {
+    const nextIds = courses.map((c) => c.id);
+    const nextSet = new Set(nextIds);
+    setOrder((prev) => (prev.length === nextSet.size && prev.every((id) => nextSet.has(id)) ? prev : nextIds));
+  }, [courses]);
 
   const byId = new Map(courses.map((c) => [c.id, c]));
   const ordered = order.map((id) => byId.get(id)).filter(Boolean);
@@ -139,6 +161,7 @@ export function JourneyTable({ courses, onReorder, readOnly = false }) {
               expanded={expandedId === c.id}
               onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))}
               draggable={!readOnly}
+              ownRoadmap={ownRoadmap}
               drag={{
                 dragging: !readOnly && dragId === c.id,
                 dropTarget: !readOnly && overId === c.id && dragId && dragId !== c.id && draggingCourse?.expected_by_position === c.expected_by_position,
@@ -342,9 +365,7 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>
               <strong style={{ color: "var(--ink)" }}>{coreComplete} of {coreTotal}</strong> core courses complete
             </div>
-            <div style={{ height: 6, borderRadius: 999, background: "var(--bg)", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${pct}%`, background: "var(--blue)", borderRadius: 999 }} />
-            </div>
+            <ProgressBar pct={pct} />
           </>
         ) : (
           <div style={{ fontSize: 13, color: "var(--muted)", fontWeight: 700 }}>N/A</div>
@@ -393,8 +414,7 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart }) 
   const confirmEditing = () => {
     for (const [courseId, dateStr] of Object.entries(drafts)) {
       const original = upcoming.find((c) => c.id === courseId)?.target_date;
-      const normalized = original ? String(original).slice(0, 10) : "";
-      if (dateStr !== normalized) onSetTargetDate(courseId, dateStr || null);
+      if (dateStr !== toDateStr(original)) onSetTargetDate(courseId, dateStr || null);
     }
     setDrafts({});
     setEditing(false);
@@ -460,12 +480,12 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart }) 
               <div key={c.id} style={{ padding: i > 0 ? "12px 0 0" : "0 0 12px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
                 <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)", marginBottom: 6 }}>{c.title}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: status.bg, color: status.color, whiteSpace: "nowrap" }}>{status.label}</span>
+                  <span style={statusPill(c.status)}>{status.label}</span>
                   {editing ? (
                     <input
                       type="date"
                       min={today}
-                      value={drafts[c.id] ?? (c.target_date ? String(c.target_date).slice(0, 10) : "")}
+                      value={drafts[c.id] ?? toDateStr(c.target_date)}
                       onChange={(e) => setDrafts((d) => ({ ...d, [c.id]: e.target.value }))}
                       style={{ border: "1px solid var(--line)", borderRadius: 6, padding: "3px 6px", fontSize: 11.5, color: "var(--ink)" }}
                     />
@@ -538,7 +558,7 @@ export default function JourneyPage() {
   const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
   const resetJourney = async () => {
-    if (!confirm("Reset your journey back to the original track? This clears all recorded progress and skips — every course reverts to not started (only Intern stays unlocked).")) return;
+    if (!confirm("Reset your journey back to the original track? This clears all recorded progress and skips, any custom reordering, and any target dates you've set — every course reverts to not started (only Intern stays unlocked).")) return;
     setResetting(true);
     setErr("");
     try {
@@ -653,7 +673,7 @@ export default function JourneyPage() {
             ) : filteredJourney.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>No courses in this track.</div>
             ) : view === "list" ? (
-              <JourneyTable courses={filteredJourney} onReorder={reorderStage} />
+              <JourneyTable courses={filteredJourney} onReorder={reorderStage} readOnly={selectedTrack !== "all"} />
             ) : (
               <JourneyMindMap courses={filteredJourney} onRequestSkip={(c) => { setSkipErr(""); setSkipTarget(c); }} />
             )}

@@ -1,6 +1,12 @@
 // AI Learning: tracks + their course roadmap.
 
 import { sql } from "@/lib/sql";
+import { POSITIONS } from "@/features/accounts/constants";
+
+// The ladder, passed into queries as a parameter (see array_position() below)
+// rather than hand-copied into a SQL CASE — features/accounts/constants.js
+// is the one place this list is spelled out.
+const POSITION_ORDER = POSITIONS;
 
 // Team view (admin only): one row per account enrolled in at least one
 // track, with enough to render the roster table and the three stat cards
@@ -87,38 +93,38 @@ export async function getTrackWithCourses(trackId, accountId) {
   return rows[0] || null;
 }
 
-// Your Journey: every course across every track the account is enrolled in
-// (via account_tracks), flattened into one list — ordered by position tier,
-// then the learner's own custom order within that tier (course_assignments.
-// position, if they've ever reordered it), then track/stage/created_at as
-// the fallback before that. target_date is only ever non-null once
-// something actually writes course_assignments.
+// Your Journey: the account's own seniority level plus every course across
+// every track it's enrolled in (via account_tracks), flattened into one
+// list — ordered by position tier, then the learner's own custom order
+// within that tier (course_assignments.position, if they've ever reordered
+// it), then track/stage/created_at as the fallback before that. target_date
+// is only ever non-null once something actually writes course_assignments.
+// One round trip: position is a scalar subquery, courses is json_agg — same
+// aggregate-with-no-GROUP-BY shape as getTrackWithCourses above, so this
+// always returns exactly one row even when account_tracks has none for this
+// account (an aggregate with no GROUP BY never returns zero rows).
 export async function getJourney(accountId) {
-  return sql`
-    select c.id, c.title, c.stage, c.platform, c.est_hours, c.link, c.outcome,
-      c.expected_by_position, c.priority,
-      t.id as track_id, t.name as track_name,
-      coalesce(ca.status, 'not_started') as status, ca.target_date
+  const rows = await sql`
+    select
+      (select position from user_role where account_id = ${accountId}) as position,
+      coalesce(json_agg(
+        json_build_object(
+          'id', c.id, 'title', c.title, 'stage', c.stage, 'platform', c.platform,
+          'est_hours', c.est_hours, 'link', c.link, 'outcome', c.outcome,
+          'expected_by_position', c.expected_by_position, 'priority', c.priority,
+          'track_id', t.id, 'track_name', t.name,
+          'status', coalesce(ca.status, 'not_started'), 'target_date', ca.target_date
+        ) order by
+          coalesce(array_position(${POSITION_ORDER}::text[], c.expected_by_position), 999),
+          coalesce(ca.position, 2147483647), t.name asc, c.stage asc, c.created_at asc
+      ) filter (where c.id is not null), '[]') as courses
     from account_tracks acct
     join tracks t on t.id = acct.track_id
     join courses c on c.track_id = t.id
     left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
     where acct.account_id = ${accountId}
-    order by
-      case c.expected_by_position
-        when 'intern' then 0 when 'junior' then 1 when 'middle' then 2
-        when 'senior' then 3 when 'principal' then 4 else 5
-      end,
-      coalesce(ca.position, 2147483647), t.name asc, c.stage asc, c.created_at asc
   `;
-}
-
-// The account's own seniority level (user_role.position), for the Journey
-// page's profile strip — null if no row exists yet (nothing back-fills this
-// for existing accounts, per migration 020's own comment).
-export async function getUserPosition(accountId) {
-  const rows = await sql`select position from user_role where account_id = ${accountId}`;
-  return rows[0]?.position || null;
+  return rows[0];
 }
 
 // Reorder the courses within one position tier, for this account only —
@@ -127,11 +133,17 @@ export async function getUserPosition(accountId) {
 // the tier never ends up with a mix of set/unset positions. Scoped to
 // courses actually in that tier and reachable via the account's enrolled
 // tracks, so a tampered courseId list can't write positions cross-tier.
+// Deduped defensively: a courseId repeated in the array would make two
+// `valid` rows target the same (account_id, course_id) conflict key inside
+// one INSERT, which Postgres rejects outright ("ON CONFLICT DO UPDATE
+// command cannot affect row a second time") — normal drag-and-drop can't
+// produce that, but a malformed direct POST could.
 export async function reorderStage(accountId, position, courseIds) {
+  const uniqueIds = [...new Set(courseIds)];
   const rows = await sql`
     with ord as (
       select course_id, ord - 1 as position
-      from unnest(${courseIds}::uuid[]) with ordinality as t(course_id, ord)
+      from unnest(${uniqueIds}::uuid[]) with ordinality as t(course_id, ord)
     ),
     valid as (
       select o.course_id, o.position
@@ -191,13 +203,13 @@ export async function skipPrerequisiteFor(courseId, accountId) {
       select expected_by_position as current_position from courses where id = ${courseId}
     ),
     prev_position as (
-      select case (select current_position from target)
-        when 'junior' then 'intern'
-        when 'middle' then 'junior'
-        when 'senior' then 'middle'
-        when 'principal' then 'senior'
-        else null
-      end as position
+      -- The tier one below current, read off POSITION_ORDER by index rather
+      -- than a hand-written adjacency map — a Postgres array index of 0 (the
+      -- one-below of the ladder's first entry) is out of range and returns
+      -- null, same as the old CASE's "else null" for intern.
+      select (${POSITION_ORDER}::text[])[
+        array_position(${POSITION_ORDER}::text[], (select current_position from target)) - 1
+      ] as position
     ),
     affected as (
       select c.id,
