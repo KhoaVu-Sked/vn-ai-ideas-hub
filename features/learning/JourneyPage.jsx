@@ -370,6 +370,16 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 15 }}>📅</span>
           <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: 0 }}>Up next</h2>
+          <button
+            onClick={onSync}
+            disabled={syncing}
+            className="icon-tip"
+            data-tip="Refresh which courses show here"
+            aria-label="Refresh which courses show here"
+            style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.6 : 1 }}
+          >
+            🔄
+          </button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <button
@@ -400,16 +410,6 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
               ✓
             </button>
           )}
-          <button
-            onClick={onSync}
-            disabled={syncing}
-            className="icon-tip"
-            data-tip="Refresh which courses show here"
-            aria-label="Refresh which courses show here"
-            style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.6 : 1 }}
-          >
-            🔄
-          </button>
         </div>
       </div>
       {upcoming.length === 0 ? (
