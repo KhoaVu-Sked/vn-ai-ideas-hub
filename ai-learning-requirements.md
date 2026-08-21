@@ -1,6 +1,6 @@
 # AI Learning Platform — Requirements
 
-**Status:** In progress — Learning Hub and Your Journey are built and live in this repo; the agent layer (Planner, Knowledge Builder, Scheduler) and Manager Dashboard are not.
+**Status:** In progress — Learning Hub, Your Journey, and Team view are built and live in this repo; the agent layer (Planner, Knowledge Builder, Scheduler) is not.
 **Owner:** The Kiet
 **Purpose:** One place for a learner to see the tracks available to them, enroll, and work through a roadmap of courses by seniority level (Intern → Principal) — currently self-serve and manual; the original plan to automate planning, note-generation, and scheduling with agents is still ahead, not behind, this build.
 
@@ -122,9 +122,18 @@ A **Wrap-up** button in each List-row's expanded panel. No questionnaire, no res
 
 ---
 
-## 5. Feature: Manager Dashboard — ⬜ Not started
+## 5. Feature: Team view (replaces "Manager Dashboard") — ✅ Built
 
-None of this exists: no team overview table, no per-learner drill-down, no team summary stats, no unmatched-skills review, no catalog-sync control. The "visible to your manager" language in the Skip prerequisite copy (4.5) describes what the *data* supports — `course_assignments.status` is recorded correctly and could be read by a manager view — not a screen that exists today.
+Lives at `/learning-hub/team`.
+
+**Access — a real decision, not the original plan:** this app has no manager/report hierarchy anywhere (no `manager_id`, no "my direct reports" concept). Rather than build one, Team view reuses `accounts.role = 'admin'` — the exact same gate as Dashboard/Manage/Activity. That means **any admin sees every enrolled learner org-wide**, not a personal "my team" view scoped to specific reports. If a real hierarchy is ever wanted, that's new schema (an admin UI to assign who manages whom) — not built, not planned.
+
+**What's on the page, all computed from existing tables — no new schema:**
+- **Stat cards**: Learners (count + breakdown by track combination), Average completion (pooled `core` course completion across everyone), In progress over 3 weeks ("stalled" — an `in_progress` course whose `course_assignments.updated_at` hasn't moved in 21+ days, with an example course + name).
+- **Team progress table**: name, `user_role.position`, enrolled track(s), % core-course complete + bar, in-progress count, last activity (relative time from `updated_at`). Filterable by track, sortable by name or % complete.
+- **Drill-down**: clicking a row opens that person's roadmap **read-only** — literally the same `JourneyTable` component the learner's own Journey page uses, with drag-reorder and the Wrap-up button both disabled via a `readOnly` prop.
+
+**Deliberately not included:** the "Sync courses" / "Catalog last synced" control from early mockups — that's the Google Sheets pipeline in Section 2.2, never built and not planned. No unmatched-skills review either, since the upload/matching flow it would review (old Section 3) doesn't exist.
 
 ---
 
@@ -165,7 +174,8 @@ All of these live in the same database as the rest of `vn-ai-ideas-hub` (see `sc
 
 ## 10. Explicitly out of scope (current phase)
 
-- Anything under Sections 5–8 (Manager Dashboard, Planner agent, Knowledge Builder, Scheduler agent) — all unstarted, not merely deferred mid-build
+- Anything under Sections 6–8 (Planner agent, Knowledge Builder, Scheduler agent) — all unstarted, not merely deferred mid-build
+- A real manager/report hierarchy for Team view — it's org-wide (any admin, every learner) by deliberate choice, not scoped to "my direct reports"
 - Competency-model file upload and skill-matching (old Section 3) — replaced by simple self-serve track enrollment; not being built toward
 - Per-course prerequisite links (course A requires specifically course B) — only tier-level gating (all of tier N before tier N+1) is built; would need a new `course_prerequisites`-style table
 - A Google Sheets catalog-sync workflow — catalog edits are SQL migrations for now
