@@ -116,6 +116,21 @@ export async function setTargetDate(accountId, courseId, targetDate) {
   return { target_date: rows[0].target_date };
 }
 
+// Auto-signal "this is the course you're on now": flips a course from
+// not_started to in_progress. Only from not_started — the `where` guard on
+// the conflict update means calling this against a course that's already
+// in_progress/complete/skipped is a safe no-op, never reverts real progress.
+export async function startCourse(accountId, courseId) {
+  const rows = await sql`
+    insert into course_assignments (account_id, course_id, status)
+    values (${accountId}, ${courseId}, 'in_progress')
+    on conflict (account_id, course_id) do update set status = 'in_progress', updated_at = now()
+      where course_assignments.status = 'not_started'
+    returning status
+  `;
+  return { status: rows[0]?.status || null };
+}
+
 // "Skip prerequisite" on a locked course: rather than marking that one
 // course skipped, this marks EVERY course in the position tier below it
 // 'skipped' for this account (across all its enrolled tracks) — which is

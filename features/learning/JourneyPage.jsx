@@ -15,7 +15,7 @@
 // every course in its own tier 'not_started' — unlocking the whole tier
 // into its normal, un-started state rather than a synthetic status.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import Avatar from "@/components/Avatar";
 import Loading from "@/components/Loading";
@@ -357,7 +357,12 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
 // check. Date picks are staged locally (drafts) and only sent when the
 // confirm tick is clicked, not on every keystroke/pick. Sync re-fetches
 // in case editing elsewhere changed what qualifies.
-function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
+//
+// The soonest/next pick (upcoming[0]) auto-flips not_started -> in_progress
+// — "this is the one you're on now" — the moment it becomes the top pick,
+// not on any click. Guarded by a ref so the same course only gets the
+// start call once per mount, not on every re-render.
+function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart }) {
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState({}); // courseId -> date string, staged until confirmed
   const today = new Date().toISOString().slice(0, 10);
@@ -366,6 +371,15 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
   const dated = eligible.filter((c) => c.target_date).sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
   const undated = eligible.filter((c) => !c.target_date);
   const upcoming = [...dated, ...undated].slice(0, 2);
+
+  const startedRef = useRef(new Set());
+  useEffect(() => {
+    const top = upcoming[0];
+    if (top && top.status === "not_started" && !startedRef.current.has(top.id)) {
+      startedRef.current.add(top.id);
+      onAutoStart(top.id);
+    }
+  }, [upcoming[0]?.id, upcoming[0]?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startEditing = () => { setDrafts({}); setEditing(true); };
   // Only sends what actually changed, and only on confirm — typing/picking a
@@ -552,6 +566,13 @@ export default function JourneyPage() {
     try { await load(); } finally { setSyncingUpNext(false); }
   };
 
+  // Best-effort and silent — this is a background auto-signal, not a user
+  // action, so a failure here shouldn't surface a scary error banner.
+  const autoStartCourse = (courseId) => {
+    setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, status: "in_progress" } : c)));
+    api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
+  };
+
   // Completes every course in the tier below the clicked one, not just that
   // course — so a full reload rather than a single-row patch.
   const confirmSkip = async () => {
@@ -633,7 +654,7 @@ export default function JourneyPage() {
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
-            <UpNextCard courses={filteredJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} />
+            <UpNextCard courses={filteredJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} onAutoStart={autoStartCourse} />
             <KnowledgeArtifactsCard />
           </div>
           </div>
