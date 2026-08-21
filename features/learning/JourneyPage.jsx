@@ -354,15 +354,31 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
 // tier order, track/stage/created_at — that's the "order" fallback).
 // target_date is a suggestion the learner sets themselves via the edit
 // icon here, never an enforced deadline — editable anytime, no locking
-// check. Sync re-fetches in case editing elsewhere changed what qualifies.
+// check. Date picks are staged locally (drafts) and only sent when the
+// confirm tick is clicked, not on every keystroke/pick. Sync re-fetches
+// in case editing elsewhere changed what qualifies.
 function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
   const [editing, setEditing] = useState(false);
+  const [drafts, setDrafts] = useState({}); // courseId -> date string, staged until confirmed
   const today = new Date().toISOString().slice(0, 10);
 
   const eligible = courses.filter((c) => c.status !== "complete" && c.status !== "skipped");
   const dated = eligible.filter((c) => c.target_date).sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
   const undated = eligible.filter((c) => !c.target_date);
   const upcoming = [...dated, ...undated].slice(0, 2);
+
+  const startEditing = () => { setDrafts({}); setEditing(true); };
+  // Only sends what actually changed, and only on confirm — typing/picking a
+  // date never talks to the server by itself.
+  const confirmEditing = () => {
+    for (const [courseId, dateStr] of Object.entries(drafts)) {
+      const original = upcoming.find((c) => c.id === courseId)?.target_date;
+      const normalized = original ? String(original).slice(0, 10) : "";
+      if (dateStr !== normalized) onSetTargetDate(courseId, dateStr || null);
+    }
+    setDrafts({});
+    setEditing(false);
+  };
 
   return (
     <section style={card}>
@@ -391,7 +407,7 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
             🪄
           </button>
           <button
-            onClick={() => setEditing(true)}
+            onClick={startEditing}
             className="icon-tip"
             data-tip="Suggest a target date for these courses"
             aria-label="Suggest a target date for these courses"
@@ -401,7 +417,7 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
           </button>
           {editing && (
             <button
-              onClick={() => setEditing(false)}
+              onClick={confirmEditing}
               className="icon-tip"
               data-tip="Done editing"
               aria-label="Done editing"
@@ -429,8 +445,8 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing }) {
                     <input
                       type="date"
                       min={today}
-                      value={c.target_date ? String(c.target_date).slice(0, 10) : ""}
-                      onChange={(e) => onSetTargetDate(c.id, e.target.value || null)}
+                      value={drafts[c.id] ?? (c.target_date ? String(c.target_date).slice(0, 10) : "")}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [c.id]: e.target.value }))}
                       style={{ border: "1px solid var(--line)", borderRadius: 6, padding: "3px 6px", fontSize: 11.5, color: "var(--ink)" }}
                     />
                   ) : (
