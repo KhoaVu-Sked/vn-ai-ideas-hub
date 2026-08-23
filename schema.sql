@@ -130,6 +130,14 @@ create table if not exists course_assignments (
   unique (account_id, course_id)
 );
 create index if not exists course_assignments_account_id_idx on course_assignments (account_id);
+-- Existing databases predate all three of these columns (position: migration
+-- 024, the two quiz_* columns: migration 026). Kept right here next to the
+-- table they belong to — rather than down in the generic migration-history
+-- block below — so the whole AI Learning schema (tables plus every column
+-- ever added to them) stays in one place for anyone re-running this file.
+alter table course_assignments add column if not exists position integer;
+alter table course_assignments add column if not exists quiz_total_questions integer;
+alter table course_assignments add column if not exists quiz_correct_first_try integer;
 
 -- Quiz for a course: pure reference content (question/options/answer/
 -- rationale), no per-learner state. The front end shows all options and
@@ -471,10 +479,6 @@ alter table requests alter column state_changed_at set default now();
 alter table requests alter column state_changed_at set not null;
 alter table requests drop column if exists start_date;
 alter table requests drop column if exists due_date;
-
--- ── migration 024: course_assignments.position ──
-alter table course_assignments add column if not exists position integer;
-
--- migration 026: quiz completion stats on course_assignments
-alter table course_assignments add column if not exists quiz_total_questions integer;
-alter table course_assignments add column if not exists quiz_correct_first_try integer;
+-- (migrations 024 and 026 — course_assignments.position/quiz_total_questions/
+-- quiz_correct_first_try — are replayed right next to that table's create
+-- statement above, not here.)

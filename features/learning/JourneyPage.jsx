@@ -513,7 +513,11 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart }) 
 // still shows what was actually answered. Both null for a course completed
 // before this existed (or completed with no stats sent) — shown honestly as
 // "No quiz data recorded" rather than a fabricated number.
-function KnowledgeArtifactsCard({ completions }) {
+// inProgressCourse: the account's own current in_progress pick (from the
+// already-fetched journey list — no extra fetch), shown as one more row
+// below the completions so the card also points at what's next, not just
+// what's done. Null when nothing's in progress; no fallback fabricated.
+function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
   return (
     <section style={card}>
       <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: "0 0 2px" }}>Knowledge artifacts</h2>
@@ -540,6 +544,17 @@ function KnowledgeArtifactsCard({ completions }) {
               </div>
             );
           })}
+        </div>
+      )}
+      {inProgressCourse && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>{inProgressCourse.title}</div>
+          <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
+            In progress — waiting on the wrap-up quiz for more information
+          </div>
+          <Link href={`/learning-hub/journey/${inProgressCourse.id}/quiz`} style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
+            Take the quiz →
+          </Link>
         </div>
       )}
     </section>
@@ -583,6 +598,12 @@ export default function JourneyPage() {
     if (selectedTrack !== "all" && !trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack("all");
   }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
   const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
+  // Knowledge artifacts' "waiting on the quiz" row — the account's current
+  // in_progress pick, across every enrolled track (not scoped to the track
+  // dropdown, same as recentCompletions isn't). Already on hand from the
+  // journey fetch, so no extra request. First match is enough: in practice
+  // there's only ever one, since only the top Up next pick auto-starts.
+  const inProgressCourse = journey.find((c) => c.status === "in_progress") || null;
   // Core-course progress for the profile strip, scoped to whatever the
   // track dropdown currently shows.
   const coreCourses = filteredJourney.filter((c) => c.priority === "core");
@@ -714,7 +735,7 @@ export default function JourneyPage() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
             <UpNextCard courses={filteredJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} onAutoStart={autoStartCourse} />
-            <KnowledgeArtifactsCard completions={recentCompletions} />
+            <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourse={inProgressCourse} />
           </div>
           </div>
           </>
