@@ -12,7 +12,13 @@ import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import { card, errBanner, STATUS_META, statusPill, POSITION_LABEL } from "@/features/learning/shared";
 
+// "Completed" replaces "Enrolled" once every course in the track is done
+// for THIS account (complete_count === course_count, and there's at least
+// one course — an empty track never reads as "completed"). Same badge,
+// just a different label, so it shows wherever this card does: both "Your
+// tracks" and "Suggested tracks" use the same component.
 function TrackCard({ track, onPreview }) {
+  const completed = track.course_count > 0 && track.complete_count === track.course_count;
   return (
     <button
       onClick={() => onPreview(track.id)}
@@ -29,7 +35,11 @@ function TrackCard({ track, onPreview }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)" }}>{track.name}</div>
-        {track.assigned && <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "2px 8px", background: "#e6f4ea", color: "#1f7a3c" }}>Enrolled</span>}
+        {track.assigned && (
+          <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "2px 8px", background: "#e6f4ea", color: "#1f7a3c" }}>
+            {completed ? "Completed" : "Enrolled"}
+          </span>
+        )}
       </div>
       <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{track.course_count} course{track.course_count === 1 ? "" : "s"}</div>
       <div style={{ fontSize: 12.5, color: "var(--blue)", fontWeight: 700, marginTop: 4 }}>Preview roadmap →</div>

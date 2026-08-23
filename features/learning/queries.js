@@ -54,14 +54,20 @@ export async function getTeamOverview() {
   `;
 }
 
-// Suggested-tracks cards on the Learning Hub — name, course count, and whether
-// this account is already assigned to it.
+// Suggested-tracks cards on the Learning Hub — name, course count, whether
+// this account is already assigned to it, and how many of its courses this
+// account has completed (so the card can say "Completed" instead of
+// "Enrolled" once every course in the track is done). complete_count is
+// scoped to THIS account via the same course_assignments join — someone
+// else finishing every course in a track doesn't mark it complete here.
 export async function listTracks(accountId) {
   return sql`
     select t.id, t.name, count(c.id)::int as course_count,
-      exists(select 1 from account_tracks at2 where at2.track_id = t.id and at2.account_id = ${accountId}) as assigned
+      exists(select 1 from account_tracks at2 where at2.track_id = t.id and at2.account_id = ${accountId}) as assigned,
+      count(c.id) filter (where ca.status = 'complete')::int as complete_count
     from tracks t
     left join courses c on c.track_id = t.id
+    left join course_assignments ca on ca.course_id = c.id and ca.account_id = ${accountId}
     group by t.id, t.name
     order by t.name asc
   `;
