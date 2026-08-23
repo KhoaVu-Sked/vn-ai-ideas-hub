@@ -153,10 +153,12 @@ export default function QuizPage() {
   const { user: me } = useSession();
   const [course, setCourse] = useState(null);
   const [questions, setQuestions] = useState([]);
-  // questionId -> { selected: 'B', revealedCorrect: true } — revealedCorrect
-  // is sticky (never flips back to false once true) so Next stays unlocked
-  // and the rationale stays visible even if a later click lands on a wrong
-  // option out of curiosity.
+  // questionId -> { selected: 'B', revealedCorrect: true, firstTryCorrect: false }.
+  // revealedCorrect is sticky (never flips back to false once true) so Next
+  // stays unlocked and the rationale stays visible even if a later click
+  // lands on a wrong option out of curiosity. firstTryCorrect is set once,
+  // on the first click for that question, and never touched again — it's
+  // the accuracy this course's completion gets recorded with.
   const [answers, setAnswers] = useState({});
   const [index, setIndex] = useState(0);
   const [ready, setReady] = useState(false);
@@ -187,22 +189,35 @@ export default function QuizPage() {
 
   const handleAnswer = (label) => {
     if (!current) return;
-    setAnswers((prev) => ({
-      ...prev,
-      [current.id]: { selected: label, revealedCorrect: !!prev[current.id]?.revealedCorrect || label === current.correct_answer },
-    }));
+    setAnswers((prev) => {
+      const prevEntry = prev[current.id];
+      const isCorrect = label === current.correct_answer;
+      return {
+        ...prev,
+        [current.id]: {
+          selected: label,
+          revealedCorrect: !!prevEntry?.revealedCorrect || isCorrect,
+          // Only ever set on the FIRST click for this question — later
+          // clicks (right or wrong) don't change what "first try" was.
+          firstTryCorrect: prevEntry ? prevEntry.firstTryCorrect : isCorrect,
+        },
+      };
+    });
   };
 
   // Next just advances locally; on the last question (button already
   // requires revealedCorrect to be enabled) it instead marks the course
-  // complete. A failed complete-call leaves revealedCorrect untouched, so
-  // the button re-enables on its own for a retry.
+  // complete, sending how many questions were right on the first click —
+  // a one-time snapshot, not a growing attempt log. A failed complete-call
+  // leaves revealedCorrect untouched, so the button re-enables for a retry.
   const handleNext = async () => {
     if (index < questions.length - 1) { setIndex((i) => i + 1); return; }
     setFinishing(true);
     setErr("");
     try {
-      await api(`/api/courses/${courseId}/complete`, { method: "POST" });
+      const total = questions.length;
+      const correct = questions.filter((q) => answers[q.id]?.firstTryCorrect).length;
+      await api(`/api/courses/${courseId}/complete`, { method: "POST", body: JSON.stringify({ correct, total }) });
       setDone(true);
     } catch (e) {
       setErr(e.message);

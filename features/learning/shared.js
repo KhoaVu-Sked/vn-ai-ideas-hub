@@ -41,3 +41,18 @@ export function fmtDate(d) {
 // client (Up next's date input) and the server (the target route's past-date
 // check) — one normalization point instead of two independent `.slice(0,10)`s.
 export const toDateStr = (d) => (d ? String(d).slice(0, 10) : "");
+
+// "3 days ago" / "1 week ago" — used by Team view's Last activity column and
+// the Journey page's Knowledge artifacts card, so it lives here once instead
+// of twice.
+export function relTime(d) {
+  if (!d) return "—";
+  const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return weeks === 1 ? "1 week ago" : `${weeks} weeks ago`;
+  const months = Math.floor(days / 30);
+  return months <= 1 ? "1 month ago" : `${months} months ago`;
+}

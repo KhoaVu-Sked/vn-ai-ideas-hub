@@ -103,6 +103,11 @@ export async function getTrackWithCourses(trackId, accountId) {
 // aggregate-with-no-GROUP-BY shape as getTrackWithCourses above, so this
 // always returns exactly one row even when account_tracks has none for this
 // account (an aggregate with no GROUP BY never returns zero rows).
+// recentCompletions: the 3 most recently completed courses (any track),
+// for the Knowledge artifacts card — a separate scalar subquery rather than
+// folded into the courses json_agg above, since it needs its own order-by
+// + limit (most recent first) independent of the roadmap's own ordering.
+// Still one round trip.
 export async function getJourney(accountId) {
   const rows = await sql`
     select
@@ -117,7 +122,25 @@ export async function getJourney(accountId) {
         ) order by
           coalesce(array_position(${POSITION_ORDER}::text[], c.expected_by_position), 999),
           coalesce(ca.position, 2147483647), t.name asc, c.stage asc, c.created_at asc
-      ) filter (where c.id is not null), '[]') as courses
+      ) filter (where c.id is not null), '[]') as courses,
+      (
+        select coalesce(json_agg(
+          json_build_object(
+            'id', r.course_id, 'title', r.title,
+            'quiz_total_questions', r.quiz_total_questions,
+            'quiz_correct_first_try', r.quiz_correct_first_try,
+            'completed_at', r.updated_at
+          )
+        ), '[]')
+        from (
+          select ca2.course_id, c2.title, ca2.quiz_total_questions, ca2.quiz_correct_first_try, ca2.updated_at
+          from course_assignments ca2
+          join courses c2 on c2.id = ca2.course_id
+          where ca2.account_id = ${accountId} and ca2.status = 'complete'
+          order by ca2.updated_at desc
+          limit 3
+        ) r
+      ) as recent_completions
     from account_tracks acct
     join tracks t on t.id = acct.track_id
     join courses c on c.track_id = t.id
@@ -283,11 +306,22 @@ export async function getCourseWithQuiz(courseId, accountId) {
 // question in its quiz (found the correct answer on each). Unconditional,
 // unlike startCourse's not_started-only guard: finishing the quiz is a real
 // user action, not a background auto-signal, so it should always land.
-export async function completeCourse(accountId, courseId) {
+//
+// quizStats is a snapshot taken now, not a live join against
+// course_quiz_questions later — the quiz's content could change after the
+// fact, and this should keep recording what the learner actually saw. Both
+// null if the caller doesn't send them (defensive; the quiz page always
+// does), so an old-style call still completes the course, just without
+// stats for the Knowledge artifacts card to show.
+export async function completeCourse(accountId, courseId, quizStats = {}) {
+  const total = quizStats.total ?? null;
+  const correct = quizStats.correct ?? null;
   const rows = await sql`
-    insert into course_assignments (account_id, course_id, status)
-    values (${accountId}, ${courseId}, 'complete')
-    on conflict (account_id, course_id) do update set status = 'complete', updated_at = now()
+    insert into course_assignments (account_id, course_id, status, quiz_total_questions, quiz_correct_first_try)
+    values (${accountId}, ${courseId}, 'complete', ${total}, ${correct})
+    on conflict (account_id, course_id) do update set
+      status = 'complete', updated_at = now(),
+      quiz_total_questions = ${total}, quiz_correct_first_try = ${correct}
     returning status
   `;
   return { status: rows[0]?.status || null };
