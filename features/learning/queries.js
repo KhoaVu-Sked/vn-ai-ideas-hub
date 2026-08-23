@@ -255,3 +255,40 @@ export async function toggleTrackAssignment(trackId, accountId) {
   `;
   return { assigned: rows[0].inserted > 0 };
 }
+
+// Wrap-up quiz for one course: title/link plus every course_quiz_questions
+// row (correct_answer and rationale included — there's no scoring or attempt
+// history, so nothing is gained by holding them back from the client) and
+// the caller's own status for the course, for the "already completed" banner.
+// One round trip: questions is a json_agg, same shape as getJourney's courses.
+export async function getCourseWithQuiz(courseId, accountId) {
+  const rows = await sql`
+    select c.id, c.title, c.link, c.platform, coalesce(ca.status, 'not_started') as status,
+      coalesce(json_agg(
+        json_build_object(
+          'id', q.id, 'position', q.position, 'question', q.question,
+          'options', q.options, 'correct_answer', q.correct_answer, 'rationale', q.rationale
+        ) order by q.position asc
+      ) filter (where q.id is not null), '[]') as questions
+    from courses c
+    left join course_quiz_questions q on q.course_id = c.id
+    left join course_assignments ca on ca.course_id = c.id and ca.account_id = ${accountId}
+    where c.id = ${courseId}
+    group by c.id, c.title, c.link, c.platform, ca.status
+  `;
+  return rows[0] || null;
+}
+
+// Mark a course complete — called once a learner has clicked through every
+// question in its quiz (found the correct answer on each). Unconditional,
+// unlike startCourse's not_started-only guard: finishing the quiz is a real
+// user action, not a background auto-signal, so it should always land.
+export async function completeCourse(accountId, courseId) {
+  const rows = await sql`
+    insert into course_assignments (account_id, course_id, status)
+    values (${accountId}, ${courseId}, 'complete')
+    on conflict (account_id, course_id) do update set status = 'complete', updated_at = now()
+    returning status
+  `;
+  return { status: rows[0]?.status || null };
+}

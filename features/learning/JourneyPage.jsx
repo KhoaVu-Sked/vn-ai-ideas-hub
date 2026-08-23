@@ -22,6 +22,7 @@
 // into its normal, un-started state rather than a synthetic status.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import Avatar from "@/components/Avatar";
 import Loading from "@/components/Loading";
@@ -78,14 +79,15 @@ function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true,
                   drill-down shouldn't see an action button for someone else's
                   wrap-up. Independent of `draggable`: filtering the List view
                   to one track disables reordering but is still your own
-                  roadmap, so Wrap-up should stay visible there. Placeholder
-                  either way — no questionnaire yet. */}
+                  roadmap, so Wrap-up should stay visible there. The quiz page
+                  itself handles a course with no quiz content yet. */}
               {ownRoadmap && (
-                <button
-                  style={{ alignSelf: "flex-start", border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12.5, fontWeight: 700, color: "var(--body)", cursor: "pointer" }}
+                <Link
+                  href={`/learning-hub/journey/${course.id}/quiz`}
+                  style={{ alignSelf: "flex-start", border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12.5, fontWeight: 700, color: "var(--body)", cursor: "pointer", textDecoration: "none" }}
                 >
                   Wrap-up
-                </button>
+                </Link>
               )}
             </div>
           </td>
