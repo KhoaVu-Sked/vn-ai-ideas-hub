@@ -137,6 +137,32 @@ const fail = (check, detail, why) => problems.push({ check, detail, why });
   }
 }
 
+// ── 5. Identifiers used but never imported ────────────────────────
+// `next build` resolves imports; it does not notice that a file calls useRef
+// without importing it. That is a clean build and a crash on first render, and
+// it has happened four times here.
+{
+  const HOOKS = ["useState", "useEffect", "useCallback", "useRef", "useMemo",
+                 "useContext", "useReducer", "useLayoutEffect"];
+  for (const file of sqlBearingFiles()) {
+    if (!/\.jsx?$/.test(file)) continue;
+    const src = read(file);
+    const imported = new Set();
+    for (const m of src.matchAll(/^import \{([^}]*)\} from/gm)) {
+      for (const n of m[1].split(",")) imported.add(n.trim().split(" as ")[0]);
+    }
+    for (const m of src.matchAll(/^import (\w+) from/gm)) imported.add(m[1]);
+    // declared locally is fine too
+    for (const m of src.matchAll(/(?:const|let|function)\s+(\w+)/g)) imported.add(m[1]);
+
+    for (const hook of HOOKS) {
+      if (new RegExp(`\\b${hook}\\s*\\(`).test(src) && !imported.has(hook)) {
+        fail("missing-import", `${file}: ${hook}()`, "used but never imported — builds fine, crashes at runtime");
+      }
+    }
+  }
+}
+
 function sqlBearingFiles() {
   const out = [];
   const walk = (dir) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { tagPill } from "@/features/admin/tagColors";
@@ -79,6 +79,14 @@ export default function IdeaPage() {
   const [formFields, setFormFields] = useState([]);
   const [showSubmit, setShowSubmit] = useState(false);
 
+  // Every local change bumps this. A refetch that was already in flight when it
+  // happened is describing an older world, and applying it would undo what the
+  // user just did — delete a comment and watch it come back a tenth of a second
+  // later. Such a response is dropped, and one retry is scheduled so we still
+  // converge on the server's version.
+  const generation = useRef(0);
+  const staleRetry = useRef(null);
+
   const load = useCallback(async () => {
     setBusy(true); setErr("");
     try {
@@ -93,11 +101,20 @@ export default function IdeaPage() {
   // Quietly pull in other people's requests/status changes — no spinner, and
   // never while a modal or the content editor is open, so nothing typed is lost.
   const refresh = useCallback(async () => {
+    const at = generation.current;
     try {
       const d = await api(`/api/ideas/${id}`);
+      if (generation.current !== at) {
+        // Something changed locally while this was in flight. Drop it, and come
+        // back shortly for a version that includes the change.
+        clearTimeout(staleRetry.current);
+        staleRetry.current = setTimeout(() => { refresh(); }, 400);
+        return;
+      }
       setData(d);
     } catch { /* leave the current view alone */ }
   }, [id]);
+  useEffect(() => () => clearTimeout(staleRetry.current), []);
   useRevalidateOnFocus(refresh, { enabled: !editing && !showSubmit && !showRoles && !taskModal && !openTask });
   // Same guard as above: a live ping must not land mid-edit either.
   useLive(id, refresh, { enabled: !editing && !showSubmit && !showRoles && !taskModal && !openTask });
@@ -105,7 +122,10 @@ export default function IdeaPage() {
   useEffect(() => { api("/api/form-fields").then(({ fields }) => setFormFields(fields || [])).catch(() => {}); }, []);
 
   // Merge into local state (obj or updater); run an action with optional revert.
-  const patch = (upd) => setData((d) => ({ ...d, ...(typeof upd === "function" ? upd(d) : upd) }));
+  const patch = (upd) => {
+    generation.current += 1;            // invalidates any refetch already in flight
+    setData((d) => ({ ...d, ...(typeof upd === "function" ? upd(d) : upd) }));
+  };
   const run = async (fn, revert) => { setActionErr(""); try { await fn(); } catch (e) { if (revert) revert(); setActionErr(e.message); } };
 
   if (busy && !data) return <Shell><Loading label="Loading idea" /></Shell>;
