@@ -18,6 +18,7 @@ import TaskBoard from "@/features/ideas/TaskBoard";
 import TaskModal from "@/features/ideas/TaskModal";
 import TaskDrawer from "@/features/ideas/TaskDrawer";
 import { api } from "@/lib/apiClient";
+import { serialize } from "@/lib/serialize";
 
 
 function Pill({ bg, fg, children }) {
@@ -156,23 +157,54 @@ export default function IdeaPage() {
   const upsertTask = (t) => patch((d) => ({
     tasks: d.tasks.some((x) => x.id === t.id) ? d.tasks.map((x) => (x.id === t.id ? t : x)) : [...d.tasks, t],
   }));
+  // Close the modal and show the card straight away. Waiting for the round trip
+  // made adding a request the slowest thing on the page, for no reason — the
+  // server can only reject it for a reason we already checked in the form.
+  //
+  // A new card has no id or number until the server answers, so it gets a
+  // temporary one and sits at reduced opacity until the real row replaces it.
   const saveTask = async (formValues) => {
     const editingTask = taskModal?.task;
-    const { task } = await api(
-      editingTask ? `/api/ideas/${id}/tasks/${editingTask.id}` : `/api/ideas/${id}/tasks`,
-      { method: editingTask ? "PATCH" : "POST", body: JSON.stringify(formValues) },
-    );
-    upsertTask(task);
+    const prev = tasks;
+    const tempId = `pending-${Date.now()}`;
+
+    const optimistic = editingTask
+      ? { ...editingTask, ...formValues,
+          assignee: (members || []).find((m) => m.account_id === formValues.assignee_id) || null }
+      : { id: tempId, number: "…", title: formValues.title, detail: formValues.detail || "",
+          state: "pending_approval", position: Number.MAX_SAFE_INTEGER,
+          created_at: new Date().toISOString(), state_changed_at: new Date().toISOString(),
+          commentCount: 0, mine: true, pending: true,
+          author: (members || []).find((m) => m.account_id === meId) || { id: meId },
+          assignee: (members || []).find((m) => m.account_id === formValues.assignee_id) || null };
+
+    upsertTask(optimistic);
     setTaskModal(null);
-    setOpenTask((o) => (o && o.id === task.id ? task : o));
     setTab("tasks");
+
+    try {
+      const { task } = await api(
+        editingTask ? `/api/ideas/${id}/tasks/${editingTask.id}` : `/api/ideas/${id}/tasks`,
+        { method: editingTask ? "PATCH" : "POST", body: JSON.stringify(formValues) },
+      );
+      // Swap the placeholder for the real row, keyed on the temp id for a create.
+      patch((d) => ({ tasks: d.tasks.map((x) => (x.id === (editingTask ? task.id : tempId) ? task : x)) }));
+      setOpenTask((o) => (o && (o.id === task.id || o.id === tempId) ? task : o));
+    } catch (e) {
+      patch({ tasks: prev });          // put the board back
+      setActionErr(e.message);
+      throw e;                          // the modal reopens with the text intact
+    }
   };
   const moveTask = (t, state) => {
     const prev = tasks;
     patch((d) => ({ tasks: d.tasks.map((x) => (x.id === t.id ? { ...x, state } : x)) })); // optimistic
     setOpenTask((o) => (o && o.id === t.id ? { ...o, state } : o));
+    // Per-card queue: two quick drags of the same card must reach the server in
+    // the order they happened, or the second one gets overwritten by the first.
     run(async () => {
-      const { task } = await api(`/api/ideas/${id}/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ state }) });
+      const { task } = await serialize(`task:${t.id}`, () =>
+        api(`/api/ideas/${id}/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ state }) }));
       upsertTask(task);
       setOpenTask((o) => (o && o.id === task.id ? task : o));
     }, () => { patch({ tasks: prev }); setOpenTask((o) => (o && o.id === t.id ? t : o)); });
