@@ -19,14 +19,10 @@ export async function POST(request, { params }) {
       actorId: user.uid, actor: who, kind: "member", detail: rolesText, base,
       auditAction: `joined a team as ${rolesText}`,
     }));
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "member");
-      publishBoard("member");
-      publishIdea(id, "member");
-      publishBoard("member");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "member");
+    publishBoard("member");
     return Response.json(result, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not join the team.");
@@ -39,14 +35,10 @@ export async function DELETE(_request, { params }) {
     const user = await requireUser();
     const { id } = await params;
     await leaveTeam(id, user.uid);
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "member");
-      publishBoard("member");
-      publishIdea(id, "member");
-      publishBoard("member");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "member");
+    publishBoard("member");
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not leave the team.");

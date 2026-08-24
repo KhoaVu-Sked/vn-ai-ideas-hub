@@ -28,11 +28,9 @@ export async function PATCH(request, { params }) {
         auditAction: `moved task ${task.number} to ${task.state.replace(/_/g, " ")}`,
       }));
     }
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "task");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "task");
     return Response.json({ task });
   } catch (e) {
     return jsonError(e, "Could not update the task.");
@@ -45,11 +43,9 @@ export async function DELETE(_request, { params }) {
     const user = await requireUser();
     const { taskId } = await params;
     await deleteIdeaTask(taskId, user.uid, user.role === "admin");
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "task");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "task");
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not remove the task.");

@@ -36,11 +36,9 @@ export async function POST(request) {
       rows: [["Idea", project.name], ["Submitted by", who], ["Tags", (project.tags || []).join(", ") || "—"]],
       ctaPath: `/idea/${project.id}`, base,
     }));
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishBoard("created");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishBoard("created");
     return Response.json({ project }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not create the idea.");

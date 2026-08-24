@@ -41,14 +41,10 @@ export async function PATCH(request, { params }) {
         auditAction: `edited ${res.changed.join(", ")} on "${res.name}"`,
       }));
     }
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "idea");
-      publishBoard("idea");
-      publishIdea(id, "idea");
-      publishBoard("idea");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "idea");
+    publishBoard("idea");
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not update the idea.");
@@ -65,14 +61,10 @@ export async function DELETE(_request, { params }) {
     if ((process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN) && urls?.length) {
       for (const u of urls) { try { await del(u); } catch { /* ignore */ } }
     }
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "idea");
-      publishBoard("idea");
-      publishIdea(id, "idea");
-      publishBoard("idea");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "idea");
+    publishBoard("idea");
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not delete the idea.");

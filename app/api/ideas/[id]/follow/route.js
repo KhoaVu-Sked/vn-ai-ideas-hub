@@ -9,12 +9,11 @@ export async function POST(_request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "follow");
-    });
-    return Response.json(await toggleFollow(id, user.uid));
+    const result = await toggleFollow(id, user.uid);
+    // After the write. publish.js defers the send itself, so this must
+    // not be wrapped in after() — nesting would drop the callback.
+    publishIdea(id, "follow");
+    return Response.json(result);
   } catch (e) {
     return jsonError(e, "Could not update follow.");
   }

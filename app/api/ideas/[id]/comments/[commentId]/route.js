@@ -10,13 +10,11 @@ export async function PATCH(request, { params }) {
     const user = await requireUser();
     const { id, commentId } = await params;
     const { body } = await request.json();
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "comment");
-      publishIdea(id, "comment");
-    });
-    return Response.json({ comment: await updateComment(commentId, user.uid, user.role === "admin", body) });
+    const comment = await updateComment(commentId, user.uid, user.role === "admin", body);
+    // After the write. publish.js defers the send itself, so this must not be
+    // wrapped in after() — nesting would drop the callback.
+    publishIdea(id, "comment");
+    return Response.json({ comment });
   } catch (e) {
     return jsonError(e, "Could not update the comment.");
   }
@@ -28,12 +26,9 @@ export async function DELETE(_request, { params }) {
     const user = await requireUser();
     const { id, commentId } = await params;
     await deleteComment(commentId, user.uid, user.role === "admin");
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "comment");
-      publishIdea(id, "comment");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "comment");
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not remove the comment.");

@@ -19,11 +19,9 @@ export async function POST(request, { params }) {
       actorId: user.uid, actor: who, kind: "request", body: `${task.number} ${task.title}`, base,
       auditAction: `added task ${task.number}`,
     }));
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "task");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "task");
     return Response.json({ task }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not add the task.");

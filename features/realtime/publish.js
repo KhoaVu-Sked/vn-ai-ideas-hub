@@ -1,27 +1,33 @@
-// Called from write routes after a change lands. Fire-and-forget: a failed
-// publish costs a live update, never the write itself.
+// Called from write routes. Fire-and-forget: a failed publish costs a live
+// update, never the write itself.
 
-import { headers } from "next/headers";
+import { after } from "next/server";
 import { CHANNEL, encode, BOARD } from "./channel";
 import { publisher } from "./redis";
 
-// Read the caller's tab id here rather than threading it through thirty route
-// handlers. after() runs inside the request's async context, so the headers are
-// still reachable; if that ever stops being true we lose sender-exclusion, not
-// correctness, so it fails soft.
-async function originTab() {
-  try { return (await headers()).get("x-client-id") || null; }
-  catch { return null; }
-}
-
-async function send(scope, kind) {
+function send(scope, kind) {
   const p = publisher();
   if (!p) return;                                  // realtime not configured
-  try {
-    await p.publish(CHANNEL, encode(scope, kind, await originTab()));
-  } catch (e) {
-    console.error("realtime publish failed:", e.message);
-  }
+
+  // headers() is called HERE, while we are still in the request, and only
+  // awaited later. Reading it inside the after() callback was unreliable — the
+  // origin came back null, so tabs stopped recognising their own pings and
+  // refetched changes they had already applied.
+  const originP = import("next/headers")
+    .then(({ headers }) => headers())
+    .then((h) => h.get("x-client-id"))
+    .catch(() => null);
+
+  // Deferred so the publish cannot outrun the commit, and so the invocation
+  // stays alive long enough for it to flush. Callers therefore must NOT wrap
+  // these in after() themselves — nesting would drop the callback.
+  after(async () => {
+    try {
+      await p.publish(CHANNEL, encode(scope, kind, await originP));
+    } catch (e) {
+      console.error("realtime publish failed:", e.message);
+    }
+  });
 }
 
 // Something inside one idea changed — a task moved, a comment landed.

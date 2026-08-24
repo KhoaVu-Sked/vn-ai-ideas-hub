@@ -34,12 +34,10 @@ export async function PATCH(request, { params }) {
       detail: { from: project.previousStatus, to: project.status }, base,
       auditAction: `changed status of "${project.name}" from ${project.previousStatus} to ${project.status}`,
     }));
-    // After the write, never before: a ping that outruns the commit makes
-    // every other client refetch the old row and see nothing change.
-    after(() => {
-      publishIdea(id, "status");
-      publishBoard("status");
-    });
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "status");
+    publishBoard("status");
     return Response.json({ project });
   } catch (e) {
     return jsonError(e, "Could not update the status.");

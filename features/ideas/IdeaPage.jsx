@@ -159,14 +159,36 @@ export default function IdeaPage() {
     run(async () => { const r = await api(`/api/ideas/${id}/follow`, { method: "POST" }); patch({ followedByMe: r.following }); },
         () => patch({ followedByMe }));
   };
+  // Insert-or-replace, never blind append. A refetch can land between the
+  // comment being committed and this tab processing its own POST response, in
+  // which case the server copy is already on screen and appending would show it
+  // twice. Matching upsertTask, which has always done this.
+  const upsertComment = (comment, replacingId) => patch((d) => {
+    const at = d.comments.findIndex((c) => c.id === (replacingId ?? comment.id));
+    if (at === -1) return { comments: [...d.comments, comment] };
+    const next = d.comments.slice();
+    next[at] = comment;
+    return { comments: next };
+  });
+
   const postComment = () => {
     const body = commentText.trim();
     if (!body) return;
+    const tempId = `pending-${Date.now()}`;
     setCommentText("");
+    // Show it straight away. Waiting for the round trip made posting feel like
+    // nothing had happened.
+    upsertComment({
+      id: tempId, body, date: "now", mine: true, pending: true,
+      author: (members || []).find((m) => m.account_id === meId) || { id: meId },
+    });
     run(async () => {
       const { comment } = await api(`/api/ideas/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
-      patch((d) => ({ comments: [...d.comments, comment] }));
-    }, () => setCommentText(body));
+      upsertComment(comment, tempId);
+    }, () => {
+      patch((d) => ({ comments: d.comments.filter((c) => c.id !== tempId) }));
+      setCommentText(body);
+    });
   };
   const removeComment = (cid) => {
     const prev = comments;
