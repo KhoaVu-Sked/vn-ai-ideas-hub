@@ -27,8 +27,6 @@ export async function PATCH(request, { params }) {
     if (!canEdit) return Response.json({ error: "Only the project lead can change status." }, { status: 403 });
     const { status } = await request.json();
     const project = await updateStatus(id, status); // validates the status value
-    publishIdea(id, "status");
-    publishBoard("status");
     const base = new URL(request.url).origin;
     const who = user.name || user.username;
     after(() => ideaEvent(id, {
@@ -36,6 +34,12 @@ export async function PATCH(request, { params }) {
       detail: { from: project.previousStatus, to: project.status }, base,
       auditAction: `changed status of "${project.name}" from ${project.previousStatus} to ${project.status}`,
     }));
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "status");
+      publishBoard("status");
+    });
     return Response.json({ project });
   } catch (e) {
     return jsonError(e, "Could not update the status.");

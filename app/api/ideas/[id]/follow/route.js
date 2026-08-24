@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { toggleFollow } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
@@ -8,7 +9,11 @@ export async function POST(_request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
-    publishIdea(id, "follow");
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "follow");
+    });
     return Response.json(await toggleFollow(id, user.uid));
   } catch (e) {
     return jsonError(e, "Could not update follow.");

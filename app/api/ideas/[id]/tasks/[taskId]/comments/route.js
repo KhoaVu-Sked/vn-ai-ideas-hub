@@ -21,7 +21,6 @@ export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id, taskId } = await params;
-    publishIdea(id, "comment");
     const { body } = await request.json();
     const comment = await addComment(id, user.uid, body, taskId);
     const base = new URL(request.url).origin;
@@ -30,6 +29,11 @@ export async function POST(request, { params }) {
       actorId: user.uid, actor: who, kind: "request", body: comment.body, base,
       auditAction: "commented on a task",
     }));
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "comment");
+    });
     return Response.json({ comment }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not post the comment.");

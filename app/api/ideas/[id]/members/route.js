@@ -10,8 +10,6 @@ export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
-    publishIdea(id, "member");
-    publishBoard("member");
     const { roles, role } = await request.json();
     const result = await joinTeam(id, user.uid, roles ?? role);
     const base = new URL(request.url).origin;
@@ -21,6 +19,14 @@ export async function POST(request, { params }) {
       actorId: user.uid, actor: who, kind: "member", detail: rolesText, base,
       auditAction: `joined a team as ${rolesText}`,
     }));
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "member");
+      publishBoard("member");
+      publishIdea(id, "member");
+      publishBoard("member");
+    });
     return Response.json(result, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not join the team.");
@@ -32,9 +38,15 @@ export async function DELETE(_request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
-    publishIdea(id, "member");
-    publishBoard("member");
     await leaveTeam(id, user.uid);
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "member");
+      publishBoard("member");
+      publishIdea(id, "member");
+      publishBoard("member");
+    });
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not leave the team.");

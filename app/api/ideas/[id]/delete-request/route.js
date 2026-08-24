@@ -10,8 +10,6 @@ export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
-    publishIdea(id, "delete-request");
-    publishBoard("delete-request");
     const isLead = await isProjectLead(id, user.uid);
     if (!isLead && user.role !== "admin") {
       return Response.json({ error: "Only the project lead can request deletion." }, { status: 403 });
@@ -29,6 +27,14 @@ export async function POST(request, { params }) {
       quote: reason || "",
       ctaPath: `/idea/${id}`, base,
     }));
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "delete-request");
+      publishBoard("delete-request");
+      publishIdea(id, "delete-request");
+      publishBoard("delete-request");
+    });
     return Response.json({ ok: true }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not send the request.");
@@ -41,9 +47,15 @@ export async function DELETE(_request, { params }) {
     const user = await requireUser();
     if (user.role !== "admin") return Response.json({ error: "Admins only." }, { status: 403 });
     const { id } = await params;
-    publishIdea(id, "delete-request");
-    publishBoard("delete-request");
     await clearDeleteRequest(id);
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "delete-request");
+      publishBoard("delete-request");
+      publishIdea(id, "delete-request");
+      publishBoard("delete-request");
+    });
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not update the request.");

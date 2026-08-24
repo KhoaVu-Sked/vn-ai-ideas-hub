@@ -18,7 +18,6 @@ export async function GET() {
 // POST /api/projects { name, tags[], context, pain_points, expected_benefit, target_date }
 // → create an idea (starts as Submitted; the creator becomes its Project Lead)
 export async function POST(request) {
-  publishBoard("created");
   try {
     const user = await requireUser();
     const { name, tags, context, pain_points, expected_benefit, target_date } = await request.json();
@@ -37,6 +36,11 @@ export async function POST(request) {
       rows: [["Idea", project.name], ["Submitted by", who], ["Tags", (project.tags || []).join(", ") || "—"]],
       ctaPath: `/idea/${project.id}`, base,
     }));
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishBoard("created");
+    });
     return Response.json({ project }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not create the idea.");

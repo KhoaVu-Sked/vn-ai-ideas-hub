@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { put } from "@vercel/blob";
 import { addAttachment } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
@@ -10,7 +11,6 @@ export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
-    publishIdea(id, "attachment");
     const form = await request.formData();
     const file = form.get("file");
     if (!file || typeof file === "string") return Response.json({ error: "No file provided." }, { status: 400 });
@@ -25,6 +25,11 @@ export async function POST(request, { params }) {
     const blob = await put(`ideas/${id}/${file.name}`, file, { access: "private", addRandomSuffix: true });
     const attachment = await addAttachment(id, user.uid, {
       filename: file.name, url: blob.url, size: file.size, content_type: file.type,
+    });
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "attachment");
     });
     return Response.json({ attachment }, { status: 201 });
   } catch (e) {

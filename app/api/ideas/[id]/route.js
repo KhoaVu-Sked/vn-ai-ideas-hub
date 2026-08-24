@@ -29,8 +29,6 @@ export async function PATCH(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
-    publishIdea(id, "idea");
-    publishBoard("idea");
     const allowed = user.role === "admin" || (await isProjectLead(id, user.uid));
     if (!allowed) return Response.json({ error: "Only the project lead can edit this idea." }, { status: 403 });
     const body = await request.json();
@@ -43,6 +41,14 @@ export async function PATCH(request, { params }) {
         auditAction: `edited ${res.changed.join(", ")} on "${res.name}"`,
       }));
     }
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "idea");
+      publishBoard("idea");
+      publishIdea(id, "idea");
+      publishBoard("idea");
+    });
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not update the idea.");
@@ -55,12 +61,18 @@ export async function DELETE(_request, { params }) {
     const user = await requireUser();
     if (user.role !== "admin") return Response.json({ error: "Only an admin can delete an idea." }, { status: 403 });
     const { id } = await params;
-    publishIdea(id, "idea");
-    publishBoard("idea");
     const { urls } = await deleteIdea(id);
     if ((process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN) && urls?.length) {
       for (const u of urls) { try { await del(u); } catch { /* ignore */ } }
     }
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "idea");
+      publishBoard("idea");
+      publishIdea(id, "idea");
+      publishBoard("idea");
+    });
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not delete the idea.");

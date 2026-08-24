@@ -12,7 +12,6 @@ export async function PATCH(request, { params }) {
   try {
     const user = await requireUser();
     const { id, taskId } = await params;
-    publishIdea(id, "task");
     const patch = await request.json();
     const isAdmin = user.role === "admin";
     const moving = patch.state !== undefined;
@@ -29,6 +28,11 @@ export async function PATCH(request, { params }) {
         auditAction: `moved task ${task.number} to ${task.state.replace(/_/g, " ")}`,
       }));
     }
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "task");
+    });
     return Response.json({ task });
   } catch (e) {
     return jsonError(e, "Could not update the task.");
@@ -41,6 +45,11 @@ export async function DELETE(_request, { params }) {
     const user = await requireUser();
     const { taskId } = await params;
     await deleteIdeaTask(taskId, user.uid, user.role === "admin");
+    // After the write, never before: a ping that outruns the commit makes
+    // every other client refetch the old row and see nothing change.
+    after(() => {
+      publishIdea(id, "task");
+    });
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not remove the task.");
