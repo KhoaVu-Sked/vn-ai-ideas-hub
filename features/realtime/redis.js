@@ -12,7 +12,20 @@ import { CHANNEL, decode } from "./channel";
 
 export const realtimeConfigured = () => Boolean(process.env.REDIS_URL);
 
+// Must never throw. A malformed REDIS_URL makes `new Redis()` throw
+// synchronously, and this is called from inside route handlers — so a bad
+// realtime config would surface as a 500 on a write that actually succeeded.
 function connect() {
+  try {
+    return build();
+  } catch (e) {
+    if (!warned) { warned = true; console.error("redis unavailable, realtime disabled:", e.message); }
+    return null;
+  }
+}
+let warned = false;
+
+function build() {
   const client = new Redis(process.env.REDIS_URL, {
     // A hung Redis must never hold up an HTTP response. Fail fast and let the
     // write succeed without a ping rather than time the request out.
@@ -25,10 +38,13 @@ function connect() {
   return client;
 }
 
-let pub;
+let pub, pubFailed = false;
 export function publisher() {
-  if (!realtimeConfigured()) return null;
-  pub ||= connect();
+  if (!realtimeConfigured() || pubFailed) return null;
+  if (!pub) {
+    pub = connect();
+    if (!pub) pubFailed = true;       // don't retry a broken config every write
+  }
   return pub;
 }
 
@@ -42,6 +58,7 @@ export function onMessage(fn) {
   if (!realtimeConfigured()) return () => {};
   if (!sub) {
     sub = connect();
+    if (!sub) return () => {};
     sub.subscribe(CHANNEL, (err) => {
       if (err) console.error("redis subscribe failed:", err.message);
     });

@@ -6,6 +6,18 @@ import { CHANNEL, encode, BOARD } from "./channel";
 import { publisher } from "./redis";
 
 function send(scope, kind) {
+  // Nothing in here may throw. It is called synchronously inside route
+  // handlers, so an exception would be caught by the route's own try/catch and
+  // returned as a 500 — failing a write that had already succeeded, and making
+  // the client revert a change the database had accepted.
+  try {
+    trySend(scope, kind);
+  } catch (e) {
+    console.error("realtime publish skipped:", e.message);
+  }
+}
+
+function trySend(scope, kind) {
   const p = publisher();
   if (!p) return;                                  // realtime not configured
 
