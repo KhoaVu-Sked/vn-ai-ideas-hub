@@ -8,7 +8,7 @@
 // app keeps working on refetch-on-focus alone. Realtime is an improvement on
 // the existing behaviour, never a dependency of it.
 
-import { endSession } from "@/lib/apiClient";
+import { endSession, CLIENT_ID } from "@/lib/apiClient";
 
 const scopes = new Map();      // scope -> Set<callback>
 let socket = null;
@@ -40,6 +40,11 @@ function open() {
     try { msg = JSON.parse(e.data); } catch { return; }
 
     if (msg.type === "changed") {
+      // Our own change: the request that caused it already returned the
+      // authoritative row and the UI has applied it. Refetching here is a
+      // second round trip that makes the person who acted wait longer than
+      // everyone watching — the opposite of what should happen.
+      if (msg.origin && msg.origin === CLIENT_ID) return;
       for (const cb of scopes.get(msg.scope) || []) cb(msg.kind);
       return;
     }

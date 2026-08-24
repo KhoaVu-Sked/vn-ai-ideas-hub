@@ -36,7 +36,7 @@ export async function GET(request) {
 
     const stopListening = onMessage((msg) => {
       if (closed || !scopes.has(msg.scope)) return;
-      send({ type: "changed", scope: msg.scope, kind: msg.kind });
+      send({ type: "changed", scope: msg.scope, kind: msg.kind, origin: msg.origin });
     });
 
     function send(obj) {

@@ -14,7 +14,10 @@ export const CHANNEL = "hub:changes";
 // the same time.
 export const BOARD = "board";           // list-level: new idea, status moved
 
-export const encode = (scope, kind) => JSON.stringify({ scope, kind });
+// `origin` is the tab that caused the change. It already has the authoritative
+// answer from its own request, so it ignores its own ping rather than paying
+// for a second, redundant round trip.
+export const encode = (scope, kind, origin) => JSON.stringify({ scope, kind, origin });
 export function decode(raw) {
   try {
     const m = JSON.parse(raw);
