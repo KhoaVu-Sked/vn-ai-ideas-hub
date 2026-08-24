@@ -5,6 +5,7 @@
 import { defaultTagColor } from "@/features/admin/tagColors";
 import { tagPill } from "@/features/admin/tagColors";
 import { field, primary } from "./styles";
+import { onEnter } from "@/lib/onEnter";
 
 export default function TagsSection({ addTag, delTag, newTag, setColor, setNewTag, tags }) {
   return (
@@ -24,7 +25,7 @@ export default function TagsSection({ addTag, delTag, newTag, setColor, setNewTa
                 {tags.length === 0 && <span style={{ fontSize: 12.5, color: "var(--faint)" }}>No tags.</span>}
               </div>
               <div style={{ display: "flex", gap: 8, maxWidth: 340 }}>
-                <input value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTag()} placeholder="New tag name" style={field} />
+                <input value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={onEnter(addTag)} placeholder="New tag name" style={field} />
                 <button onClick={addTag} style={primary}>Add</button>
               </div>
             </section>

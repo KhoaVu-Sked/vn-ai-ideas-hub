@@ -19,6 +19,7 @@ import TaskModal from "@/features/ideas/TaskModal";
 import TaskDrawer from "@/features/ideas/TaskDrawer";
 import { api } from "@/lib/apiClient";
 import { serialize } from "@/lib/serialize";
+import { onEnter } from "@/lib/onEnter";
 
 
 function Pill({ bg, fg, children }) {
@@ -79,12 +80,23 @@ export default function IdeaPage() {
   const [formFields, setFormFields] = useState([]);
   const [showSubmit, setShowSubmit] = useState(false);
 
-  // Every local change bumps this. A refetch that was already in flight when it
-  // happened is describing an older world, and applying it would undo what the
-  // user just did — delete a comment and watch it come back a tenth of a second
-  // later. Such a response is dropped, and one retry is scheduled so we still
-  // converge on the server's version.
+  // Reconciling local edits with server snapshots.
+  //
+  // refresh() replaces the whole idea with what the server had when the request
+  // went out. Two ways that goes wrong:
+  //   - a response already in flight when you change something describes the
+  //     world before your change, and applying it undoes what you just did
+  //   - a response fetched WHILE your write is in flight has not seen the write
+  //     yet, so applying it undoes it just the same
+  //
+  // So: every local change bumps `generation`, every unconfirmed write counts in
+  // `pendingWrites`, and a snapshot is only applied when neither has moved and
+  // nothing is outstanding. Otherwise it is dropped and retried once things
+  // settle, so we still converge on the server rather than trusting local state
+  // forever.
   const generation = useRef(0);
+  const pendingWrites = useRef(0);
+  const posting = useRef(false);      // a comment POST is in flight
   const staleRetry = useRef(null);
 
   const load = useCallback(async () => {
@@ -101,16 +113,17 @@ export default function IdeaPage() {
   // Quietly pull in other people's requests/status changes — no spinner, and
   // never while a modal or the content editor is open, so nothing typed is lost.
   const refresh = useCallback(async () => {
+    const again = () => {
+      clearTimeout(staleRetry.current);
+      staleRetry.current = setTimeout(() => { refresh(); }, 500);
+    };
+    // Reading mid-write is pointless: the row we would read back has not been
+    // written yet.
+    if (pendingWrites.current > 0) { again(); return; }
     const at = generation.current;
     try {
       const d = await api(`/api/ideas/${id}`);
-      if (generation.current !== at) {
-        // Something changed locally while this was in flight. Drop it, and come
-        // back shortly for a version that includes the change.
-        clearTimeout(staleRetry.current);
-        staleRetry.current = setTimeout(() => { refresh(); }, 400);
-        return;
-      }
+      if (generation.current !== at || pendingWrites.current > 0) { again(); return; }
       setData(d);
     } catch { /* leave the current view alone */ }
   }, [id]);
@@ -126,7 +139,16 @@ export default function IdeaPage() {
     generation.current += 1;            // invalidates any refetch already in flight
     setData((d) => ({ ...d, ...(typeof upd === "function" ? upd(d) : upd) }));
   };
-  const run = async (fn, revert) => { setActionErr(""); try { await fn(); } catch (e) { if (revert) revert(); setActionErr(e.message); } };
+  // Counting writes here covers every action that goes through run(). saveTask
+  // and saveContent handle their own errors, so they call track() directly.
+  const track = async (fn) => {
+    pendingWrites.current += 1;
+    try { return await fn(); } finally { pendingWrites.current -= 1; }
+  };
+  const run = async (fn, revert) => {
+    setActionErr("");
+    try { await track(fn); } catch (e) { if (revert) revert(); setActionErr(e.message); }
+  };
 
   if (busy && !data) return <Shell><Loading label="Loading idea" /></Shell>;
   if (err) return <Shell><div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>{err} <button onClick={load} style={{ ...btnBase, marginLeft: 8 }}>Retry</button></div></Shell>;
@@ -163,17 +185,28 @@ export default function IdeaPage() {
   // comment being committed and this tab processing its own POST response, in
   // which case the server copy is already on screen and appending would show it
   // twice. Matching upsertTask, which has always done this.
+  // Insert-or-replace, and never leave two copies behind. The placeholder may
+  // already have been dropped by a refetch, and the server row may already be
+  // present from one — so look for both before appending.
   const upsertComment = (comment, replacingId) => patch((d) => {
-    const at = d.comments.findIndex((c) => c.id === (replacingId ?? comment.id));
+    const at = d.comments.findIndex((c) => c.id === replacingId || c.id === comment.id);
     if (at === -1) return { comments: [...d.comments, comment] };
-    const next = d.comments.slice();
-    next[at] = comment;
+    const next = d.comments.filter((c, i) => i === at || (c.id !== replacingId && c.id !== comment.id));
+    next[next.findIndex((c) => c.id === replacingId || c.id === comment.id)] = comment;
     return { comments: next };
   });
 
   const postComment = () => {
+    // Guard against posting the same text twice. postComment closes over
+    // commentText from its render, so two triggers in the same tick both read
+    // the old value and both POST — which is exactly what happens with a
+    // Vietnamese or other IME keyboard, where Enter commits the composition and
+    // then fires a second keydown. That produced two rows in the database, not
+    // just two on screen.
+    if (posting.current) return;
     const body = commentText.trim();
     if (!body) return;
+    posting.current = true;
     const tempId = `pending-${Date.now()}`;
     setCommentText("");
     // Show it straight away. Waiting for the round trip made posting feel like
@@ -183,9 +216,12 @@ export default function IdeaPage() {
       author: (members || []).find((m) => m.account_id === meId) || { id: meId },
     });
     run(async () => {
-      const { comment } = await api(`/api/ideas/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
-      upsertComment(comment, tempId);
+      try {
+        const { comment } = await api(`/api/ideas/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
+        upsertComment(comment, tempId);
+      } finally { posting.current = false; }
     }, () => {
+      posting.current = false;
       patch((d) => ({ comments: d.comments.filter((c) => c.id !== tempId) }));
       setCommentText(body);
     });
@@ -225,10 +261,10 @@ export default function IdeaPage() {
     setTab("tasks");
 
     try {
-      const { task } = await api(
+      const { task } = await track(() => api(
         editingTask ? `/api/ideas/${id}/tasks/${editingTask.id}` : `/api/ideas/${id}/tasks`,
         { method: editingTask ? "PATCH" : "POST", body: JSON.stringify(formValues) },
-      );
+      ));
       // Swap the placeholder for the real row, keyed on the temp id for a create.
       patch((d) => ({ tasks: d.tasks.map((x) => (x.id === (editingTask ? task.id : tempId) ? task : x)) }));
       setOpenTask((o) => (o && (o.id === task.id || o.id === tempId) ? task : o));
@@ -535,7 +571,7 @@ export default function IdeaPage() {
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <input
               value={commentText} onChange={(e) => setCommentText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && postComment()}
+              onKeyDown={onEnter(postComment)}
               placeholder="Add a comment — members and followers are notified"
               style={{ flex: 1, border: "1px solid #dde3ec", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, outline: "none" }}
             />

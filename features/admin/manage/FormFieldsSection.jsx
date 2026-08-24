@@ -4,6 +4,7 @@
 
 import { btn, field, primary } from "./styles";
 import { BUILT_IN } from "./builtInFields";
+import { onEnter } from "@/lib/onEnter";
 
 export default function FormFieldsSection({ addField, addTimeFrame, delField, delTimeFrame, fields, moveField, newField, newTimeFrame, saveField, setF, setNewField, setNewTimeFrame, timeFrames }) {
   return (
@@ -39,7 +40,7 @@ export default function FormFieldsSection({ addField, addTimeFrame, delField, de
                     {timeFrames.length === 0 && <span style={{ fontSize: 12.5, color: "var(--faint)" }}>No options — the field will be empty.</span>}
                   </div>
                   <div style={{ display: "flex", gap: 8, maxWidth: 340 }}>
-                    <input value={newTimeFrame} onChange={(e) => setNewTimeFrame(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTimeFrame()} placeholder="e.g. 1-2 weeks" style={field} />
+                    <input value={newTimeFrame} onChange={(e) => setNewTimeFrame(e.target.value)} onKeyDown={onEnter(addTimeFrame)} placeholder="e.g. 1-2 weeks" style={field} />
                     <button onClick={addTimeFrame} style={primary}>Add</button>
                   </div>
                 </div>
