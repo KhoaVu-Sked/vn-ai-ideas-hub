@@ -3,6 +3,7 @@ import { getProject, isProjectLead, updateStatus } from "@/features/ideas/querie
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { ideaEvent } from "@/features/notifications/notify";
+import { publishIdea, publishBoard } from "@/features/realtime/publish";
 
 // GET /api/projects/:id → one project's full detail
 // (fetched only when a card is clicked; the board list never includes this)
@@ -26,6 +27,8 @@ export async function PATCH(request, { params }) {
     if (!canEdit) return Response.json({ error: "Only the project lead can change status." }, { status: 403 });
     const { status } = await request.json();
     const project = await updateStatus(id, status); // validates the status value
+    publishIdea(id, "status");
+    publishBoard("status");
     const base = new URL(request.url).origin;
     const who = user.name || user.username;
     after(() => ideaEvent(id, {

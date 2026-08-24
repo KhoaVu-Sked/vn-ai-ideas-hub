@@ -3,6 +3,7 @@ import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { after } from "next/server";
 import { adminEvent } from "@/features/notifications/notify";
+import { publishBoard } from "@/features/realtime/publish";
 
 // GET /api/projects → light board list (with a per-user `mine` flag)
 export async function GET() {
@@ -17,6 +18,7 @@ export async function GET() {
 // POST /api/projects { name, tags[], context, pain_points, expected_benefit, target_date }
 // → create an idea (starts as Submitted; the creator becomes its Project Lead)
 export async function POST(request) {
+  publishBoard("created");
   try {
     const user = await requireUser();
     const { name, tags, context, pain_points, expected_benefit, target_date } = await request.json();

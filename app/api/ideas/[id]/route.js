@@ -5,6 +5,7 @@ import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { after } from "next/server";
 import { ideaEvent } from "@/features/notifications/notify";
+import { publishIdea, publishBoard } from "@/features/realtime/publish";
 
 // GET /api/ideas/:id → full detail for the /idea/[id] page
 export async function GET(_request, { params }) {
@@ -28,6 +29,8 @@ export async function PATCH(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    publishIdea(id, "idea");
+    publishBoard("idea");
     const allowed = user.role === "admin" || (await isProjectLead(id, user.uid));
     if (!allowed) return Response.json({ error: "Only the project lead can edit this idea." }, { status: 403 });
     const body = await request.json();
@@ -52,6 +55,8 @@ export async function DELETE(_request, { params }) {
     const user = await requireUser();
     if (user.role !== "admin") return Response.json({ error: "Only an admin can delete an idea." }, { status: 403 });
     const { id } = await params;
+    publishIdea(id, "idea");
+    publishBoard("idea");
     const { urls } = await deleteIdea(id);
     if ((process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN) && urls?.length) {
       for (const u of urls) { try { await del(u); } catch { /* ignore */ } }

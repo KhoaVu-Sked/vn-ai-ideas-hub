@@ -3,6 +3,7 @@ import { createIdeaTask } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { ideaEvent } from "@/features/notifications/notify";
+import { publishIdea } from "@/features/realtime/publish";
 
 // POST /api/ideas/:id/tasks { title, detail, start_date, due_date, assignee_id, comment }
 // Every new task starts in Pending approval — the lead decides what's accepted.
@@ -10,6 +11,7 @@ export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    publishIdea(id, "task");
     const body = await request.json();
     const task = await createIdeaTask(id, user.uid, body);
     const base = new URL(request.url).origin;

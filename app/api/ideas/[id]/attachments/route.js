@@ -3,12 +3,14 @@ import { addAttachment } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { validateUpload } from "@/lib/upload";
+import { publishIdea } from "@/features/realtime/publish";
 
 // POST /api/ideas/:id/attachments (multipart, field "file") → upload to Vercel Blob
 export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    publishIdea(id, "attachment");
     const form = await request.formData();
     const file = form.get("file");
     if (!file || typeof file === "string") return Response.json({ error: "No file provided." }, { status: 400 });
