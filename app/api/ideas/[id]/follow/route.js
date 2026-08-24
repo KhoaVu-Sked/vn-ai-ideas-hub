@@ -1,4 +1,3 @@
-import { after } from "next/server";
 import { toggleFollow } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";

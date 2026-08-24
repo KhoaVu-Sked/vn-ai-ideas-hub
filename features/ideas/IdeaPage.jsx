@@ -17,7 +17,7 @@ import useLive from "@/features/realtime/useLive";
 import TaskBoard from "@/features/ideas/TaskBoard";
 import TaskModal from "@/features/ideas/TaskModal";
 import TaskDrawer from "@/features/ideas/TaskDrawer";
-import { api } from "@/lib/apiClient";
+import { api, onSessionEnd } from "@/lib/apiClient";
 import { serialize } from "@/lib/serialize";
 import { onEnter } from "@/lib/onEnter";
 
@@ -98,6 +98,10 @@ export default function IdeaPage() {
   const pendingWrites = useRef(0);
   const posting = useRef(false);      // a comment POST is in flight
   const staleRetry = useRef(null);
+  const retryCount = useRef(0);
+  // Mirrors the "is it safe to replace the view" condition into a ref, so
+  // refresh() can consult it wherever it was called from.
+  const refreshAllowed = useRef(true);
 
   const load = useCallback(async () => {
     setBusy(true); setErr("");
@@ -114,23 +118,36 @@ export default function IdeaPage() {
   // never while a modal or the content editor is open, so nothing typed is lost.
   const refresh = useCallback(async () => {
     const again = () => {
+      // Bounded: a permanently blocked page must not spin a timer forever.
+      if (retryCount.current >= 20) return;
+      retryCount.current += 1;
       clearTimeout(staleRetry.current);
       staleRetry.current = setTimeout(() => { refresh(); }, 500);
     };
+    // The guard lives HERE, not only in the useLive/useRevalidateOnFocus
+    // wrappers — the retry chain calls refresh() directly, so a guard applied
+    // only at those two call sites is not load-bearing.
+    if (!refreshAllowed.current) { again(); return; }
     // Reading mid-write is pointless: the row we would read back has not been
     // written yet.
     if (pendingWrites.current > 0) { again(); return; }
     const at = generation.current;
     try {
       const d = await api(`/api/ideas/${id}`);
-      if (generation.current !== at || pendingWrites.current > 0) { again(); return; }
+      if (generation.current !== at || pendingWrites.current > 0 || !refreshAllowed.current) { again(); return; }
+      retryCount.current = 0;
       setData(d);
     } catch { /* leave the current view alone */ }
   }, [id]);
   useEffect(() => () => clearTimeout(staleRetry.current), []);
-  useRevalidateOnFocus(refresh, { enabled: !editing && !showSubmit && !showRoles && !taskModal && !openTask });
+  // A 401 leaves api() hanging on purpose, so its finally never runs and the
+  // in-flight count would stay above zero, freezing refreshes for good.
+  useEffect(() => onSessionEnd(() => { pendingWrites.current = 0; }), []);
+  const safeToRefresh = !editing && !showSubmit && !showRoles && !taskModal && !openTask;
+  refreshAllowed.current = safeToRefresh;
+  useRevalidateOnFocus(refresh, { enabled: safeToRefresh });
   // Same guard as above: a live ping must not land mid-edit either.
-  useLive(id, refresh, { enabled: !editing && !showSubmit && !showRoles && !taskModal && !openTask });
+  useLive(id, refresh, { enabled: safeToRefresh });
   useEffect(() => { api("/api/tags").then(({ tags }) => setTagCatalog(tags || [])).catch(() => {}); }, []);
   useEffect(() => { api("/api/form-fields").then(({ fields }) => setFormFields(fields || [])).catch(() => {}); }, []);
 
@@ -173,12 +190,12 @@ export default function IdeaPage() {
 
   const toggleLike = () => {
     patch({ likedByMe: !likedByMe, likeCount: likeCount + (likedByMe ? -1 : 1) }); // optimistic
-    run(async () => { const r = await api(`/api/ideas/${id}/like`, { method: "POST" }); patch({ likedByMe: r.liked, likeCount: r.count }); },
+    run(async () => { const r = await serialize(`like:${id}`, () => api(`/api/ideas/${id}/like`, { method: "POST" })); patch({ likedByMe: r.liked, likeCount: r.count }); },
         () => patch({ likedByMe, likeCount }));
   };
   const toggleFollow = () => {
     patch({ followedByMe: !followedByMe }); // optimistic
-    run(async () => { const r = await api(`/api/ideas/${id}/follow`, { method: "POST" }); patch({ followedByMe: r.following }); },
+    run(async () => { const r = await serialize(`follow:${id}`, () => api(`/api/ideas/${id}/follow`, { method: "POST" })); patch({ followedByMe: r.following }); },
         () => patch({ followedByMe }));
   };
   // Insert-or-replace, never blind append. A refetch can land between the
@@ -227,9 +244,18 @@ export default function IdeaPage() {
     });
   };
   const removeComment = (cid) => {
-    const prev = comments;
+    // Keep the row so the revert can put back exactly it, rather than restoring
+    // a whole array captured before this action — which would also wipe
+    // anything else the user has done since, mid-flight.
+    const removed = comments.find((c) => c.id === cid);
+    const at = comments.findIndex((c) => c.id === cid);
     patch((d) => ({ comments: d.comments.filter((c) => c.id !== cid) })); // optimistic
-    run(() => api(`/api/ideas/${id}/comments/${cid}`, { method: "DELETE" }), () => patch({ comments: prev }));
+    run(() => api(`/api/ideas/${id}/comments/${cid}`, { method: "DELETE" }), () => patch((d) => {
+      if (!removed || d.comments.some((c) => c.id === cid)) return {};
+      const next = d.comments.slice();
+      next.splice(Math.min(at, next.length), 0, removed);
+      return { comments: next };
+    }));
   };
 
   const upsertTask = (t) => patch((d) => ({
@@ -243,7 +269,6 @@ export default function IdeaPage() {
   // temporary one and sits at reduced opacity until the real row replaces it.
   const saveTask = async (formValues) => {
     const editingTask = taskModal?.task;
-    const prev = tasks;
     const tempId = `pending-${Date.now()}`;
 
     const optimistic = editingTask
@@ -257,7 +282,6 @@ export default function IdeaPage() {
           assignee: (members || []).find((m) => m.account_id === formValues.assignee_id) || null };
 
     upsertTask(optimistic);
-    setTaskModal(null);
     setTab("tasks");
 
     try {
@@ -268,10 +292,17 @@ export default function IdeaPage() {
       // Swap the placeholder for the real row, keyed on the temp id for a create.
       patch((d) => ({ tasks: d.tasks.map((x) => (x.id === (editingTask ? task.id : tempId) ? task : x)) }));
       setOpenTask((o) => (o && (o.id === task.id || o.id === tempId) ? task : o));
+      // Only now — closing it earlier meant a failed save unmounted the form
+      // and threw away everything typed, while TaskModal's own setErr/setBusy
+      // landed on an unmounted component and did nothing.
+      setTaskModal(null);
     } catch (e) {
-      patch({ tasks: prev });          // put the board back
+      // Remove just the placeholder, rather than restoring a whole array
+      // captured before this action — that would also undo anything else done
+      // in the meantime.
+      patch((d) => ({ tasks: d.tasks.filter((x) => x.id !== tempId) }));
       setActionErr(e.message);
-      throw e;                          // the modal reopens with the text intact
+      throw e;                          // the still-mounted modal shows the error
     }
   };
   const moveTask = (t, state) => {
@@ -298,7 +329,7 @@ export default function IdeaPage() {
   const changeStatus = (status) => {
     const prev = idea.status;
     patch((d) => ({ idea: { ...d.idea, status } })); // optimistic
-    run(async () => { const { project } = await api(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }); patch((d) => ({ idea: { ...d.idea, status: project.status } })); },
+    run(async () => { const { project } = await serialize(`status:${id}`, () => api(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ status }) })); patch((d) => ({ idea: { ...d.idea, status: project.status } })); },
         () => patch((d) => ({ idea: { ...d.idea, status: prev } })));
   };
   const join = (roles) => {

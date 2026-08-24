@@ -41,7 +41,7 @@ export async function PATCH(request, { params }) {
 export async function DELETE(_request, { params }) {
   try {
     const user = await requireUser();
-    const { taskId } = await params;
+    const { id, taskId } = await params;
     await deleteIdeaTask(taskId, user.uid, user.role === "admin");
     // publish.js defers this itself, so it lands after the commit —
     // do not wrap it in after() here or the callback is dropped.

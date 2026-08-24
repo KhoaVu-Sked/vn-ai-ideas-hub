@@ -1,4 +1,3 @@
-import { after } from "next/server";
 import { put } from "@vercel/blob";
 import { addAttachment } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";

@@ -2,6 +2,7 @@
 // update, never the write itself.
 
 import { after } from "next/server";
+import { headers } from "next/headers";
 import { CHANNEL, encode, BOARD } from "./channel";
 import { publisher } from "./redis";
 
@@ -25,8 +26,7 @@ function trySend(scope, kind) {
   // awaited later. Reading it inside the after() callback was unreliable — the
   // origin came back null, so tabs stopped recognising their own pings and
   // refetched changes they had already applied.
-  const originP = import("next/headers")
-    .then(({ headers }) => headers())
+  const originP = Promise.resolve(headers())
     .then((h) => h.get("x-client-id"))
     .catch(() => null);
 

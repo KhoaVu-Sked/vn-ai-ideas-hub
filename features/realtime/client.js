@@ -16,7 +16,6 @@ let retry = 0;
 let giveUp = false;            // endpoint said no — stop asking
 let idleTimer = null;
 let reconnectTimer = null;
-let replacing = false;         // a make-before-break swap is in flight
 
 const url = () =>
   `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws`;
@@ -29,7 +28,6 @@ function open() {
 
   ws.onopen = () => {
     retry = 0;
-    replacing = false;
     for (const scope of scopes.keys()) {
       ws.send(JSON.stringify({ type: "subscribe", scope }));
     }
@@ -50,12 +48,12 @@ function open() {
     }
     // Open the replacement while this one is still delivering, so there is no
     // window where a change could be missed.
-    if (msg.type === "closing-soon" && !replacing) {
-      replacing = true;
-      const old = socket;
+    // Open the replacement while this one is still delivering, so no change is
+    // missed in the gap.
+    if (msg.type === "closing-soon" && socket === ws) {
       socket = null;
       open();
-      setTimeout(() => { try { old.close(1000, "replaced"); } catch {} }, 5000);
+      setTimeout(() => { try { ws.close(1000, "replaced"); } catch {} }, 5000);
       return;
     }
     if (msg.type === "session-ended") {
@@ -65,10 +63,14 @@ function open() {
   };
 
   ws.onclose = (e) => {
-    if (socket === ws) socket = null;
-    if (replacing || giveUp) return;
-    // 1008/4001 and friends are deliberate refusals — retrying won't help.
-    if (e.code === 4001) { giveUp = true; return; }
+    // Identity, not a shared "replacing" flag. If this is not the current
+    // socket it is the old half of a completed swap and there is nothing to do.
+    // The flag version stranded the client whenever the replacement's handshake
+    // failed: nothing cleared it, so no reconnect was ever scheduled.
+    if (socket !== ws) return;
+    socket = null;
+    if (giveUp) return;
+    if (e.code === 4001) { giveUp = true; return; }   // session retired
     schedule();
   };
 

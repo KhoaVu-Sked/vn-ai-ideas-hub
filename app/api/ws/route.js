@@ -1,7 +1,7 @@
 import { experimental_upgradeWebSocket } from "@vercel/functions";
 import { getUser } from "@/features/auth/guard";
 import { getSessionId } from "@/features/auth/queries";
-import { onMessage, realtimeConfigured } from "@/features/realtime/redis";
+import { onMessage, canReceive } from "@/features/realtime/redis";
 
 // Sockets are pinned to one instance for their lifetime, and instances don't
 // share memory — so a change published by whichever instance handled the write
@@ -19,7 +19,10 @@ export async function GET(request) {
   // No Redis means no fan-out, and a socket that can never deliver anything is
   // worse than none — the client would sit there believing it is live. Refuse,
   // and let it fall back to refetch-on-focus.
-  if (!realtimeConfigured()) {
+  // canReceive(), not just "is REDIS_URL set": if the subscriber could not be
+  // created this instance can never deliver anything, and a socket that looks
+  // live but is deaf is worse than no socket at all.
+  if (!canReceive()) {
     return new Response("realtime is not configured", { status: 503 });
   }
 
@@ -29,6 +32,18 @@ export async function GET(request) {
   const user = await getUser();
   if (!user) return new Response("unauthorized", { status: 401 });
 
+  try {
+    return upgrade(user);
+  } catch (e) {
+    // experimental_upgradeWebSocket throws when the runtime has no upgrade
+    // support, or when `ws` is missing. Refuse the way the check above does
+    // rather than 500 on every attempt.
+    console.error("ws upgrade unavailable:", e.message);
+    return new Response("realtime is not available", { status: 503 });
+  }
+}
+
+function upgrade(user) {
   return experimental_upgradeWebSocket((ws) => {
     // Which scopes this socket cares about — an idea id, or "board".
     const scopes = new Set();
@@ -75,11 +90,18 @@ export async function GET(request) {
       }
     });
 
-    ws.on("close", () => {
+    // One teardown, reachable from both exits. An 'error' emission with no
+    // listener is an uncaught exception in Node — which would take down the
+    // whole invocation, and with it every other socket pinned to this instance
+    // and the shared Redis subscriber.
+    const cleanup = () => {
+      if (closed) return;
       closed = true;
       stopListening();
       clearInterval(recheck);
       clearTimeout(expiring);
-    });
+    };
+    ws.on("close", cleanup);
+    ws.on("error", (e) => { console.error("ws:", e?.message || e); cleanup(); });
   });
 }
