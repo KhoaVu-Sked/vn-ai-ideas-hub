@@ -13,6 +13,7 @@ import AppHeader from "@/components/AppHeader";
 import SubmitModal from "@/features/ideas/SubmitModal";
 import Loading from "@/components/Loading";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
+import useLive from "@/features/realtime/useLive";
 import TaskBoard from "@/features/ideas/TaskBoard";
 import TaskModal from "@/features/ideas/TaskModal";
 import TaskDrawer from "@/features/ideas/TaskDrawer";
@@ -97,6 +98,8 @@ export default function IdeaPage() {
     } catch { /* leave the current view alone */ }
   }, [id]);
   useRevalidateOnFocus(refresh, { enabled: !editing && !showSubmit && !showRoles && !taskModal && !openTask });
+  // Same guard as above: a live ping must not land mid-edit either.
+  useLive(id, refresh, { enabled: !editing && !showSubmit && !showRoles && !taskModal && !openTask });
   useEffect(() => { api("/api/tags").then(({ tags }) => setTagCatalog(tags || [])).catch(() => {}); }, []);
   useEffect(() => { api("/api/form-fields").then(({ fields }) => setFormFields(fields || [])).catch(() => {}); }, []);
 

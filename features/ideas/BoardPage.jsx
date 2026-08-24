@@ -10,6 +10,7 @@ import AppHeader from "@/components/AppHeader";
 import SubmitModal from "@/features/ideas/SubmitModal";
 import Loading from "@/components/Loading";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
+import useLive from "@/features/realtime/useLive";
 import { api } from "@/lib/apiClient";
 
 // ─────────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ function Board() {
   useEffect(() => { const q = searchParams.get("q"); if (q) setSearch(q); }, [searchParams]);
   // Someone else may have changed an idea while this tab sat idle.
   useRevalidateOnFocus(loadList, { enabled: !showSubmit });
+  useLive("board", loadList, { enabled: !showSubmit });
 
   // Preview drawer — light detail, cache-first.
   const openPreview = useCallback(async (p) => {

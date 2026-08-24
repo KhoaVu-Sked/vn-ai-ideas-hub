@@ -3,6 +3,7 @@ import { deleteIdeaTask, moveIdeaTask, updateIdeaTask } from "@/features/ideas/q
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { ideaEvent } from "@/features/notifications/notify";
+import { publishIdea } from "@/features/realtime/publish";
 
 // PATCH /api/ideas/:id/tasks/:taskId
 //   { state } → move it to another board column
@@ -11,6 +12,7 @@ export async function PATCH(request, { params }) {
   try {
     const user = await requireUser();
     const { id, taskId } = await params;
+    publishIdea(id, "task");
     const patch = await request.json();
     const isAdmin = user.role === "admin";
     const moving = patch.state !== undefined;

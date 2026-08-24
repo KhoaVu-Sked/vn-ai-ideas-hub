@@ -3,12 +3,13 @@ import { addComment, listTaskComments } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { ideaEvent } from "@/features/notifications/notify";
+import { publishIdea } from "@/features/realtime/publish";
 
 // GET /api/ideas/:id/tasks/:taskId/comments → the thread on one task
 export async function GET(_request, { params }) {
   try {
     const user = await requireUser();
-    const { taskId } = await params;
+    const { id, taskId } = await params;
     return Response.json({ comments: await listTaskComments(taskId, user.uid) });
   } catch (e) {
     return jsonError(e, "Could not load the comments.");
@@ -20,6 +21,7 @@ export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id, taskId } = await params;
+    publishIdea(id, "comment");
     const { body } = await request.json();
     const comment = await addComment(id, user.uid, body, taskId);
     const base = new URL(request.url).origin;

@@ -72,6 +72,13 @@ add to that list when you retire more.
 Moving something into `components/` means anyone can depend on it, so changing
 its props is now a cross-feature change. Check who imports it first.
 
+### A write route under an idea
+
+Add a `publishIdea(id, kind)` call, or the board will not update live for anyone
+else. Put it **after** the write succeeds, not at the top of the handler, and
+never in a `GET` — a publish on read means every reader triggers a refetch for
+every viewer.
+
 ### An environment variable
 
 | Also change | Why |

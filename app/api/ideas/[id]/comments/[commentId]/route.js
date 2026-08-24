@@ -1,12 +1,14 @@
 import { deleteComment, updateComment } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
+import { publishIdea } from "@/features/realtime/publish";
 
 // PATCH /api/ideas/:id/comments/:commentId { body } → reword your own
 export async function PATCH(request, { params }) {
   try {
     const user = await requireUser();
-    const { commentId } = await params;
+    const { id, commentId } = await params;
+    publishIdea(id, "comment");
     const { body } = await request.json();
     return Response.json({ comment: await updateComment(commentId, user.uid, user.role === "admin", body) });
   } catch (e) {
@@ -18,7 +20,8 @@ export async function PATCH(request, { params }) {
 export async function DELETE(_request, { params }) {
   try {
     const user = await requireUser();
-    const { commentId } = await params;
+    const { id, commentId } = await params;
+    publishIdea(id, "comment");
     await deleteComment(commentId, user.uid, user.role === "admin");
     return Response.json({ ok: true });
   } catch (e) {

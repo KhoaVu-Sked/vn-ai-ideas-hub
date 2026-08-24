@@ -3,12 +3,15 @@ import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { after } from "next/server";
 import { adminEvent } from "@/features/notifications/notify";
+import { publishIdea, publishBoard } from "@/features/realtime/publish";
 
 // POST /api/ideas/:id/delete-request { reason } → project lead asks admin to delete
 export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    publishIdea(id, "delete-request");
+    publishBoard("delete-request");
     const isLead = await isProjectLead(id, user.uid);
     if (!isLead && user.role !== "admin") {
       return Response.json({ error: "Only the project lead can request deletion." }, { status: 403 });
@@ -38,6 +41,8 @@ export async function DELETE(_request, { params }) {
     const user = await requireUser();
     if (user.role !== "admin") return Response.json({ error: "Admins only." }, { status: 403 });
     const { id } = await params;
+    publishIdea(id, "delete-request");
+    publishBoard("delete-request");
     await clearDeleteRequest(id);
     return Response.json({ ok: true });
   } catch (e) {
