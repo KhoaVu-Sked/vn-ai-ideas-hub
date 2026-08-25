@@ -13,6 +13,12 @@ import { api } from "@/lib/apiClient";
 
 const AUTH_PATHS = new Set(["/login", "/register", "/forgot", "/skedadmin"]);
 
+// Module scope, so it survives the pathname changes below. This component lives
+// in the root layout and never unmounts, so keying the effect on the path meant
+// a database round trip on every navigation — for a value that changes once per
+// release, against a driver that charges a round trip per query.
+let asked = false;
+
 export default function WhatsNew() {
   const [news, setNews] = useState(null);
   const pathname = usePathname();
@@ -20,7 +26,8 @@ export default function WhatsNew() {
   useEffect(() => {
     // Nothing to announce to someone who has not signed in — and /api/whats-new
     // would 401, which apiClient turns into a redirect.
-    if (AUTH_PATHS.has(pathname)) return undefined;
+    if (AUTH_PATHS.has(pathname) || asked) return undefined;
+    asked = true;
     let live = true;
     api("/api/whats-new")
       .then((d) => { if (live && d.show) setNews(d.news); })
@@ -39,7 +46,7 @@ export default function WhatsNew() {
     <div
       onClick={close}
       style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.45)", display: "flex",
-               alignItems: "center", justifyContent: "center", zIndex: 120, padding: 20 }}
+               alignItems: "center", justifyContent: "center", zIndex: 90, padding: 20 }}
     >
       <div
         onClick={(e) => e.stopPropagation()}

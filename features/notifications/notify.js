@@ -7,7 +7,7 @@
 // The idea helpers also write the audit entry, so a route calls one function.
 
 import { addAuditEntry } from "@/features/admin/queries";
-import { getAdminEmails, getIdeaMeta, getIdeaRecipients } from "@/features/notifications/queries";
+import { emailsFor, getAdminEmails, getIdeaMeta, getIdeaRecipients } from "@/features/notifications/queries";
 import { sendEmail } from "@/features/notifications/mail";
 import { notificationsEnabled } from "@/features/admin/queries";
 import { renderEmail, renderEmailText } from "@/features/notifications/emailTemplate";
@@ -70,11 +70,17 @@ export function buildIdeaEmail({ meta, actor = "Someone", kind, detail = "", bod
   return { subject, html: renderEmail(parts), text: renderEmailText(parts) };
 }
 
-export async function notifyIdea(ideaId, { actorId, actor = "Someone", kind, detail = "", body = "", base } = {}) {
+// `also` is a list of account ids to reach in addition to this idea's members
+// and followers. Merging needs it: the people who followed the absorbed idea
+// have had their follow deleted by the time this runs, so they cannot be found
+// from the idea any more, and they are the ones most affected.
+export async function notifyIdea(ideaId, { actorId, actor = "Someone", kind, detail = "", body = "", base, also = [] } = {}) {
   try {
     const meta = await getIdeaMeta(ideaId);
     if (!meta) return;
-    const recipients = await getIdeaRecipients(ideaId, actorId);
+    const own = await getIdeaRecipients(ideaId, actorId);
+    const extra = await emailsFor(also, actorId);
+    const recipients = [...new Set([...own, ...extra])];
     if (recipients.length === 0) return;
     // Admin kill switch — see Manage → Settings. Deliberately checked here and
     // not in sendEmail, so sign-up and password-reset codes keep working.

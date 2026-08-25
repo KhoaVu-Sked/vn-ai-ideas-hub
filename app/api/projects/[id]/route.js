@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { getProject, isProjectLead, updateStatus } from "@/features/ideas/queries";
+import { getProject, isProjectLead, updateStatus , assertNotMerged } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { ideaEvent } from "@/features/notifications/notify";
@@ -23,6 +23,7 @@ export async function PATCH(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    await assertNotMerged(id);
     const canEdit = user.role === "admin" || (await isProjectLead(id, user.uid));
     if (!canEdit) return Response.json({ error: "Only the project lead can change status." }, { status: 403 });
     const { status } = await request.json();

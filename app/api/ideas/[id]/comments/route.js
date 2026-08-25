@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { addComment } from "@/features/ideas/queries";
+import { addComment , assertNotMerged } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { ideaEvent } from "@/features/notifications/notify";
@@ -10,6 +10,7 @@ export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    await assertNotMerged(id);
     const { body } = await request.json();
     const comment = await addComment(id, user.uid, body);
     const base = new URL(request.url).origin;

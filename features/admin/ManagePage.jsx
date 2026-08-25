@@ -57,7 +57,11 @@ function ManagePage() {
       const [t, a, fb, ff, tf, dr, st, mq] = await Promise.all([
         api("/api/tags"), api("/api/accounts"), api("/api/feedback"),
         api("/api/form-fields"), api("/api/time-frames"), api("/api/ideas/delete-requests"),
-        api("/api/settings"), api("/api/merge-requests"),
+        api("/api/settings"),
+        // Tolerated separately: if merge_requests hasn't been created yet, the
+        // whole page used to come back empty — no tags, no accounts, no fields —
+        // behind one error banner.
+        api("/api/merge-requests").catch(() => ({ requests: [] })),
       ]);
       setEmailOn(st.settings.email_notifications);
       setTags(t.tags);
@@ -141,11 +145,20 @@ function ManagePage() {
       const names = r.sources.map((x) => `${x.number} ${x.name}`).join(", ");
       if (!confirm(`Merge ${names} into ${r.main.number} ${r.main.name}?\n\nTheir requests, likes, follows and team will be removed. This cannot be undone.`)) return;
     }
-    const reason = decision === "reject" ? (prompt("Why are you rejecting it? (optional)") ?? "") : "";
+    let reason = "";
+    if (decision === "reject") {
+      // null means Cancel. Coercing it to "" rejected the request anyway.
+      const typed = prompt("Why are you rejecting it? (optional)");
+      if (typed === null) return;
+      reason = typed;
+    }
     run(async () => {
-      await api(`/api/merge-requests/${r.id}`, { method: "PATCH", body: JSON.stringify({ decision, reason }) });
+      const res = await api(`/api/merge-requests/${r.id}`, { method: "PATCH", body: JSON.stringify({ decision, reason }) });
       setMergeRequests((rs) => rs.filter((x) => x.id !== r.id));
       if (decision === "approve") await load();      // the board and lists moved
+      // Some sources merged and some didn't: the admin is the only person who
+      // can tell, so it must not read as a clean success.
+      if (res?.message) setErr(res.message);
     }, decision === "approve" ? "Merged." : "Merge request rejected.");
   };
 
@@ -168,7 +181,7 @@ function ManagePage() {
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Section</label>
               <select value={view} onChange={(e) => setView(e.target.value)} style={{ ...field, width: 240, fontWeight: 700, fontSize: 13.5, padding: "9px 12px" }}>
-                {MANAGE_SECTIONS.map(([v, l]) => <option key={v} value={v}>{l}{v === "feedback" && openFb > 0 ? ` (${openFb})` : ""}{v === "deletions" && deleteRequests.length > 0 ? ` (${deleteRequests.length})` : ""}</option>)}
+                {MANAGE_SECTIONS.map(([v, l]) => <option key={v} value={v}>{l}{v === "feedback" && openFb > 0 ? ` (${openFb})` : ""}{v === "merges" && mergeRequests.length > 0 ? ` (${mergeRequests.length})` : ""}{v === "deletions" && deleteRequests.length > 0 ? ` (${deleteRequests.length})` : ""}</option>)}
               </select>
             </div>
 

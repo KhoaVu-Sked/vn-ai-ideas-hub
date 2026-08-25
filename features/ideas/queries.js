@@ -114,6 +114,27 @@ export async function updateContent(id, { context, pain_points, expected_benefit
 // ── idea deletion ─────────────────────────────────────────────
 // Hard delete (admin). Returns attachment blob URLs so the route can clean them.
 export async function deleteIdea(id) {
+  // Deleting an idea caught up in a merge does damage that is invisible until
+  // much later:
+  //   · it is the one others were merged into → their merged_into is set null by
+  //     the FK, and ideas that have been gutted (content copied away, files
+  //     moved, team and comments deleted) reappear on the board as if live
+  //   · it is named by a merge request → that row cascades away, taking with it
+  //     the only record of why other ideas disappeared
+  const tangled = await sql`
+    select
+      (select count(*) from ideas where merged_into = ${id})::int as absorbed,
+      (select count(*) from merge_requests
+        where main_idea_id = ${id} or ${id} = any(source_ids))::int as requests
+  `;
+  const t = tangled[0] || {};
+  if (t.absorbed > 0) {
+    throw err(409, `${t.absorbed} idea(s) were merged into this one. Deleting it would bring them back as empty ideas.`);
+  }
+  if (t.requests > 0) {
+    throw err(409, "This idea is part of a merge request. Deleting it would erase the record of that merge.");
+  }
+
   const urls = (await sql`select url from attachments where idea_id = ${id}`).map((r) => r.url);
   const rows = await sql`delete from ideas where id = ${id} returning id`;
   if (rows.length === 0) throw err(404, "This idea no longer exists.");
@@ -293,8 +314,33 @@ export async function addAttachment(ideaId, accountId, { kind = "file", label, f
 }
 
 export async function getAttachment(attId) {
-  const rows = await sql`select id, idea_id, url, filename, content_type from attachments where id = ${attId}`;
+  const rows = await sql`select id, idea_id, kind, url, filename, content_type from attachments where id = ${attId}`;
   return rows[0] || null;
+}
+
+// Rename: the requirement is "edit or remove", and only remove existed. Editing
+// is limited to the label — changing a file's bytes or a link's target would be
+// a different document under the same name, which is worse than adding a new one.
+export async function renameAttachment(attId, accountId, isAdmin, label) {
+  const name = (label || "").trim().slice(0, 200);
+  if (!name) throw err(400, "Give it a name.");
+  const rows = await sql`
+    update attachments at set label = ${name}
+    where at.id = ${attId}
+      and ( at.account_id = ${accountId}
+         or ${isAdmin}
+         or exists (select 1 from idea_members m
+                    where m.idea_id = at.idea_id and m.account_id = ${accountId}
+                      and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
+    returning id, kind, label, filename, url, size
+  `;
+  if (rows.length === 0) throw err(403, "You can't rename this.");
+  const r = rows[0];
+  return { id: r.id, kind: r.kind, label: r.label, filename: r.filename, url: r.url, size: Number(r.size) };
 }
 
 // Author, or a moderator (idea lead / admin), can delete. Returns the blob URL.
@@ -373,8 +419,32 @@ function cleanRoles(roles) {
   return [...new Set(list)];
 }
 
-export async function joinTeam(ideaId, accountId, roles) {
+// Joining a team. The working roles are self-service; the two singular ones are
+// not, and that distinction is load-bearing.
+//
+// Project Lead carries every permission on an idea. Until the creator became the
+// Initiator, the creator held Project Lead, so the seat was always occupied and
+// the partial unique index quietly stopped anyone else taking it. Now the seat
+// starts empty, so without this check any signed-in person could POST
+// {"roles":["Project Lead"]} at somebody else's idea and take control of it —
+// rewriting the content, changing status, deleting the author's comments.
+//
+// So Project Lead may only be taken by an admin or by the person who raised the
+// idea, and Initiator is never self-service: it records who raised it.
+export async function joinTeam(ideaId, accountId, roles, { isAdmin = false } = {}) {
   const list = cleanRoles(roles);
+
+  if (list.includes(INITIATOR_ROLE)) {
+    throw err(403, `${INITIATOR_ROLE} records who raised the idea — it can't be taken.`);
+  }
+  if (list.includes(LEAD_ROLE) && !isAdmin) {
+    const own = await sql`
+      select 1 from ideas where id = ${ideaId} and initiator_account_id = ${accountId}
+    `;
+    if (own.length === 0) {
+      throw err(403, `Only an admin or the person who raised this idea can take ${LEAD_ROLE}.`);
+    }
+  }
   try {
     const rows = await sql`
       with ins as (
@@ -666,4 +736,16 @@ export async function setStar(ideaId, on, adminId) {
   `;
   if (rows.length === 0) throw err(404, "Idea not found.");
   return { id: rows[0].id, name: rows[0].name, starred: rows[0].starred };
+}
+
+// A merged idea is kept only so its URL can redirect. Writing to one is always a
+// mistake: the comment or like would be invisible for ever — the idea is off the
+// board, excluded from the dashboard, and nobody will open it again. The browser
+// redirects, but a stale tab, a queued request or a direct call would not.
+export async function assertNotMerged(ideaId) {
+  const rows = await sql`select merged_into from ideas where id = ${ideaId}`;
+  if (rows.length === 0) throw err(404, "Idea not found.");
+  if (rows[0].merged_into) {
+    throw err(409, "This idea was merged into another one — open that idea instead.");
+  }
 }

@@ -1,4 +1,4 @@
-import { toggleLike } from "@/features/ideas/queries";
+import { toggleLike , assertNotMerged } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { publishIdea, publishBoard } from "@/features/realtime/publish";
@@ -8,6 +8,7 @@ export async function POST(_request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    await assertNotMerged(id);
     const result = await toggleLike(id, user.uid);
     // After the write. publish.js defers the send itself, so this must
     // not be wrapped in after() — nesting would drop the callback.

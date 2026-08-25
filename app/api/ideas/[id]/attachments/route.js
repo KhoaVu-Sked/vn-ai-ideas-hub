@@ -1,5 +1,5 @@
 import { put } from "@vercel/blob";
-import { addAttachment } from "@/features/ideas/queries";
+import { addAttachment , assertNotMerged } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { validateUpload } from "@/lib/upload";
@@ -15,6 +15,7 @@ export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    await assertNotMerged(id);
 
     if ((request.headers.get("content-type") || "").includes("application/json")) {
       const { kind, label, url } = await request.json();

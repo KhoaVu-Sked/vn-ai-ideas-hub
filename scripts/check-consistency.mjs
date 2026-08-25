@@ -192,6 +192,9 @@ const fail = (check, detail, why) => problems.push({ check, detail, why });
         for (const n of m[1].split(",")) scope.add(n.trim().split(":").pop().trim());
       }
       for (const m of part.matchAll(/(?:const|let|var)\s+(\w+)\s*=/g)) scope.add(m[1]);
+      // for (const x of …) and .map((x) => …) bind a name without an `=`.
+      for (const m of part.matchAll(/for\s*\(\s*(?:const|let|var)\s+(\w+)\s+of\b/g)) scope.add(m[1]);
+      for (const m of part.matchAll(/\(\s*\(?(\w+)\)?\s*=>/g)) scope.add(m[1]);
       for (const m of src.matchAll(/^(?:const|let|function)\s+(\w+)/gm)) scope.add(m[1]);
       for (const m of src.matchAll(/^import[^;]*?\{([^}]*)\}/gm)) {
         for (const n of m[1].split(",")) scope.add(n.trim().split(" as ").pop().trim());
@@ -202,6 +205,39 @@ const fail = (check, detail, why) => problems.push({ check, detail, why });
           fail("undeclared-arg", `${file}: publish…(${name}) in ${verb[1]}`,
             "not declared in this handler — a ReferenceError that becomes a 500 on a committed write");
         }
+      }
+    }
+  }
+}
+
+// ── 7. Every Manage section must have somewhere to render ─────────
+// sections.js drives both the header menu and the page selector. A key with no
+// matching branch is a menu entry that opens a blank panel — and nothing else
+// would tell you.
+{
+  const list = read("features/admin/sections.js");
+  const page = read("features/admin/ManagePage.jsx");
+  for (const m of list.matchAll(/\["(\w+)",\s*"[^"]*"\]/g)) {
+    const key = m[1];
+    if (!page.includes(`view === '${key}'`) && !page.includes(`view === "${key}"`)) {
+      fail("orphan-section", `sections.js: "${key}"`, "no render branch in ManagePage — the menu entry would show nothing");
+    }
+  }
+}
+
+// ── 8. The release note must be bumped when its content changes ────
+// last_seen_release is compared against RELEASE. Editing NEWS without changing
+// RELEASE means nobody who dismissed the previous note ever sees the new one.
+{
+  const src = read("features/announcements/release.js");
+  if (src) {
+    const rel = (src.match(/export const RELEASE = "([^"]+)"/) || [])[1];
+    if (!rel) fail("release", "features/announcements/release.js", "no RELEASE constant");
+    else {
+      // The key is a date plus a slug; a stale one is the common mistake.
+      const dated = /^\d{4}-\d{2}-\d{2}/.test(rel);
+      if (!dated) {
+        fail("release", `RELEASE = "${rel}"`, "start it with a date so a stale key is obvious at a glance");
       }
     }
   }

@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { createIdeaTask } from "@/features/ideas/queries";
+import { createIdeaTask , assertNotMerged } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { ideaEvent } from "@/features/notifications/notify";
@@ -11,6 +11,7 @@ export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    await assertNotMerged(id);
     const body = await request.json();
     const task = await createIdeaTask(id, user.uid, body);
     const base = new URL(request.url).origin;

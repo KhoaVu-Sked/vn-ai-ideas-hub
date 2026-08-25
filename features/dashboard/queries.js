@@ -20,13 +20,13 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
         and (${since}::timestamptz is null or i.created_at >= ${since})
     `,
     quarterStart
-      ? sql`select count(*)::int as n from ideas where created_at >= ${quarterStart}`
+      ? sql`select count(*)::int as n from ideas where merged_into is null and created_at >= ${quarterStart}`
       : Promise.resolve([{ n: 0 }]),
     sql`
       select
         (select count(*) from accounts)::int as total_accounts,
         (select count(*) from (
-          select initiator_account_id as acct from ideas where initiator_account_id is not null
+          select initiator_account_id as acct from ideas where initiator_account_id is not null and merged_into is null
           union select account_id from likes
           union select account_id from requests
           union select account_id from idea_members
@@ -44,7 +44,8 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
       from ideas i
       cross join unnest(i.tags) as t
       left join tags tg on tg.name = t
-      where (${since}::timestamptz is null or i.created_at >= ${since})
+      where i.merged_into is null
+        and (${since}::timestamptz is null or i.created_at >= ${since})
       group by t order by n desc, t asc
     `,
     sql`
@@ -52,7 +53,9 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
         greatest(0, extract(day from (now() - updated_at))::int) as days_update,
         greatest(0, extract(day from (now() - created_at))::int) as days_created
       from ideas
-      where status in ('On Hold', 'In Review') and (${since}::timestamptz is null or created_at >= ${since})
+      where merged_into is null
+        and status in ('On Hold', 'In Review')
+        and (${since}::timestamptz is null or created_at >= ${since})
     `,
     sql`
       select * from (
@@ -61,7 +64,8 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
           (select count(*) from requests r where r.idea_id = i.id)::int as requests,
           (select count(*) from idea_members m where m.idea_id = i.id)::int as members
         from ideas i
-        where (${since}::timestamptz is null or i.created_at >= ${since})
+        where i.merged_into is null
+          and (${since}::timestamptz is null or i.created_at >= ${since})
       ) x
       order by (likes + requests + members) desc, name asc
       limit 8
