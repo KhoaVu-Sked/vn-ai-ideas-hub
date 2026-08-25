@@ -129,3 +129,19 @@ export async function updateEvent(accessToken, eventId, event) {
   if (!res.ok) throw Object.assign(new Error(body.error?.message || "Could not update the calendar event."), { status: res.status });
   return body;
 }
+
+// Used by Reset (Your Journey) to clean up whatever Auto Schedule booked, so
+// a demo account can be reset and re-run without stale events piling up on
+// the connected calendar. 404/410 both mean it's already gone (deleted by
+// the learner themselves, or this call running twice) — treated as success,
+// not an error, since the end state either way is "no event there."
+export async function deleteEvent(accessToken, eventId) {
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error?.message || "Could not delete the calendar event.");
+  }
+}

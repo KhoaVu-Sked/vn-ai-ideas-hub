@@ -757,12 +757,16 @@ export default function JourneyPage() {
   const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
   const resetJourney = async () => {
-    if (!confirm("Reset your journey back to the original track? This clears all recorded progress and skips, any custom reordering, and any target dates you've set — every course reverts to not started (only Intern stays unlocked).")) return;
+    if (!confirm("Reset your journey back to the original track? This clears all recorded progress and skips, any custom reordering, and any target dates you've set — every course reverts to not started (only Intern stays unlocked). Any Auto Schedule events on your Google Calendar are deleted too.")) return;
     setResetting(true);
     setErr("");
     try {
-      await api("/api/journey/reset", { method: "POST" });
+      const { calendarError } = await api("/api/journey/reset", { method: "POST" });
       await load();
+      // Non-fatal: the roadmap reset already succeeded by this point — this
+      // just tells the learner their Google Calendar may still have a
+      // leftover event or two to clear by hand.
+      if (calendarError) setErr(calendarError);
     } catch (e) {
       setErr(e.message);
     } finally {

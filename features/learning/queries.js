@@ -264,9 +264,13 @@ export async function skipPrerequisiteFor(courseId, accountId) {
 // above). With nothing recorded, only the Intern tier's gate is open — that
 // tier has no tier below it — so everything past it shows Locked again,
 // exactly the track's original state.
+// Returns the calendar_event_ids being orphaned by the delete, so the route
+// can also clean those up on the learner's actual Google Calendar — Reset
+// otherwise clears this app's own data while leaving Auto Schedule's events
+// sitting on their calendar with nothing here pointing at them anymore.
 export async function resetJourney(accountId) {
-  const rows = await sql`delete from course_assignments where account_id = ${accountId} returning course_id`;
-  return { reset: rows.length };
+  const rows = await sql`delete from course_assignments where account_id = ${accountId} returning course_id, calendar_event_id`;
+  return { reset: rows.length, eventIds: rows.map((r) => r.calendar_event_id).filter(Boolean) };
 }
 
 // Toggle "I'm on this track" — same delete-first-else-insert idiom as

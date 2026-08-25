@@ -199,6 +199,7 @@ The calculation (`features/learning/scheduler.js`) is a plain freebusy-diff: cou
 - Each not-yet-done course in that range across their enrolled tracks gets one study-block event (`Study: {title}`), capped at 4 hours per block regardless of `est_hours` (one session per course, not a multi-day split — `capped: true` surfaces in the result when this kicks in).
 - Writes land on the same `course_assignments.target_date` Up next's pencil-edit already writes, so results appear there immediately — plus `calendar_event_id`, so re-running Auto Schedule updates existing events instead of duplicating them (falls back to creating a new one if the learner deleted it on their own calendar).
 - A revoked/expired Google connection (`invalid_grant`) drops the stored `calendar_connections` row automatically, so the next attempt correctly asks to reconnect rather than failing the same way silently.
+- **Reset** (4.5) also deletes whatever Auto Schedule booked on the caller's Google Calendar, not just this app's own rows — best-effort: the roadmap reset always lands even if the calendar cleanup partly fails (surfaced as a non-fatal message), useful for re-running a demo cleanly.
 
 **Acceptance criteria:**
 - [x] Not-connected learners are prompted to connect Google Calendar inline, redirected back to the same modal on success
