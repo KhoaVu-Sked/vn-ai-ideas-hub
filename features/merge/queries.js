@@ -32,9 +32,16 @@ export async function createMergeRequest(mainIdeaId, sourceIds, accountId) {
   if (main.length === 0) throw err(404, "Idea not found.");
   if (main[0].merged_into) throw err(400, "This idea has itself been merged into another.");
 
+  // Both directions. Without the crossing checks you can queue "fold B into A"
+  // and "fold A into C" at once; approving them in that order files B's content
+  // onto an idea that is itself already merged away, where nobody will find it.
   const open = await sql`
     select id from merge_requests
-    where status = 'pending' and (main_idea_id = ${mainIdeaId} or source_ids && ${ids}::uuid[])
+    where status = 'pending'
+      and ( main_idea_id = ${mainIdeaId}
+         or source_ids && ${ids}::uuid[]
+         or main_idea_id = any(${ids}::uuid[])
+         or ${mainIdeaId} = any(source_ids) )
   `;
   if (open.length) throw err(409, "One of these ideas is already in a pending merge request.");
 
@@ -90,17 +97,38 @@ export async function rejectMergeRequest(reqId, adminId, reason) {
 // round trip per query, so each source is a single CTE chain rather than six
 // sequential statements.
 export async function approveMergeRequest(reqId, adminId) {
-  const reqs = await sql`
-    select id, main_idea_id, source_ids from merge_requests
+  // Claim it first, in one statement, and only proceed if we won. The HTTP
+  // driver gives every statement its own transaction, so reading "pending" and
+  // stamping "approved" at the end left a window where two admins clicking
+  // Approve together both did the work — inserting the merged write-up twice
+  // and sending two emails.
+  const claimed = await sql`
+    update merge_requests
+    set status = 'approved', decided_by = ${adminId}, decided_at = now()
     where id = ${reqId} and status = 'pending'
+    returning main_idea_id, source_ids
   `;
-  if (reqs.length === 0) throw err(404, "That merge request is no longer pending.");
-  const { main_idea_id: mainId, source_ids: sourceIds } = reqs[0];
+  if (claimed.length === 0) throw err(409, "That merge request is no longer pending.");
+  const { main_idea_id: mainId, source_ids: sourceIds } = claimed[0];
+
+  // The main idea may itself have been merged away since the request was raised.
+  const live = await sql`select 1 from ideas where id = ${mainId} and merged_into is null`;
+  if (live.length === 0) {
+    await sql`
+      update merge_requests set status = 'rejected',
+        reason = 'The idea being kept has itself been merged into another.'
+      where id = ${reqId}
+    `;
+    throw err(409, "The idea being kept has itself been merged into another.");
+  }
   const ids = Array.isArray(sourceIds) ? sourceIds : String(sourceIds).replace(/[{}]/g, "").split(",").filter(Boolean);
 
   const merged = [];
+  const failed = [];
+  const affected = new Set();   // people who followed or worked on a merged idea
   for (const sourceId of ids) {
-    const rows = await sql`
+    try {
+      const rows = await sql`
       with src as (
         select i.*, coalesce(a.name, a.username) as author_name
         from ideas i left join accounts a on a.id = i.initiator_account_id
@@ -112,16 +140,28 @@ export async function approveMergeRequest(reqId, adminId) {
       note as (
         insert into comments (idea_id, request_id, account_id, body, created_at)
         select ${mainId}, null,
-               coalesce(src.initiator_account_id, ${adminId}),
+               -- initiator_account_id has no foreign key, but comments.account_id
+               -- does. An idea raised by someone since deleted would otherwise
+               -- fail the insert and make that idea permanently unmergeable.
+               coalesce((select id from accounts where id = src.initiator_account_id), ${adminId}),
                'Merged from ' || 'IDEA-' || lpad(coalesce(src.seq, 0)::text, 3, '0')
                  || ' — ' || src.name || E'\n\n'
                  || 'Context: '          || coalesce(nullif(src.context, ''), '—')          || E'\n\n'
                  || 'Pain points: '      || coalesce(nullif(src.pain_points, ''), '—')      || E'\n\n'
                  || 'Expected benefit: ' || coalesce(nullif(src.expected_benefit, ''), '—')
-                 || case when src.extra is null or src.extra::text = '{}' then ''
-                         else E'\n\n' || (select string_agg(k || ': ' || coalesce(v #>> '{}', '—'), E'\n')
+                 || case when coalesce(nullif(array_to_string(src.tags, ', '), ''), '') = '' then ''
+                         else E'\n\n' || 'Category: ' || array_to_string(src.tags, ', ') end
+                 || case when coalesce(src.target_date, '') = '' then ''
+                         else E'\n\n' || 'Expected time frame: ' || src.target_date end
+                 -- jsonb_each throws on anything that is not an object, and extra
+                 -- can be coerced into an array through the content endpoint.
+                 || case when jsonb_typeof(src.extra) <> 'object' or src.extra::text = '{}' then ''
+                         else E'\n\n' || (select string_agg(k || ': ' || coalesce(v #>> '{}', '—'), E'\n' order by k)
                                           from jsonb_each(src.extra) as e(k, v)) end,
-               coalesce(src.created_at, now())
+               -- now(), not the source's creation date. Comments sort ascending,
+               -- so back-dating buried the merge note mid-thread and the merge
+               -- looked like it had done nothing.
+               now()
         from src
         returning id
       ),
@@ -135,28 +175,37 @@ export async function approveMergeRequest(reqId, adminId) {
       -- source are dropped rather than folded in.
       del_req  as (delete from requests where idea_id = ${sourceId} and exists (select 1 from src) returning id),
       del_like as (delete from likes    where idea_id = ${sourceId} and exists (select 1 from src) returning idea_id),
-      del_fol  as (delete from follows  where idea_id = ${sourceId} and exists (select 1 from src) returning idea_id),
-      del_mem  as (delete from idea_members where idea_id = ${sourceId} and exists (select 1 from src) returning id),
+      -- Returning the account ids: these are the people who were following or on
+      -- the team of the idea that just disappeared, and they are the ones who
+      -- most need telling. After this statement there is no way to find them.
+      del_fol  as (delete from follows  where idea_id = ${sourceId} and exists (select 1 from src) returning account_id),
+      del_mem  as (delete from idea_members where idea_id = ${sourceId} and exists (select 1 from src) returning account_id),
       del_com  as (delete from comments where idea_id = ${sourceId} and exists (select 1 from src) returning id)
       update ideas set merged_into = ${mainId}, updated_at = now()
       where id = ${sourceId} and exists (select 1 from src)
-      returning id, name, seq
+      returning id, name, seq,
+        array(select account_id from del_fol
+              union select account_id from del_mem) as affected
     `;
-    if (rows.length) {
-      merged.push({
-        id: rows[0].id,
-        name: rows[0].name,
-        number: `IDEA-${String(rows[0].seq ?? 0).padStart(3, "0")}`,
-      });
+      if (rows.length) {
+        merged.push({
+          id: rows[0].id,
+          name: rows[0].name,
+          number: `IDEA-${String(rows[0].seq ?? 0).padStart(3, "0")}`,
+        });
+        for (const acc of rows[0].affected || []) affected.add(acc);
+      }
+    } catch (e) {
+      // One source failing must not hide the ones that already went through.
+      // The request is already claimed, so it will not sit in the queue looking
+      // untouched — the caller reports what happened to each.
+      console.error(`merge: source ${sourceId} failed —`, e.message);
+      failed.push({ id: sourceId, error: e.message });
     }
   }
 
-  await sql`
-    update merge_requests set status = 'approved', decided_by = ${adminId}, decided_at = now()
-    where id = ${reqId}
-  `;
   const main = await sql`select id, name from ideas where id = ${mainId}`;
-  return { main: main[0] || { id: mainId }, merged };
+  return { main: main[0] || { id: mainId }, merged, failed, affected: [...affected] };
 }
 
 // For the merge picker: everything mergeable, newest first. Search is done on

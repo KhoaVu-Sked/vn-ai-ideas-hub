@@ -22,7 +22,7 @@ create table if not exists ideas (
   starred               boolean not null default false,       -- admin-pinned; tops the board
   starred_by            uuid,
   starred_at            timestamptz,
-  merged_into           uuid,                                 -- set when folded into another idea
+  merged_into           uuid references ideas(id) on delete set null,  -- folded into another idea
   delete_requested      boolean not null default false,       -- project lead asked admin to delete
   delete_reason         text,
   delete_requested_by   uuid,

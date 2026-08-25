@@ -36,3 +36,17 @@ export async function getIdeaMeta(ideaId) {
   const rows = await sql`select name, 'IDEA-' || lpad(coalesce(seq, 0)::text, 3, '0') as number from ideas where id = ${ideaId}`;
   return rows[0] || null;
 }
+
+// Email addresses for a list of account ids, minus whoever caused the event.
+// One query, because the HTTP driver charges a round trip each.
+export async function emailsFor(accountIds, exceptId) {
+  const ids = [...new Set((accountIds || []).filter(Boolean).map(String))];
+  if (ids.length === 0) return [];
+  const rows = await sql`
+    select email from accounts
+    where id = any(${ids}::uuid[])
+      and email is not null
+      and (${exceptId}::uuid is null or id <> ${exceptId}::uuid)
+  `;
+  return rows.map((r) => r.email).filter(Boolean);
+}

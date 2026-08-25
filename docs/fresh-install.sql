@@ -22,7 +22,7 @@ create table if not exists ideas (
   starred               boolean not null default false,       -- admin-pinned; tops the board
   starred_by            uuid,
   starred_at            timestamptz,
-  merged_into           uuid,                                 -- set when folded into another idea
+  merged_into           uuid references ideas(id) on delete set null,  -- folded into another idea
   delete_requested      boolean not null default false,       -- project lead asked admin to delete
   delete_reason         text,
   delete_requested_by   uuid,
@@ -31,6 +31,7 @@ create table if not exists ideas (
 );
 create index if not exists ideas_updated_at_idx on ideas (updated_at desc);
 create index if not exists ideas_starred_idx on ideas (starred desc, updated_at desc);
+create index if not exists ideas_merged_into_idx on ideas (merged_into);
 
 -- Admin-configurable extra fields for the Submit form. Deleting a field ARCHIVES
 -- it (archived = true) — existing answers in ideas.extra are kept, never dropped.

@@ -1,5 +1,5 @@
 import { del } from "@vercel/blob";
-import { deleteAttachment } from "@/features/ideas/queries";
+import { deleteAttachment , renameAttachment } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { publishIdea } from "@/features/realtime/publish";
@@ -18,5 +18,20 @@ export async function DELETE(_request, { params }) {
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not remove the file.");
+  }
+}
+
+// PATCH /api/ideas/:id/attachments/:attId { label } → rename
+// Uploader, acting lead or admin only — the same rule as removing it.
+export async function PATCH(request, { params }) {
+  try {
+    const user = await requireUser();
+    const { id, attId } = await params;
+    const { label } = await request.json();
+    const attachment = await renameAttachment(attId, user.uid, user.role === "admin", label);
+    publishIdea(id, "attachment");
+    return Response.json({ attachment });
+  } catch (e) {
+    return jsonError(e, "Could not rename it.");
   }
 }

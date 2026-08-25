@@ -62,8 +62,13 @@ export function canMoveTask({ from, to, isLead, isAdmin, isAssignee }) {
 //
 // So: whoever holds Project Lead — and while nobody does, the Initiator. The
 // moment someone takes Project Lead, the Initiator's authority ends.
-export function actsAsLead(myRoles = [], members = []) {
-  if (myRoles.includes(LEAD_ROLE)) return true;
-  if (!myRoles.includes(INITIATOR_ROLE)) return false;
+export function actsAsLead(myRoles, members) {
+  const mine = myRoles || [];
+  if (mine.includes(LEAD_ROLE)) return true;
+  if (!mine.includes(INITIATOR_ROLE)) return false;
+  // No member list means we cannot know whether the seat is taken. Defaulting it
+  // to [] would have answered "vacant" and handed the Initiator full authority
+  // on an idea that already has a lead. Fail closed instead.
+  if (!Array.isArray(members)) return false;
   return !members.some((m) => (m.roles || []).includes(LEAD_ROLE));
 }

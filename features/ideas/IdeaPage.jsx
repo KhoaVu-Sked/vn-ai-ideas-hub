@@ -69,11 +69,15 @@ export default function IdeaPage() {
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState("");
   const [actionErr, setActionErr] = useState("");
+  // The page had only an error channel, so a confirmation was being drawn in
+  // red on pink and read as a failure.
+  const [actionOk, setActionOk] = useState("");
   const [tab, setTab] = useState("overview");     // overview | tasks
   const [commentText, setCommentText] = useState("");
   const [taskModal, setTaskModal] = useState(null); // { task } | {} while open
   const [showMerge, setShowMerge] = useState(false);
   const [docForm, setDocForm] = useState(null);   // { kind, label, url } while adding
+  const [renaming, setRenaming] = useState(null); // { id, label } while editing
   const [openTask, setOpenTask] = useState(null);
   const [showRoles, setShowRoles] = useState(false);
   const [pickedRoles, setPickedRoles] = useState([]);
@@ -146,7 +150,7 @@ export default function IdeaPage() {
   // A 401 leaves api() hanging on purpose, so its finally never runs and the
   // in-flight count would stay above zero, freezing refreshes for good.
   useEffect(() => onSessionEnd(() => { pendingWrites.current = 0; }), []);
-  const safeToRefresh = !editing && !showSubmit && !showRoles && !taskModal && !openTask;
+  const safeToRefresh = !editing && !showSubmit && !showRoles && !taskModal && !openTask && !showMerge && !docForm;
   refreshAllowed.current = safeToRefresh;
   useRevalidateOnFocus(refresh, { enabled: safeToRefresh });
   // Same guard as above: a live ping must not land mid-edit either.
@@ -178,10 +182,7 @@ export default function IdeaPage() {
 
   // This idea was folded into another one. Its row is kept so old links still
   // work — they just land on the idea it became part of.
-  if (idea.merged_into) {
-    if (typeof window !== "undefined") window.location.replace(`/idea/${idea.merged_into}`);
-    return <Shell><Loading label="This idea was merged — taking you there" /></Shell>;
-  }
+  if (idea.merged_into) return <MergedRedirect to={idea.merged_into} />;
   const isLead = actsAsLead(myRoles, members);
   // Derived, not read from the payload — joining, leaving or a role change
   // must flip this immediately.
@@ -370,6 +371,24 @@ export default function IdeaPage() {
     });
   };
 
+  // "Edit" here means the name only. Swapping the file or the link target would
+  // be a different document wearing the same label, which is worse than adding
+  // a new entry and removing the old one.
+  const saveDocName = () => {
+    const { id: attId, label } = renaming || {};
+    const name = (label || "").trim();
+    if (!name) { setActionErr("Give it a name."); return; }
+    const before = attachments.find((a) => a.id === attId);
+    setRenaming(null);
+    patch((d) => ({ attachments: d.attachments.map((a) => (a.id === attId ? { ...a, label: name } : a)) }));
+    run(async () => {
+      const { attachment } = await api(`/api/ideas/${id}/attachments/${attId}`, {
+        method: "PATCH", body: JSON.stringify({ label: name }),
+      });
+      patch((d) => ({ attachments: d.attachments.map((a) => (a.id === attId ? { ...a, ...attachment } : a)) }));
+    }, () => patch((d) => ({ attachments: d.attachments.map((a) => (a.id === attId ? before : a)) })));
+  };
+
   const changeStatus = (status) => {
     const prev = idea.status;
     patch((d) => ({ idea: { ...d.idea, status } })); // optimistic
@@ -464,8 +483,12 @@ export default function IdeaPage() {
       {showMerge && (
         <MergeModal
           ideaId={id} ideaNumber={idea.number} ideaName={idea.name}
+          ideaContext={idea.context} isAdmin={isAdmin}
           onClose={() => setShowMerge(false)}
-          onRequested={(n) => setActionErr(`Merge requested for ${n} idea${n === 1 ? "" : "s"} — an admin will review it.`)}
+          onRequested={(n) => {
+            setActionOk(`Merge requested for ${n} idea${n === 1 ? "" : "s"} — an admin will review it.`);
+            setTimeout(() => setActionOk(""), 6000);
+          }}
         />
       )}
       {openTask && (
@@ -477,6 +500,7 @@ export default function IdeaPage() {
         />
       )}
       {actionErr && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 14 }}>{actionErr}</div>}
+      {actionOk && <div style={{ background: "#ebf6ed", border: "1px solid #bde2c5", color: "#2f7a43", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 16, fontWeight: 600 }}>✓ {actionOk}</div>}
 
       {deleteRequested && (
         <div style={{ background: "#fff8ec", border: "1px solid #f4c8a4", borderRadius: 10, padding: "10px 14px", fontSize: 12.5, color: "#9f5314", marginBottom: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -630,23 +654,6 @@ export default function IdeaPage() {
           )}
 
           {/* Attachments */}
-          <div style={{ ...sectionLabel, marginTop: 26 }}>Attachments ({attachments.length})</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {attachments.map((a) => (
-              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px" }}>
-                <span style={{ fontSize: 14 }}>📎</span>
-                <a href={`/api/ideas/${id}/attachments/${a.id}/download`} style={{ flex: 1, fontSize: 13, color: "var(--blue)", fontWeight: 600, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.filename}</a>
-                <span style={{ fontSize: 11, color: "var(--faint)" }}>{fmtSize(a.size)}</span>
-                {(a.mine || canEdit) && <button onClick={() => removeAttachment(a.id)} title="Remove" style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>}
-              </div>
-            ))}
-            {attachments.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No files yet.</div>}
-          </div>
-          <label style={{ ...btnBase, display: "inline-block", marginTop: 10, cursor: "pointer" }}>
-            + Upload file
-            <input type="file" accept={ACCEPT_ATTR} onChange={(e) => { uploadFile(e.target.files?.[0]); e.target.value = ""; }} style={{ display: "none" }} />
-          </label>
-          <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>Word, Excel, PDF, or images · max 5 MB each.</div>
 
           {/* Comments — the Overview thread */}
           <div style={{ ...sectionLabel, marginTop: 26 }}>Comments ({comments.length})</div>
@@ -758,9 +765,23 @@ export default function IdeaPage() {
               {attachments.map((a) => (
                 <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 8, padding: "7px 10px" }}>
                   <span style={{ fontSize: 13 }}>{a.kind === "link" ? "\u{1F517}" : "\u{1F4CE}"}</span>
-                  <span className="breakable" style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: "var(--body)", fontWeight: 600 }}>
-                    {a.label || a.filename}
-                  </span>
+                  {renaming?.id === a.id ? (
+                    <input
+                      value={renaming.label} autoFocus
+                      onChange={(e) => setRenaming((r) => ({ ...r, label: e.target.value }))}
+                      onKeyDown={onEnter(saveDocName)}
+                      onBlur={saveDocName}
+                      style={{ flex: 1, minWidth: 0, border: "1px solid #d5dce6", borderRadius: 6, padding: "4px 7px", fontSize: 12.5, outline: "none" }}
+                    />
+                  ) : (
+                    <span className="breakable" style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: "var(--body)", fontWeight: 600 }}>
+                      {a.label || a.filename}
+                    </span>
+                  )}
+                  {(a.mine || canEdit) && renaming?.id !== a.id && (
+                    <button onClick={() => setRenaming({ id: a.id, label: a.label || a.filename })}
+                      title="Rename" style={{ border: "none", background: "none", color: "var(--faint)", cursor: "pointer", fontSize: 11.5, fontWeight: 700 }}>Edit</button>
+                  )}
                   {a.kind === "link" ? (
                     <a href={a.url} target="_blank" rel="noopener noreferrer"
                        style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>Enter</a>
@@ -770,7 +791,7 @@ export default function IdeaPage() {
                   )}
                   {(a.mine || canEdit) && (
                     <button onClick={() => removeAttachment(a.id)} title="Remove"
-                      style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>\u2715</button>
+                      style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>
                   )}
                 </div>
               ))}
@@ -863,4 +884,13 @@ function Shell({ onNewIdea, wide, children }) {
       <main style={{ maxWidth: wide ? 1360 : 1060, margin: "0 auto", padding: "20px 22px 0", transition: "max-width 500ms cubic-bezier(0.22, 1, 0.36, 1)" }}>{children}</main>
     </div>
   );
+}
+
+// A merged idea keeps its row so old links still work. Redirecting belongs in an
+// effect, not the render body — and router.replace keeps it a client navigation
+// rather than a full reload.
+function MergedRedirect({ to }) {
+  const router = useRouter();
+  useEffect(() => { router.replace(`/idea/${to}`); }, [router, to]);
+  return <Shell><Loading label="This idea was merged — taking you there" /></Shell>;
 }

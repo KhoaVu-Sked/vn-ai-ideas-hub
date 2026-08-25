@@ -8,21 +8,44 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/apiClient";
-import { onEnter } from "@/lib/onEnter";
 
-export default function MergeModal({ ideaId, ideaNumber, ideaName, onClose, onRequested }) {
+export default function MergeModal({ ideaId, ideaNumber, ideaName, ideaContext, isAdmin, onClose, onRequested }) {
   const [all, setAll] = useState(null);
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState(new Set());
   const [main, setMain] = useState({ id: ideaId, number: ideaNumber, name: ideaName });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  // Preview is specified as "the same as preview button in the main page", and
+  // the board's is an in-page slide-over — not a new tab. Same endpoint, same
+  // shape, so the two stay consistent if either changes.
+  const [preview, setPreview] = useState(null);   // { id, name, number, loading, content }
+
+  const openPreview = async (i) => {
+    setPreview({ id: i.id, name: i.name, number: i.number, loading: true });
+    try {
+      const d = await api(`/api/projects/${i.id}`);
+      setPreview((p) => (p && p.id === i.id
+        ? { ...p, loading: false, content: d.content, counts: d.counts, status: d.project?.status }
+        : p));
+    } catch (e) {
+      setPreview((p) => (p && p.id === i.id ? { ...p, loading: false, error: e.message } : p));
+    }
+  };
 
   useEffect(() => {
+    let live = true;
     api(`/api/ideas/${ideaId}/merge`)
-      .then((d) => setAll(d.ideas || []))
-      .catch((e) => { setErr(e.message); setAll([]); });
-  }, [ideaId]);
+      .then((d) => {
+        if (!live) return;
+        // Seed the page's own idea into the list. The server excludes it, but
+        // Promote makes another idea the one we keep — and then THIS idea has to
+        // be selectable, or Promote leads nowhere.
+        setAll([{ id: ideaId, number: ideaNumber, name: ideaName, context: ideaContext || "" }, ...(d.ideas || [])]);
+      })
+      .catch((e) => { if (live) { setErr(e.message); setAll([]); } });
+    return () => { live = false; };
+  }, [ideaId, ideaNumber, ideaName, ideaContext]);
 
   // Searching the client side: the list is capped at 200, so a round trip per
   // keystroke would cost more than it saves.
@@ -85,7 +108,7 @@ export default function MergeModal({ ideaId, ideaNumber, ideaName, onClose, onRe
         </div>
 
         <input
-          value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onEnter(() => {})}
+          value={q} onChange={(e) => setQ(e.target.value)}
           placeholder="Search by name or ID…"
           style={{ width: "100%", border: "1px solid #d5dce6", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", marginBottom: 12 }}
         />
@@ -114,8 +137,14 @@ export default function MergeModal({ ideaId, ideaNumber, ideaName, onClose, onRe
                   />
                   <span style={chip}>{i.number}</span>
                   <span className="breakable" style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", flex: 1, minWidth: 0 }}>{i.name}</span>
-                  <button onClick={() => window.open(`/idea/${i.id}`, "_blank", "noopener")} style={btn}>Preview</button>
-                  <button onClick={() => promote(i)} style={btn} title="Keep this one instead">Promote</button>
+                  <button onClick={() => openPreview(i)} style={btn}>Preview</button>
+                  {/* Promoting re-points the request at that idea, and the server
+                      checks lead rights on whichever idea is being kept — so a
+                      non-admin promoting an idea they don't lead would only find
+                      out on submit. */}
+                  {(isAdmin || i.id === ideaId) && (
+                    <button onClick={() => promote(i)} style={btn} title="Keep this one instead">Promote</button>
+                  )}
                 </div>
                 {i.context && (
                   <div className="breakable" style={{ fontSize: 12, color: "var(--muted)", marginTop: 6, marginLeft: 28 }}>{i.context}</div>
@@ -124,6 +153,38 @@ export default function MergeModal({ ideaId, ideaNumber, ideaName, onClose, onRe
             );
           })}
         </div>
+
+        {preview && (
+          <div onClick={() => setPreview(null)}
+            style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.35)", display: "flex",
+                     justifyContent: "flex-end", zIndex: 118 }}>
+            <div className="drawer-panel" onClick={(e) => e.stopPropagation()}
+              style={{ background: "#fff", width: 460, maxWidth: "100%", height: "100%", overflowY: "auto",
+                       padding: "22px 24px", boxShadow: "-12px 0 40px rgba(10,22,44,0.25)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={chip}>{preview.number}</span>
+                <button onClick={() => setPreview(null)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: 18, color: "#8d97a8", cursor: "pointer" }}>✕</button>
+              </div>
+              <h3 className="breakable" style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 12px" }}>{preview.name}</h3>
+              {preview.loading && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Loading…</div>}
+              {preview.error && <div style={{ fontSize: 12.5, color: "#c92a2a" }}>{preview.error}</div>}
+              {/* Same [{kind:"heading"|"text", text}] stream the board drawer renders,
+                  so the two previews cannot drift apart. */}
+              {(preview.content || []).map((part, n) => (
+                part.kind === "heading" ? (
+                  <div key={n} style={{ ...label, marginTop: n === 0 ? 0 : 14 }}>{part.text}</div>
+                ) : (
+                  <div key={n} className="breakable" style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.55, marginTop: 4, whiteSpace: "pre-wrap" }}>{part.text}</div>
+                )
+              ))}
+              {preview.content && preview.content.length === 0 && !preview.loading && (
+                <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Nothing written on this idea yet.</div>
+              )}
+              <a href={`/idea/${preview.id}`} target="_blank" rel="noopener noreferrer"
+                 style={{ fontSize: 12.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>Open the full idea →</a>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }}>
           <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
