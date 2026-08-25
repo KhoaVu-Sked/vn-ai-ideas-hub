@@ -111,7 +111,8 @@ function Board() {
   const filtered = useMemo(() => projects.filter((p) => {
     if (mineOnly && !p.mine) return false;
     if (statusFilter !== "All" && p.status !== statusFilter) return false;
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    // Match the human number as well as the name — people quote "IDEA-012".
+    if (search && !`${p.number || ""} ${p.name}`.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   }), [projects, statusFilter, search, mineOnly]);
 
@@ -169,7 +170,11 @@ function Board() {
                       <Pill bg={m.bg} fg={m.fg}>{p.status}</Pill>
                       {p.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
                     </div>
-                    <div title={p.name} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{p.name}</div>
+                    <div title={p.name} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>
+                      {/* Starred ideas already sort to the top; the star says why. */}
+                      {p.starred && <span title="A starred idea" style={{ marginRight: 5 }}>★</span>}
+                      {p.name}
+                    </div>
                     {p.context && (
                       <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{p.context}</div>
                     )}
