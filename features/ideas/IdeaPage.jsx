@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { tagPill } from "@/features/admin/tagColors";
-import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, ROLES, STATUS_META, STATUS_ORDER } from "@/features/ideas/constants";
+import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, ROLES, STATUS_META, STATUS_ORDER, actsAsLead } from "@/features/ideas/constants";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import Avatar from "@/components/Avatar";
 import TagChip from "@/components/TagChip";
@@ -172,7 +172,7 @@ export default function IdeaPage() {
   if (!data) return null;
 
   const { idea, members, tasks, comments, attachments, likeCount, likedByMe, followedByMe, myRoles, meId, isAdmin, deleteRequested, deleteReason } = data;
-  const isLead = (myRoles || []).includes(LEAD_ROLE);
+  const isLead = actsAsLead(myRoles, members);
   // Derived, not read from the payload — joining, leaving or a role change
   // must flip this immediately.
   const canEdit = isAdmin || isLead;

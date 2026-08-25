@@ -52,3 +52,18 @@ export function canMoveTask({ from, to, isLead, isAdmin, isAssignee }) {
   if (GATED.has(from) || GATED.has(to)) return false;
   return isAssignee;
 }
+
+// Who may act as the idea's lead.
+//
+// Project Lead carries every permission on an idea: editing content, changing
+// status, triaging requests, moving cards in and out of the gated columns. The
+// creator is now the Initiator, so without this rule they could not touch their
+// own idea until an admin appointed a lead.
+//
+// So: whoever holds Project Lead — and while nobody does, the Initiator. The
+// moment someone takes Project Lead, the Initiator's authority ends.
+export function actsAsLead(myRoles = [], members = []) {
+  if (myRoles.includes(LEAD_ROLE)) return true;
+  if (!myRoles.includes(INITIATOR_ROLE)) return false;
+  return !members.some((m) => (m.roles || []).includes(LEAD_ROLE));
+}
