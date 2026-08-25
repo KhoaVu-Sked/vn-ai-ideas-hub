@@ -1,5 +1,5 @@
 import { del } from "@vercel/blob";
-import { LEAD_ROLE } from "@/features/ideas/constants";
+import { actsAsLead } from "@/features/ideas/constants";
 import { deleteIdea, getIdea, isProjectLead, updateContent } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
@@ -16,7 +16,7 @@ export async function GET(_request, { params }) {
     data.meId = user.uid;
     data.isAdmin = user.role === "admin";
     // Whether the viewer may edit content / change status.
-    data.canEdit = data.isAdmin || (data.myRoles || []).includes(LEAD_ROLE);
+    data.canEdit = data.isAdmin || actsAsLead(data.myRoles, data.members);
     return Response.json(data);
   } catch (e) {
     return jsonError(e, "Could not load this idea.");

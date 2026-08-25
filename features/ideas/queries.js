@@ -39,11 +39,13 @@ export async function createProject({ name, tags, context, pain_points, expected
     returning id, name, status, tags
   `;
   const idea = rows[0];
-  // The creator becomes the idea's lead.
+  // The creator is the Initiator. Project Lead is left open for someone to
+  // take — until they do, the Initiator acts with the lead's permissions
+  // (see actsAsLead in ./constants), so a new idea is never stuck waiting.
   if (initiatorAccountId) {
     await sql`
       insert into idea_members (idea_id, account_id, roles)
-      values (${idea.id}, ${initiatorAccountId}, array['Project Lead'])
+      values (${idea.id}, ${initiatorAccountId}, array['Initiator'])
       on conflict (idea_id, account_id) do nothing
     `;
   }
@@ -275,17 +277,28 @@ export async function deleteAttachment(attId, accountId, isAdmin) {
     where at.id = ${attId}
       and ( at.account_id = ${accountId}
          or ${isAdmin}
-         or exists (select 1 from idea_members m where m.idea_id = at.idea_id and m.account_id = ${accountId} and m.roles @> array['Project Lead']) )
+         or exists (select 1 from idea_members m where m.idea_id = at.idea_id and m.account_id = ${accountId} and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
     returning url
   `;
   if (rows.length === 0) throw err(403, "You can't remove this file.");
   return { url: rows[0].url };
 }
 
+// "Acts as lead": holds Project Lead, or holds Initiator while that seat is
+// empty. The name is kept for its callers; the rule is the wider one.
 export async function isProjectLead(ideaId, accountId) {
   const rows = await sql`
-    select 1 from idea_members
-    where idea_id = ${ideaId} and account_id = ${accountId} and roles @> array['Project Lead']
+    select 1 from idea_members m
+    where m.idea_id = ${ideaId} and m.account_id = ${accountId}
+      and ( m.roles @> array['Project Lead']
+         or ( m.roles @> array['Initiator']
+              and not exists (select 1 from idea_members l
+                              where l.idea_id = m.idea_id
+                                and l.roles @> array['Project Lead']) ) )
   `;
   return rows.length > 0;
 }
@@ -479,7 +492,11 @@ export async function updateIdeaTask(taskId, accountId, isAdmin, patch) {
          or ${isAdmin}
          or exists (select 1 from idea_members m
                     where m.idea_id = t.idea_id and m.account_id = ${accountId}
-                      and m.roles @> array['Project Lead']) )
+                      and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
     returning t.id
   `;
   if (rows.length === 0) throw err(403, "You can't edit this task.");
@@ -497,7 +514,11 @@ export async function moveIdeaTask(taskId, state, accountId, isAdmin) {
       select r.id, r.idea_id, r.state as from_state, r.assignee_id,
         (${isAdmin} or exists (select 1 from idea_members m
              where m.idea_id = r.idea_id and m.account_id = ${accountId}
-               and m.roles @> array['Project Lead'])) as is_lead
+               and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) ))) as is_lead
       from requests r where r.id = ${taskId}
     )
     update requests r set
@@ -527,7 +548,11 @@ export async function deleteIdeaTask(taskId, accountId, isAdmin) {
          or ${isAdmin}
          or exists (select 1 from idea_members m
                     where m.idea_id = r.idea_id and m.account_id = ${accountId}
-                      and m.roles @> array['Project Lead']) )
+                      and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
     returning id
   `;
   if (rows.length === 0) throw err(403, "You can't remove this task.");
@@ -588,7 +613,11 @@ export async function deleteComment(commentId, accountId, isAdmin) {
          or ${isAdmin}
          or exists (select 1 from idea_members m
                     where m.idea_id = c.idea_id and m.account_id = ${accountId}
-                      and m.roles @> array['Project Lead']) )
+                      and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
     returning id
   `;
   if (rows.length === 0) throw err(403, "You can't remove this comment.");
