@@ -19,6 +19,10 @@ create table if not exists ideas (
   pain_points           text,
   expected_benefit      text,
   extra                 jsonb not null default '{}'::jsonb,   -- admin-defined custom fields
+  starred               boolean not null default false,       -- admin-pinned; tops the board
+  starred_by            uuid,
+  starred_at            timestamptz,
+  merged_into           uuid,                                 -- set when folded into another idea
   delete_requested      boolean not null default false,       -- project lead asked admin to delete
   delete_reason         text,
   delete_requested_by   uuid,
@@ -148,6 +152,8 @@ create table if not exists attachments (
   id           uuid primary key default gen_random_uuid(),
   idea_id      uuid not null references ideas(id) on delete cascade,
   account_id   uuid not null references accounts(id) on delete cascade,
+  kind         text not null default 'file',      -- file | link
+  label        text,                              -- what to call it in the UI
   filename     text not null,
   url          text not null,
   size         bigint not null default 0,
@@ -380,3 +386,32 @@ alter table requests alter column state_changed_at set default now();
 alter table requests alter column state_changed_at set not null;
 alter table requests drop column if exists start_date;
 alter table requests drop column if exists due_date;
+
+-- ── migration 020: starred ideas ──
+alter table ideas add column if not exists starred boolean not null default false;
+alter table ideas add column if not exists starred_by uuid;
+alter table ideas add column if not exists starred_at timestamptz;
+create index if not exists ideas_starred_idx on ideas (starred desc, updated_at desc);
+
+-- ── migration 021: documentation (links alongside files) ──
+alter table attachments add column if not exists kind text not null default 'file';
+alter table attachments add column if not exists label text;
+
+-- ── migration 022: merging duplicate ideas ──
+create table if not exists merge_requests (
+  id           uuid primary key default gen_random_uuid(),
+  main_idea_id uuid not null references ideas(id) on delete cascade,
+  source_ids   uuid[] not null,
+  requested_by uuid not null references accounts(id) on delete cascade,
+  status       text not null default 'pending',
+  reason       text,
+  decided_by   uuid references accounts(id) on delete set null,
+  decided_at   timestamptz,
+  created_at   timestamptz not null default now()
+);
+create index if not exists merge_requests_status_idx on merge_requests (status, created_at desc);
+alter table ideas add column if not exists merged_into uuid references ideas(id) on delete set null;
+create index if not exists ideas_merged_into_idx on ideas (merged_into);
+
+-- ── migration 023: What's New, seen once per release ──
+alter table accounts add column if not exists last_seen_release text;

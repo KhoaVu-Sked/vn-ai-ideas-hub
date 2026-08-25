@@ -17,6 +17,7 @@ import useLive from "@/features/realtime/useLive";
 import TaskBoard from "@/features/ideas/TaskBoard";
 import TaskModal from "@/features/ideas/TaskModal";
 import TaskDrawer from "@/features/ideas/TaskDrawer";
+import MergeModal from "@/features/ideas/MergeModal";
 import { api, onSessionEnd } from "@/lib/apiClient";
 import { serialize } from "@/lib/serialize";
 import { onEnter } from "@/lib/onEnter";
@@ -71,6 +72,8 @@ export default function IdeaPage() {
   const [tab, setTab] = useState("overview");     // overview | tasks
   const [commentText, setCommentText] = useState("");
   const [taskModal, setTaskModal] = useState(null); // { task } | {} while open
+  const [showMerge, setShowMerge] = useState(false);
+  const [docForm, setDocForm] = useState(null);   // { kind, label, url } while adding
   const [openTask, setOpenTask] = useState(null);
   const [showRoles, setShowRoles] = useState(false);
   const [pickedRoles, setPickedRoles] = useState([]);
@@ -172,6 +175,13 @@ export default function IdeaPage() {
   if (!data) return null;
 
   const { idea, members, tasks, comments, attachments, likeCount, likedByMe, followedByMe, myRoles, meId, isAdmin, deleteRequested, deleteReason } = data;
+
+  // This idea was folded into another one. Its row is kept so old links still
+  // work — they just land on the idea it became part of.
+  if (idea.merged_into) {
+    if (typeof window !== "undefined") window.location.replace(`/idea/${idea.merged_into}`);
+    return <Shell><Loading label="This idea was merged — taking you there" /></Shell>;
+  }
   const isLead = actsAsLead(myRoles, members);
   // Derived, not read from the payload — joining, leaving or a role change
   // must flip this immediately.
@@ -244,6 +254,7 @@ export default function IdeaPage() {
     });
   };
   const removeComment = (cid) => {
+    if (!confirm("Remove this comment? This can't be undone.")) return;
     // Keep the row so the revert can put back exactly it, rather than restoring
     // a whole array captured before this action — which would also wipe
     // anything else the user has done since, mid-flight.
@@ -326,6 +337,39 @@ export default function IdeaPage() {
     run(() => api(`/api/ideas/${id}/tasks/${t.id}`, { method: "DELETE" }), () => patch({ tasks: prev }));
   };
 
+  // Only an admin can star. It pins the idea to the top of the board and
+  // weights its contributors' scores, so it is not something a lead can award
+  // its own idea.
+  const toggleStar = () => {
+    const next = !idea.starred;
+    if (!confirm(next
+      ? `Mark "${idea.name}" as a starred idea? It will pin to the top of the board.`
+      : `Remove the star from "${idea.name}"?`)) return;
+    patch((d) => ({ idea: { ...d.idea, starred: next } }));   // optimistic
+    run(async () => {
+      const { idea: got } = await serialize(`star:${id}`, () =>
+        api(`/api/ideas/${id}/star`, { method: "PATCH", body: JSON.stringify({ starred: next }) }));
+      patch((d) => ({ idea: { ...d.idea, starred: got.starred } }));
+    }, () => patch((d) => ({ idea: { ...d.idea, starred: !next } })));
+  };
+
+  // Documentation: a link or a file, both stored as attachments so the
+  // permissions are the same either way — anyone adds, the uploader or the
+  // acting lead or an admin removes.
+  const addLink = () => {
+    const label = (docForm?.label || "").trim();
+    const url = (docForm?.url || "").trim();
+    if (!label) { setActionErr("Give the link a name."); return; }
+    if (!/^https?:\/\//i.test(url)) { setActionErr("A link must start with http:// or https://"); return; }
+    setDocForm(null);
+    run(async () => {
+      const { attachment } = await api(`/api/ideas/${id}/attachments`, {
+        method: "POST", body: JSON.stringify({ kind: "link", label, url }),
+      });
+      patch((d) => ({ attachments: [...d.attachments, attachment] }));
+    });
+  };
+
   const changeStatus = (status) => {
     const prev = idea.status;
     patch((d) => ({ idea: { ...d.idea, status } })); // optimistic
@@ -388,12 +432,15 @@ export default function IdeaPage() {
   };
   const dismissDeletion = () => run(async () => { await api(`/api/ideas/${id}/delete-request`, { method: "DELETE" }); patch({ deleteRequested: false, deleteReason: "" }); });
 
-  const uploadFile = (file) => {
+  const uploadFile = (file, label) => {
     if (!file) return;
     const bad = validateUpload({ name: file.name, type: file.type, size: file.size });
     if (bad) { setActionErr(bad); return; }
     const fd = new FormData();
     fd.append("file", file);
+    // Optional: the Documentation box lets you name a file; the plain uploader
+    // does not, and falls back to the filename.
+    if ((label || "").trim()) fd.append("label", label.trim());
     run(async () => {
       const { attachment } = await api(`/api/ideas/${id}/attachments`, { method: "POST", body: fd });
       patch((d) => ({ attachments: [...d.attachments, attachment] }));
@@ -412,6 +459,13 @@ export default function IdeaPage() {
         <TaskModal
           task={taskModal.task} members={members}
           onClose={() => setTaskModal(null)} onSave={saveTask}
+        />
+      )}
+      {showMerge && (
+        <MergeModal
+          ideaId={id} ideaNumber={idea.number} ideaName={idea.name}
+          onClose={() => setShowMerge(false)}
+          onRequested={(n) => setActionErr(`Merge requested for ${n} idea${n === 1 ? "" : "s"} — an admin will review it.`)}
         />
       )}
       {openTask && (
@@ -450,7 +504,19 @@ export default function IdeaPage() {
             {idea.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
           </div>
 
-          <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px", lineHeight: 1.25, overflowWrap: "anywhere" }}>{idea.name}</h1>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px", lineHeight: 1.25, overflowWrap: "anywhere", flex: 1, minWidth: 0 }}>{idea.name}</h1>
+            {/* Admins see a control; everyone else sees the star only when it is
+                set, because to them it is a fact about the idea, not a button. */}
+            {isAdmin ? (
+              <button onClick={toggleStar} title={idea.starred ? "Remove the star" : "Mark as a starred idea"}
+                style={{ border: "none", background: "none", cursor: "pointer", fontSize: 24, lineHeight: 1,
+                         padding: "2px 4px", filter: idea.starred ? "none" : "grayscale(1)",
+                         opacity: idea.starred ? 1 : 0.35 }}>★</button>
+            ) : idea.starred ? (
+              <span title="A starred idea" style={{ fontSize: 24, lineHeight: 1, padding: "2px 4px" }}>★</span>
+            ) : null}
+          </div>
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
             {idea.number}
             {/* Who raised it, and who is driving it — two separate roles. Each
@@ -482,6 +548,7 @@ export default function IdeaPage() {
             )}
             <button onClick={() => setTaskModal({})} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none" }}>+ Add request</button>
             {isAdmin && <button onClick={deleteIdea} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Delete idea</button>}
+            {canEdit && <button onClick={() => setShowMerge(true)} style={btnBase} title="Fold duplicate ideas into this one">Merge…</button>}
             {!isAdmin && isLead && !deleteRequested && <button onClick={requestDeletion} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Request deletion</button>}
           </div>
 
@@ -678,6 +745,83 @@ export default function IdeaPage() {
               {members.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No team yet.</div>}
             </div>
             {isAdmin && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Admin: change a role, or set someone as {LEAD_ROLE} to transfer the lead. There can be one {LEAD_ROLE} and one {INITIATOR_ROLE} per idea.</div>}
+          </div>
+
+          {/* ── Documentation ──────────────────────────────────────
+              Links and files in one place. Anyone may add; the person who added
+              it, the acting lead, or an admin may remove. Files already went
+              through attachments, so a link is the same row with kind='link'. */}
+          <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 18px" }}>
+            <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 12 }}>Documentation</div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {attachments.map((a) => (
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 8, padding: "7px 10px" }}>
+                  <span style={{ fontSize: 13 }}>{a.kind === "link" ? "\u{1F517}" : "\u{1F4CE}"}</span>
+                  <span className="breakable" style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: "var(--body)", fontWeight: 600 }}>
+                    {a.label || a.filename}
+                  </span>
+                  {a.kind === "link" ? (
+                    <a href={a.url} target="_blank" rel="noopener noreferrer"
+                       style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>Enter</a>
+                  ) : (
+                    <a href={`/api/ideas/${id}/attachments/${a.id}/download`}
+                       style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>Enter</a>
+                  )}
+                  {(a.mine || canEdit) && (
+                    <button onClick={() => removeAttachment(a.id)} title="Remove"
+                      style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>\u2715</button>
+                  )}
+                </div>
+              ))}
+              {attachments.length === 0 && <div style={{ fontSize: 12, color: "var(--muted)" }}>Nothing yet.</div>}
+            </div>
+
+            {!docForm ? (
+              <button onClick={() => setDocForm({ kind: "link", label: "", url: "" })}
+                style={{ ...btnBase, marginTop: 10, fontSize: 12, padding: "6px 12px" }}>+ Add</button>
+            ) : (
+              <div style={{ marginTop: 10, border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px", background: "#f8fafc" }}>
+                <input
+                  value={docForm.label} autoFocus
+                  onChange={(e) => setDocForm((f) => ({ ...f, label: e.target.value }))}
+                  placeholder="Name (e.g. Design doc)"
+                  style={{ width: "100%", border: "1px solid #d5dce6", borderRadius: 7, padding: "7px 10px", fontSize: 12.5, outline: "none", marginBottom: 8 }}
+                />
+                <select
+                  value={docForm.kind}
+                  onChange={(e) => setDocForm((f) => ({ ...f, kind: e.target.value }))}
+                  style={{ width: "100%", border: "1px solid #d5dce6", borderRadius: 7, padding: "7px 10px", fontSize: 12.5, background: "#fff", color: "var(--body)", marginBottom: 8 }}
+                >
+                  <option value="link">Link</option>
+                  <option value="file">File</option>
+                </select>
+
+                {docForm.kind === "link" ? (
+                  <input
+                    value={docForm.url}
+                    onChange={(e) => setDocForm((f) => ({ ...f, url: e.target.value }))}
+                    onKeyDown={onEnter(addLink)}
+                    placeholder="https://…"
+                    style={{ width: "100%", border: "1px solid #d5dce6", borderRadius: 7, padding: "7px 10px", fontSize: 12.5, outline: "none" }}
+                  />
+                ) : (
+                  <label style={{ ...btnBase, display: "inline-block", fontSize: 12, padding: "6px 12px", cursor: "pointer" }}>
+                    Choose a file
+                    <input type="file" accept={ACCEPT_ATTR} style={{ display: "none" }}
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { setDocForm(null); uploadFile(f, docForm.label); } }} />
+                  </label>
+                )}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  {docForm.kind === "link" && (
+                    <button onClick={addLink} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none", fontSize: 12, padding: "6px 12px" }}>Add</button>
+                  )}
+                  <button onClick={() => setDocForm(null)} style={{ ...btnBase, fontSize: 12, padding: "6px 12px" }}>Cancel</button>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 8 }}>Word, Excel, PDF or images · max 5 MB</div>
+              </div>
+            )}
           </div>
         </div>
       </div>

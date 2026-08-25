@@ -19,6 +19,10 @@ create table if not exists ideas (
   pain_points           text,
   expected_benefit      text,
   extra                 jsonb not null default '{}'::jsonb,   -- admin-defined custom fields
+  starred               boolean not null default false,       -- admin-pinned; tops the board
+  starred_by            uuid,
+  starred_at            timestamptz,
+  merged_into           uuid,                                 -- set when folded into another idea
   delete_requested      boolean not null default false,       -- project lead asked admin to delete
   delete_reason         text,
   delete_requested_by   uuid,
@@ -26,6 +30,7 @@ create table if not exists ideas (
   updated_at            timestamptz not null default now()
 );
 create index if not exists ideas_updated_at_idx on ideas (updated_at desc);
+create index if not exists ideas_starred_idx on ideas (starred desc, updated_at desc);
 
 -- Admin-configurable extra fields for the Submit form. Deleting a field ARCHIVES
 -- it (archived = true) — existing answers in ideas.extra are kept, never dropped.
@@ -54,6 +59,7 @@ create table if not exists accounts (
   region        text,
   timezone      text,                                    -- IANA zone, e.g. Asia/Ho_Chi_Minh
   session_id    uuid not null default gen_random_uuid(), -- rotates on sign-in; one live session
+  last_seen_release text,                                  -- last "What's New" dismissed
   created_at    timestamptz not null default now()
 );
 -- (the accounts_email unique index is created in the migration block below, after
@@ -149,6 +155,8 @@ create table if not exists attachments (
   id           uuid primary key default gen_random_uuid(),
   idea_id      uuid not null references ideas(id) on delete cascade,
   account_id   uuid not null references accounts(id) on delete cascade,
+  kind         text not null default 'file',      -- file | link
+  label        text,                              -- what to call it in the UI
   filename     text not null,
   url          text not null,
   size         bigint not null default 0,
@@ -231,6 +239,21 @@ create table if not exists app_settings (
   updated_at timestamptz not null default now(),
   updated_by uuid
 );
+
+-- Merge requests. Merging destroys other people's work, so it needs an admin's
+-- approval and records who asked and who decided.
+create table if not exists merge_requests (
+  id           uuid primary key default gen_random_uuid(),
+  main_idea_id uuid not null references ideas(id) on delete cascade,
+  source_ids   uuid[] not null,
+  requested_by uuid not null references accounts(id) on delete cascade,
+  status       text not null default 'pending',   -- pending | approved | rejected
+  reason       text,
+  decided_by   uuid references accounts(id) on delete set null,
+  decided_at   timestamptz,
+  created_at   timestamptz not null default now()
+);
+create index if not exists merge_requests_status_idx on merge_requests (status, created_at desc);
 
 -- ── Seeds ─────────────────────────────────────────────────────────
 

@@ -5,11 +5,25 @@ import { requireUser } from "@/features/auth/guard";
 import { validateUpload } from "@/lib/upload";
 import { publishIdea } from "@/features/realtime/publish";
 
-// POST /api/ideas/:id/attachments (multipart, field "file") → upload to Vercel Blob
+// POST /api/ideas/:id/attachments
+//   multipart, field "file" (+ optional "label")  → upload to Vercel Blob
+//   JSON { kind: "link", label, url }             → just a link, nothing stored
+//
+// Both land in the same table, so a link and a file carry the same permissions
+// and appear in the same Documentation list.
 export async function POST(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+
+    if ((request.headers.get("content-type") || "").includes("application/json")) {
+      const { kind, label, url } = await request.json();
+      if (kind !== "link") return Response.json({ error: "Expected a link." }, { status: 400 });
+      const attachment = await addAttachment(id, user.uid, { kind: "link", label, url });
+      publishIdea(id, "attachment");
+      return Response.json({ attachment }, { status: 201 });
+    }
+
     const form = await request.formData();
     const file = form.get("file");
     if (!file || typeof file === "string") return Response.json({ error: "No file provided." }, { status: 400 });
@@ -23,6 +37,7 @@ export async function POST(request, { params }) {
 
     const blob = await put(`ideas/${id}/${file.name}`, file, { access: "private", addRandomSuffix: true });
     const attachment = await addAttachment(id, user.uid, {
+      kind: "file", label: form.get("label") || null,
       filename: file.name, url: blob.url, size: file.size, content_type: file.type,
     });
     // publish.js defers this itself, so it lands after the commit —

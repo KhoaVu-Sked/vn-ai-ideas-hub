@@ -7,5 +7,6 @@ export const MANAGE_SECTIONS = [
   ["users", "User accounts"],
   ["feedback", "Feedback"],
   ["deletions", "Delete requests"],
+  ["merges", "Merge requests"],
   ["settings", "Settings"],
 ];
