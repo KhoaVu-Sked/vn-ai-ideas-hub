@@ -321,6 +321,135 @@ function SkipConfirmModal({ course, onCancel, onConfirm, busy, err }) {
   );
 }
 
+const modalBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "var(--body)", cursor: "pointer", textDecoration: "none", display: "inline-block" };
+const modalBtnPrimary = (busy) => ({ border: "none", background: "var(--blue)", color: "#fff", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 });
+const modalField = { display: "flex", flexDirection: "column", gap: 5, fontSize: 11.5, fontWeight: 700, color: "var(--muted)", flex: 1 };
+const modalSelect = { border: "1px solid var(--line)", borderRadius: 8, padding: "7px 8px", fontSize: 13, color: "var(--ink)", fontWeight: 500, background: "var(--card)" };
+
+// Asks for a position range ("From" defaults to the learner's own current
+// seniority) and a timeline (a number + unit, converted to months on submit
+// — the server only knows months). Save calls the auto-schedule endpoint,
+// which both books Google Calendar events AND writes target_date on each
+// course, same field Up next's own pencil-edit writes — so results show up
+// there immediately once onScheduled() reloads the journey.
+//
+// A 409 with error: "not_connected" means this account has never granted
+// (or has since revoked) Google Calendar access — that's not a failure to
+// show as an error banner, it's a real, expected first-run state, so it gets
+// its own "Connect Google Calendar" screen instead. That's a real browser
+// navigation (an <a>, not a fetch), since it has to leave the app for
+// Google's consent screen and come back to a fresh page load.
+function AutoScheduleModal({ currentPosition, onClose, onScheduled }) {
+  const [from, setFrom] = useState(currentPosition || POSITION_ORDER[0]);
+  const [to, setTo] = useState(currentPosition || POSITION_ORDER[POSITION_ORDER.length - 1]);
+  const [amount, setAmount] = useState(6);
+  const [unit, setUnit] = useState("months");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  const [needsConnect, setNeedsConnect] = useState(false);
+
+  const submit = async () => {
+    setBusy(true); setError(""); setResult(null); setNeedsConnect(false);
+    const timeline_months = unit === "years" ? Number(amount) * 12 : Number(amount);
+    try {
+      const res = await api("/api/courses/auto-schedule", {
+        method: "POST",
+        body: JSON.stringify({ from_position: from, to_position: to, timeline_months }),
+      });
+      setResult(res);
+      if (res.scheduled?.length) onScheduled();
+    } catch (e) {
+      if (e.message === "not_connected") setNeedsConnect(true);
+      else setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.5)", zIndex: 220, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: "var(--card)", borderRadius: 14, padding: 24, width: 440, maxWidth: "100%", boxShadow: "0 20px 60px rgba(10,22,44,0.35)" }}>
+        <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", marginBottom: 6 }}>🪄 Auto Schedule</div>
+
+        {needsConnect ? (
+          <>
+            <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 18px", lineHeight: 1.5 }}>
+              Connect your Google Calendar first — this only asks once. You'll come back here automatically.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={onClose} style={modalBtn}>Cancel</button>
+              <a href="/api/calendar/connect" style={{ ...modalBtn, border: "none", background: "var(--blue)", color: "#fff" }}>Connect Google Calendar</a>
+            </div>
+          </>
+        ) : result ? (
+          <>
+            <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 14px" }}>
+              {result.message || (result.scheduled.length > 0
+                ? `Booked ${result.scheduled.length} study block${result.scheduled.length === 1 ? "" : "s"} on your calendar.`
+                : "Couldn't book any study blocks — see below.")}
+            </p>
+            {result.scheduled?.length > 0 && (
+              <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                {result.scheduled.map((s) => (
+                  <div key={s.course_id} style={{ fontSize: 12.5, color: "var(--body)" }}>
+                    <strong>{s.title}</strong> — {fmtDate(s.target_date)}
+                    {s.event_link && <> · <a href={s.event_link} target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)" }}>view</a></>}
+                    {s.capped && <span style={{ color: "var(--muted)" }}> · capped at 4h</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {result.skipped?.length > 0 && (
+              <div style={{ marginBottom: 4, display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)" }}>Couldn't place {result.skipped.length}:</div>
+                {result.skipped.map((s) => (
+                  <div key={s.course_id} style={{ fontSize: 12, color: "var(--muted)" }}>{s.title} — {s.reason}</div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+              <button onClick={onClose} style={modalBtnPrimary(false)}>Done</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 18px", lineHeight: 1.5 }}>
+              Books one study block per not-yet-done course in this range, working around your existing meetings.
+            </p>
+            <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+              <label style={modalField}>From
+                <select value={from} onChange={(e) => setFrom(e.target.value)} style={modalSelect}>
+                  {POSITION_ORDER.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
+                </select>
+              </label>
+              <label style={modalField}>To
+                <select value={to} onChange={(e) => setTo(e.target.value)} style={modalSelect}>
+                  {POSITION_ORDER.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
+                </select>
+              </label>
+            </div>
+            <label style={{ ...modalField, marginBottom: 18 }}>Timeline
+              <div style={{ display: "flex", gap: 8 }}>
+                <input type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ ...modalSelect, width: 80 }} />
+                <select value={unit} onChange={(e) => setUnit(e.target.value)} style={modalSelect}>
+                  <option value="months">months</option>
+                  <option value="years">years</option>
+                </select>
+              </div>
+            </label>
+            {error && <div style={{ ...errBanner, marginBottom: 14 }}>{error}</div>}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={onClose} disabled={busy} style={modalBtn}>Cancel</button>
+              <button onClick={submit} disabled={busy} style={modalBtnPrimary(busy)}>{busy ? "Scheduling…" : "Save"}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ViewToggle({ view, onChange }) {
   const seg = (active) => ({
     height: 30, padding: "0 16px", fontSize: 12.5, fontWeight: 700, fontFamily: "inherit",
@@ -391,7 +520,7 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
 // — "this is the one you're on now" — the moment it becomes the top pick,
 // not on any click. Guarded by a ref so the same course only gets the
 // start call once per mount, not on every re-render.
-function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart }) {
+function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, onAutoSchedule }) {
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState({}); // courseId -> date string, staged until confirmed
   const today = new Date().toISOString().slice(0, 10);
@@ -441,9 +570,10 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart }) 
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <button
+            onClick={onAutoSchedule}
             className="icon-tip"
-            data-tip="Auto Schedule — coming soon"
-            aria-label="Auto Schedule — coming soon"
+            data-tip="Auto Schedule"
+            aria-label="Auto Schedule"
             style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: "pointer" }}
           >
             🪄
@@ -575,6 +705,21 @@ export default function JourneyPage() {
   const [selectedTrack, setSelectedTrack] = useState("all");
   const [position, setPosition] = useState(null);
   const [syncingUpNext, setSyncingUpNext] = useState(false);
+  const [autoScheduleOpen, setAutoScheduleOpen] = useState(false);
+
+  // Landing back here from /api/calendar/connect/callback — ?calendar=connected
+  // means the consent just succeeded, so reopen Auto Schedule right where the
+  // learner left off rather than making them click the wand a second time.
+  // Any other value is a real failure, shown as the page's own error banner.
+  // Read via window.location rather than next/navigation's useSearchParams so
+  // this client component doesn't need a Suspense boundary just for this.
+  useEffect(() => {
+    const cal = new URLSearchParams(window.location.search).get("calendar");
+    if (!cal) return;
+    if (cal === "connected") setAutoScheduleOpen(true);
+    else if (cal !== "cancelled") setErr("Couldn't connect Google Calendar — try again from the Auto Schedule button.");
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   const load = useCallback(async () => {
     setErr("");
@@ -734,7 +879,7 @@ export default function JourneyPage() {
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
-            <UpNextCard courses={filteredJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} onAutoStart={autoStartCourse} />
+            <UpNextCard courses={filteredJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} onAutoStart={autoStartCourse} onAutoSchedule={() => setAutoScheduleOpen(true)} />
             <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourse={inProgressCourse} />
           </div>
           </div>
@@ -749,6 +894,14 @@ export default function JourneyPage() {
           err={skipErr}
           onCancel={() => setSkipTarget(null)}
           onConfirm={confirmSkip}
+        />
+      )}
+
+      {autoScheduleOpen && (
+        <AutoScheduleModal
+          currentPosition={position}
+          onClose={() => setAutoScheduleOpen(false)}
+          onScheduled={load}
         />
       )}
     </div>

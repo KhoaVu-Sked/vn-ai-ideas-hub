@@ -30,3 +30,6 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `022_learning_tracks_courses.sql` — add `tracks`, `account_tracks`, `courses`, `course_assignments` for the AI Learning roadmap work.
 - `023_fix_courses_ai_track_seed.sql` — fix for UAT: adds `courses.stage/cost/outcome` (022 shipped without them) and seeds the AI Track's 23 real courses from the roadmap spreadsheet.
 - `024_course_assignments_position.sql` — add `course_assignments.position`, so a learner can reorder courses within one position tier on their own Journey view.
+- `025_course_quiz_questions.sql` — add `course_quiz_questions` for the wrap-up quiz.
+- `026_quiz_completion_stats.sql` — add `course_assignments.quiz_total_questions/quiz_correct_first_try`, a snapshot written when a course is marked complete.
+- `027_calendar_connections.sql` — add `calendar_connections` (encrypted Google refresh token per account) and `course_assignments.calendar_event_id`, for Auto Schedule.

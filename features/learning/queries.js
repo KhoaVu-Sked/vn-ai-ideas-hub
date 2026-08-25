@@ -332,3 +332,82 @@ export async function completeCourse(accountId, courseId, quizStats = {}) {
   `;
   return { status: rows[0]?.status || null };
 }
+
+// ── Auto Schedule / Google Calendar connection ─────────────────────
+
+// The stored (still-encrypted) refresh token for this account, or null if
+// they've never connected Google Calendar. Encryption/decryption itself is
+// lib/crypto.js's job, not this file's.
+export async function getCalendarConnection(accountId) {
+  const rows = await sql`select refresh_token, scope, connected_at from calendar_connections where account_id = ${accountId}`;
+  return rows[0] || null;
+}
+
+// One row per account — connecting again (a fresh consent, a new
+// refresh_token) replaces whatever was there before.
+export async function saveCalendarConnection(accountId, { refreshToken, scope }) {
+  await sql`
+    insert into calendar_connections (account_id, refresh_token, scope)
+    values (${accountId}, ${refreshToken}, ${scope || ""})
+    on conflict (account_id) do update set
+      refresh_token = excluded.refresh_token, scope = excluded.scope, updated_at = now()
+  `;
+}
+
+// Called when Google reports the refresh token itself is dead (revoked
+// access, e.g.) — nothing short of reconnecting fixes that, so the row is
+// just noise until then.
+export async function deleteCalendarConnection(accountId) {
+  await sql`delete from calendar_connections where account_id = ${accountId}`;
+}
+
+// This account's own timezone (for placing calendar events at sensible local
+// hours) and current seniority position (to default the Auto Schedule form's
+// "From" field) — one small lookup, not folded into getJourney since most
+// callers of getJourney don't need it.
+export async function getAccountSchedulingInfo(accountId) {
+  const rows = await sql`
+    select a.timezone, ur.position
+    from accounts a
+    left join user_role ur on ur.account_id = a.id
+    where a.id = ${accountId}
+  `;
+  return rows[0] || {};
+}
+
+// Every not-yet-done course between fromPosition and toPosition (inclusive),
+// across the account's own enrolled tracks — same tier-then-custom-order
+// shape as getJourney, so Auto Schedule proposes courses in the same order
+// the learner already sees them in. calendar_event_id comes along so the
+// caller can update an existing event instead of creating a duplicate.
+export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosition) {
+  return sql`
+    select c.id, c.title, c.est_hours, c.link, c.outcome, c.expected_by_position,
+      ca.calendar_event_id
+    from account_tracks acct
+    join courses c on c.track_id = acct.track_id
+    left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
+    where acct.account_id = ${accountId}
+      and array_position(${POSITION_ORDER}::text[], c.expected_by_position)
+        between array_position(${POSITION_ORDER}::text[], ${fromPosition})
+            and array_position(${POSITION_ORDER}::text[], ${toPosition})
+      and coalesce(ca.status, 'not_started') not in ('complete', 'skipped')
+    order by
+      array_position(${POSITION_ORDER}::text[], c.expected_by_position),
+      coalesce(ca.position, 2147483647), c.created_at asc
+  `;
+}
+
+// Writes what Auto Schedule decided for one course: the target_date Up next
+// already reads (Section 4.7) plus the Google event id, so a re-run knows to
+// update that event rather than create a second one.
+export async function saveScheduledEvent(accountId, courseId, { targetDate, eventId }) {
+  const rows = await sql`
+    insert into course_assignments (account_id, course_id, target_date, calendar_event_id)
+    values (${accountId}, ${courseId}, ${targetDate}, ${eventId})
+    on conflict (account_id, course_id) do update set
+      target_date = excluded.target_date, calendar_event_id = excluded.calendar_event_id, updated_at = now()
+    returning target_date, calendar_event_id
+  `;
+  return rows[0];
+}

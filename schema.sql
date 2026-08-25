@@ -125,19 +125,22 @@ create table if not exists course_assignments (
   position    integer,  -- learner's own display order within a position tier
   quiz_total_questions    integer,  -- snapshot at completion time (see migration 026)
   quiz_correct_first_try  integer,  -- how many of those were right on the first click
+  calendar_event_id       text,     -- Google Calendar event Auto Schedule created for this course (see migration 027)
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (account_id, course_id)
 );
 create index if not exists course_assignments_account_id_idx on course_assignments (account_id);
--- Existing databases predate all three of these columns (position: migration
--- 024, the two quiz_* columns: migration 026). Kept right here next to the
--- table they belong to — rather than down in the generic migration-history
--- block below — so the whole AI Learning schema (tables plus every column
--- ever added to them) stays in one place for anyone re-running this file.
+-- Existing databases predate all four of these columns (position: migration
+-- 024, the two quiz_* columns: migration 026, calendar_event_id: migration
+-- 027). Kept right here next to the table they belong to — rather than down
+-- in the generic migration-history block below — so the whole AI Learning
+-- schema (tables plus every column ever added to them) stays in one place
+-- for anyone re-running this file.
 alter table course_assignments add column if not exists position integer;
 alter table course_assignments add column if not exists quiz_total_questions integer;
 alter table course_assignments add column if not exists quiz_correct_first_try integer;
+alter table course_assignments add column if not exists calendar_event_id text;
 
 -- Quiz for a course: pure reference content (question/options/answer/
 -- rationale), no per-learner state. The front end shows all options and
@@ -155,6 +158,19 @@ create table if not exists course_quiz_questions (
   unique (course_id, position)
 );
 create index if not exists course_quiz_questions_course_id_idx on course_quiz_questions (course_id);
+
+-- Google Calendar connection for Auto Schedule (migration 027). A separate,
+-- additional grant from Google Sign-in (accounts.auth_provider) — a signed-in
+-- learner opts into this from Up next; it's not a login method, and sign-in
+-- itself never stores a token. refresh_token is encrypted at rest (see
+-- lib/crypto.js) — nothing here can read it back without CALENDAR_TOKEN_KEY.
+create table if not exists calendar_connections (
+  account_id    uuid primary key references accounts(id) on delete cascade,
+  refresh_token text not null,
+  scope         text not null default '',
+  connected_at  timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
 
 -- Tags catalog — admin-managed list of allowed tags (with a display color).
 create table if not exists tags (
