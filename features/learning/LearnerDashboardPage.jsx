@@ -70,18 +70,16 @@ export default function LearnerDashboardPage() {
 
   const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
 
-  // Both stat tiles below are scoped to what's actually expected of this
-  // account by now, on their RAW officially-assigned position (isExpectedByNow
-  // — Intern is only on the hook for the Intern tier, Senior for everything
-  // through Senior), not the whole roadmap up to Principal — same rule
-  // Journey's profile strip and Team view's roster use. Deliberately NOT
-  // the one-stage-ahead "early access" position Journey's List grants once
-  // a tier is finished (effectivePosition, shared.js) — % completion is a
-  // graded expectation, and earning early access to bonus material you
-  // haven't had time to touch yet shouldn't make your score go down the
-  // moment you unlock it. "Roadmap progress" further down stays
-  // whole-roadmap on purpose: it's the longer-horizon "how far into this
-  // track am I" picture, not a graded expectation either.
+  // Everything below — both stat tiles AND "Roadmap progress" — is scoped
+  // to what's actually expected of this account by now, on their RAW
+  // officially-assigned position (isExpectedByNow — Intern is only on the
+  // hook for the Intern tier, Senior for everything through Senior), not
+  // the whole roadmap up to Principal — same rule Journey's profile strip
+  // and Team view's roster use. Deliberately NOT the one-stage-ahead
+  // "early access" position Journey's List grants once a tier is finished
+  // (effectivePosition, shared.js) — % completion is a graded expectation,
+  // and earning early access to bonus material you haven't had time to
+  // touch yet shouldn't make your score go down the moment you unlock it.
   const expected = filteredJourney.filter((c) => isExpectedByNow(c, position));
   const coreCourses = expected.filter((c) => c.priority === "core");
   const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
@@ -93,9 +91,12 @@ export default function LearnerDashboardPage() {
 
   // Roadmap progress-by-track always covers every enrolled track, independent
   // of the Mind map's own track filter below — switching that filter
-  // shouldn't collapse this list down to one row.
+  // shouldn't collapse this list down to one row. Scoped the same way as
+  // the stat tiles above (isExpectedByNow on the raw position) — a Senior's
+  // "AI Track" bar reads against Intern-through-Senior, not the whole
+  // roadmap up to Principal.
   const perTrack = trackOptions.map((t) => {
-    const courses = journey.filter((c) => c.track_id === t.id);
+    const courses = journey.filter((c) => c.track_id === t.id && isExpectedByNow(c, position));
     return { name: t.name, total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
   });
 
@@ -140,7 +141,9 @@ export default function LearnerDashboardPage() {
 
                 <section style={{ ...card, marginBottom: 18 }}>
                   <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", margin: "0 0 4px" }}>Roadmap progress</h1>
-                  <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>Course completion by track.</p>
+                  <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>
+                    Course completion by track{position ? `, through ${POSITION_LABEL[position] || position}` : ""}.
+                  </p>
                   <div>
                     {perTrack.map((t) => <TrackProgressRow key={t.name} {...t} />)}
                   </div>
