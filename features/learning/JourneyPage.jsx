@@ -36,7 +36,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, HEADER_H, ROW_H, VISIBLE_ROWS, th, td,
   fmtDate, toDateStr, relTime, todayStr, nextAnnualReviewDateStr, addMonthsDateStr, monthsUntilDateStr,
-  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, effectivePosition,
+  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, effectivePosition, isTierDone,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
@@ -684,6 +684,13 @@ export default function JourneyPage() {
   // relevant to see right now.
   const visiblePosition = effectivePosition(journey, position);
   const visibleJourney = filteredJourney.filter((c) => isExpectedByNow(c, visiblePosition));
+  // The "max +1 stage" cap is flat, not recursive (effectivePosition,
+  // shared.js) — so someone who finishes the +1 stage TOO hits a wall:
+  // nothing new becomes visible until an admin reassigns their position.
+  // atCeiling catches that exact state (earned +1, AND that +1 tier is
+  // also fully done) so the empty-handed moment gets an explicit message
+  // instead of just... nothing happening.
+  const atCeiling = visiblePosition !== position && isTierDone(journey, visiblePosition);
   // Knowledge artifacts' "waiting on the quiz" row — the account's current
   // in_progress pick, across every enrolled track (not scoped to the track
   // dropdown, same as recentCompletions isn't). Already on hand from the
@@ -800,6 +807,15 @@ export default function JourneyPage() {
               )}
             </div>
             {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
+            {atCeiling && (
+              // The +1 cap is flat (effectivePosition, shared.js) — finishing
+              // that stage too doesn't push it to +2, so without this the
+              // learner would just see the same fully-complete list with no
+              // explanation of why nothing new ever shows up.
+              <div style={{ background: "#e6f4ea", border: "1px solid #bfe3c9", color: "#1f7a3c", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
+                🎉 You've completed everything visible through {POSITION_LABEL[visiblePosition] || visiblePosition} — the next stage unlocks once your manager updates your level.
+              </div>
+            )}
             {journey.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing here yet — enroll in a track from the Learning Hub to start your journey.</div>
             ) : filteredJourney.length === 0 ? (

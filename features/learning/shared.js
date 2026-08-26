@@ -42,32 +42,36 @@ export function isExpectedByNow(course, position) {
   return courseIdx <= posIdx;
 }
 
+// Whether every course in a given tier (across the account's FULL course
+// list — every enrolled track, not whatever a track filter has narrowed it
+// to) is complete/skipped. An empty tier (no courses in it at all) counts
+// as "done" too — same as the Mind map's tier-gate (MindMap.jsx's
+// computeLocks) treats an empty lower tier as vacuously clear, via
+// .every() on an empty array. Exported on its own (not just inlined into
+// effectivePosition below) so callers can also ask "is the +1 stage ALSO
+// finished" — see JourneyPage.jsx's atCeiling.
+export function isTierDone(courses, tierPosition) {
+  const tier = courses.filter((c) => c.expected_by_position === tierPosition);
+  return tier.every((c) => c.status === "complete" || c.status === "skipped");
+}
+
 // Once every course in an account's own current-position tier is
 // complete/skipped, they've earned early access to the NEXT tier too —
 // capped at exactly one stage ahead, never further (an Intern who's
-// finished Intern sees through Junior, not Middle; "max +1 stage"). An
-// empty own-tier (no courses in it at all across their enrolled tracks)
-// counts as "done" too — same as the Mind map's tier-gate (MindMap.jsx's
-// computeLocks) treats an empty lower tier as vacuously clear, via
-// .every() on an empty array.
+// finished Intern sees through Junior, not Middle; "max +1 stage"). This
+// is a flat, one-time step, not recursive: finishing the +1 stage too
+// doesn't push it to +2 — see JourneyPage.jsx's atCeiling for how that
+// "nothing left visible" state gets surfaced instead.
 //
 // Returns a position string — feed THIS into isExpectedByNow (instead of
 // the raw account position) wherever "what's visible/expected right now"
 // is computed, not the account's own raw user_role.position: that stays
 // the officially assigned seniority, unaffected by early access.
-//
-// `courses` should be the account's FULL list (every enrolled track), not
-// whatever a track filter has narrowed it to — "have I finished my stage"
-// shouldn't depend on which track happens to be selected in a dropdown.
-// features/learning/queries.js's getTeamOverview() does the same
-// computation server-side (own_tier / effective_position CTEs) for Team
-// view's roster and stat cards — keep the two in sync if this ever changes.
 export function effectivePosition(courses, position) {
   if (!position) return null;
   const posIdx = POSITION_ORDER.indexOf(position);
   if (posIdx === -1) return position; // unrecognized value — leave as-is, isExpectedByNow already tolerates this
-  const ownTier = courses.filter((c) => c.expected_by_position === position);
-  const tierDone = ownTier.every((c) => c.status === "complete" || c.status === "skipped");
+  const tierDone = isTierDone(courses, position);
   const nextIdx = tierDone ? Math.min(posIdx + 1, POSITION_ORDER.length - 1) : posIdx;
   return POSITION_ORDER[nextIdx];
 }
