@@ -11,7 +11,7 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, POSITION_LABEL, isExpectedByNow, effectivePosition } from "@/features/learning/shared";
+import { card, errBanner, POSITION_LABEL, isExpectedByNow } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
 
@@ -71,19 +71,18 @@ export default function LearnerDashboardPage() {
   const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
 
   // Both stat tiles below are scoped to what's actually expected of this
-  // account by now (isExpectedByNow — Intern is only on the hook for the
-  // Intern tier, Senior for everything through Senior), not the whole
-  // roadmap up to Principal — same rule Journey's profile strip and Team
-  // view's roster use. effectivePosition adds the one-stage-ahead early
-  // access Journey's List also grants once the account's own tier is fully
-  // complete/skipped ("max +1 stage") — computed off the full journey, not
-  // filteredJourney, same reasoning as Journey: whether you've finished
-  // your stage shouldn't depend on which track happens to be selected.
-  // "Roadmap progress" further down stays whole-roadmap on purpose: it's
-  // the longer-horizon "how far into this track am I" picture, not a
-  // graded expectation.
-  const visiblePosition = effectivePosition(journey, position);
-  const expected = filteredJourney.filter((c) => isExpectedByNow(c, visiblePosition));
+  // account by now, on their RAW officially-assigned position (isExpectedByNow
+  // — Intern is only on the hook for the Intern tier, Senior for everything
+  // through Senior), not the whole roadmap up to Principal — same rule
+  // Journey's profile strip and Team view's roster use. Deliberately NOT
+  // the one-stage-ahead "early access" position Journey's List grants once
+  // a tier is finished (effectivePosition, shared.js) — % completion is a
+  // graded expectation, and earning early access to bonus material you
+  // haven't had time to touch yet shouldn't make your score go down the
+  // moment you unlock it. "Roadmap progress" further down stays
+  // whole-roadmap on purpose: it's the longer-horizon "how far into this
+  // track am I" picture, not a graded expectation either.
+  const expected = filteredJourney.filter((c) => isExpectedByNow(c, position));
   const coreCourses = expected.filter((c) => c.priority === "core");
   const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
   const corePct = coreCourses.length ? Math.round((coreComplete / coreCourses.length) * 100) : 0;
@@ -134,9 +133,9 @@ export default function LearnerDashboardPage() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 18 }}>
                   <StatCard label="Level" value={POSITION_LABEL[position] || "—"} hint="Your seniority tier" />
                   <StatCard label="Tracks enrolled" value={trackOptions.length} hint={trackOptions.map((t) => t.name).join(" · ") || "—"} />
-                  <StatCard label="Core courses complete" value={`${corePct}%`} hint={`${coreComplete} of ${coreCourses.length}${visiblePosition ? ` · through ${POSITION_LABEL[visiblePosition] || visiblePosition}` : ""}`} />
+                  <StatCard label="Core courses complete" value={`${corePct}%`} hint={`${coreComplete} of ${coreCourses.length}${position ? ` · through ${POSITION_LABEL[position] || position}` : ""}`} />
                   <StatCard label="In progress" value={inProgressCount} hint="Courses you're currently on" />
-                  <StatCard label="All courses complete" value={`${overallPct}%`} hint={`${completeCount} of ${expected.length}${visiblePosition ? ` · through ${POSITION_LABEL[visiblePosition] || visiblePosition}` : ""}`} />
+                  <StatCard label="All courses complete" value={`${overallPct}%`} hint={`${completeCount} of ${expected.length}${position ? ` · through ${POSITION_LABEL[position] || position}` : ""}`} />
                 </div>
 
                 <section style={{ ...card, marginBottom: 18 }}>

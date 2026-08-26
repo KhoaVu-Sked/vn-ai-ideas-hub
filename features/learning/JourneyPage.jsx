@@ -337,11 +337,7 @@ function AutoScheduleModal({ currentPosition, annualReviewDate, onClose, onSched
 // progress scoped to whatever the dropdown currently shows. "N/A" instead
 // of a progress bar when the account isn't enrolled in any track yet —
 // not just when the current filter happens to have zero core courses.
-// scopePosition is the (possibly one-stage-ahead) effective position the
-// core-course count is actually measured against — see effectivePosition,
-// shared.js. position stays the account's raw, officially-assigned
-// seniority (the badge), unaffected by early access.
-function ProfileStrip({ me, position, scopePosition, trackTags, hasTracks, coreComplete, coreTotal }) {
+function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTotal }) {
   const pct = coreTotal ? Math.round((coreComplete / coreTotal) * 100) : 0;
   return (
     <section style={{ ...card, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -368,7 +364,7 @@ function ProfileStrip({ me, position, scopePosition, trackTags, hasTracks, coreC
           <>
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>
               <strong style={{ color: "var(--ink)" }}>{coreComplete} of {coreTotal}</strong> core courses complete
-              {scopePosition && <span style={{ color: "var(--faint)" }}> · through {POSITION_LABEL[scopePosition] || scopePosition}</span>}
+              {position && <span style={{ color: "var(--faint)" }}> · through {POSITION_LABEL[position] || position}</span>}
             </div>
             <ProgressBar pct={pct} />
           </>
@@ -668,16 +664,24 @@ export default function JourneyPage() {
   const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
   // The List (and Up next, below) only show courses in tiers at or below
   // this account's current position — an Intern sees the Intern tier, a
-  // Junior sees Intern + Junior, and so on (isExpectedByNow, shared.js —
-  // same rule the % completion numbers use). Once every course in the
-  // account's OWN tier is complete/skipped, they've earned one stage of
-  // early access too (effectivePosition — "max +1 stage": Intern -> Junior,
-  // Junior -> Middle, never further). effectivePosition is computed off the
-  // FULL journey (every enrolled track), not filteredJourney — whether
-  // you've finished your stage shouldn't depend on which track happens to
-  // be selected in the dropdown. trackOptions/trackTags above deliberately
-  // stay unrestricted: which tracks you're ENROLLED in is a different fact
-  // from which courses are relevant to see right now.
+  // Junior sees Intern + Junior, and so on (isExpectedByNow, shared.js).
+  // Once every course in the account's OWN tier is complete/skipped,
+  // they've earned one stage of early access too (effectivePosition —
+  // "max +1 stage": Intern -> Junior, Junior -> Middle, never further),
+  // computed off the FULL journey (every enrolled track), not
+  // filteredJourney — whether you've finished your stage shouldn't depend
+  // on which track happens to be selected in the dropdown.
+  //
+  // Deliberately NOT used for the % completion numbers below (coreCourses
+  // stays on the raw, officially-assigned position) — % completion is a
+  // graded expectation, and earning early access to bonus material you
+  // haven't had time to touch yet shouldn't make your score go DOWN the
+  // moment you unlock it. % only grows to cover a new tier once an admin
+  // actually reassigns the account's position, same as before this feature.
+  //
+  // trackOptions/trackTags above deliberately stay unrestricted: which
+  // tracks you're ENROLLED in is a different fact from which courses are
+  // relevant to see right now.
   const visiblePosition = effectivePosition(journey, position);
   const visibleJourney = filteredJourney.filter((c) => isExpectedByNow(c, visiblePosition));
   // Knowledge artifacts' "waiting on the quiz" row — the account's current
@@ -686,9 +690,10 @@ export default function JourneyPage() {
   // journey fetch, so no extra request. First match is enough: in practice
   // there's only ever one, since only the top Up next pick auto-starts.
   const inProgressCourse = journey.find((c) => c.status === "in_progress") || null;
-  // Core-course progress for the profile strip — visibleJourney is already
-  // scoped to what's expected by now, so this just narrows to core.
-  const coreCourses = visibleJourney.filter((c) => c.priority === "core");
+  // Core-course progress for the profile strip — the RAW position, not
+  // visiblePosition/visibleJourney (see the comment above visibleJourney's
+  // own definition for why the % stays uncoupled from early access).
+  const coreCourses = filteredJourney.filter((c) => c.priority === "core" && isExpectedByNow(c, position));
   const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
   // "All tracks" shows a tag per enrolled track; one specific track shows just that one.
   const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
@@ -750,7 +755,6 @@ export default function JourneyPage() {
             <ProfileStrip
               me={me}
               position={position}
-              scopePosition={visiblePosition}
               trackTags={trackTags}
               hasTracks={journey.length > 0}
               coreComplete={coreComplete}

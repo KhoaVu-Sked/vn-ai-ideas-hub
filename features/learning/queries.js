@@ -17,19 +17,22 @@ const POSITION_ORDER = POSITIONS;
 // already generic on accountId, not hardcoded to the caller.
 //
 // core_total/core_complete are scoped to what's actually expected of each
-// account BY NOW — every course in every tier at or below their own
-// EFFECTIVE position, not the whole roadmap up to Principal. An Intern is
-// only on the hook for the Intern tier; a Senior for everything through
-// Senior — UNLESS they've finished every course in their own tier, which
-// earns one stage of early access ("max +1 stage": Intern who's done ->
-// counted through Junior, never further). Same array_position() ladder
-// comparison, and the same effective-position rule,
-// features/learning/shared.js's isExpectedByNow()/effectivePosition() do
-// client-side for Journey's profile strip and the Learner Dashboard — this
-// is the server-side twin, for Team view's roster and its "Average
+// account BY NOW — every course in every tier at or below their own RAW,
+// officially-assigned user_role.position, not the whole roadmap up to
+// Principal. An Intern is only on the hook for the Intern tier; a Senior
+// for everything through Senior. Same array_position() ladder comparison
+// features/learning/shared.js's isExpectedByNow() does client-side for
+// Journey's profile strip and the Learner Dashboard — this is the
+// server-side twin of that rule, for Team view's roster and its "Average
 // completion" stat card (both just read core_total/core_complete off this).
-// The roster's own "Level" column still shows ur.position (raw, official,
-// unaffected) — only the progress numbers use the effective one.
+//
+// Deliberately does NOT use the one-stage-ahead "early access" position
+// (effectivePosition, shared.js) Journey's List grants once an account
+// finishes their own tier — % completion is a graded expectation, and
+// earning early access to bonus material shouldn't make the score drop the
+// moment it's unlocked. It only grows to cover a new tier once an admin
+// actually reassigns the account's position.
+//
 // No position set yet: in_range falls back to true (count the whole
 // roadmap) rather than 0/0 — same fallback isExpectedByNow() uses.
 // in_progress_count/stalled/last_activity stay UNSCOPED on purpose — those
@@ -42,48 +45,17 @@ export async function getTeamOverview() {
       join tracks t on t.id = acct.track_id
       group by acct.account_id
     ),
-    own_tier as (
-      -- Whether every course in THIS account's own tier (across all their
-      -- enrolled tracks) is complete/skipped. bool_and over zero rows
-      -- (their tier has no courses at all reachable via their tracks) never
-      -- produces a row here — the COALESCE where this is read treats a
-      -- missing row as "done" too, matching the Mind map's tier-gate
-      -- (MindMap.jsx's computeLocks), which treats an empty tier as
-      -- vacuously clear.
-      select acct.account_id,
-        bool_and(coalesce(ca.status, 'not_started') in ('complete', 'skipped')) as tier_done
-      from account_tracks acct
-      join user_role ur on ur.account_id = acct.account_id
-      join courses c on c.track_id = acct.track_id and c.expected_by_position = ur.position
-      left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
-      group by acct.account_id
-    ),
-    effective_position as (
-      select a.id as account_id,
-        case when ur.position is null then null
-          else (${POSITION_ORDER}::text[])[
-            least(
-              array_position(${POSITION_ORDER}::text[], ur.position)
-                + (case when coalesce(ot.tier_done, true) then 1 else 0 end),
-              array_length(${POSITION_ORDER}::text[], 1)
-            )
-          ]
-        end as position
-      from accounts a
-      left join user_role ur on ur.account_id = a.id
-      left join own_tier ot on ot.account_id = a.id
-    ),
     eligible as (
       select acct.account_id, c.title, c.priority, ca.status, ca.updated_at,
         (
-          ep.position is null
+          ur.position is null
           or array_position(${POSITION_ORDER}::text[], c.expected_by_position)
-             <= array_position(${POSITION_ORDER}::text[], ep.position)
+             <= array_position(${POSITION_ORDER}::text[], ur.position)
         ) as in_range
       from account_tracks acct
       join courses c on c.track_id = acct.track_id
       left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
-      left join effective_position ep on ep.account_id = acct.account_id
+      left join user_role ur on ur.account_id = acct.account_id
     ),
     progress as (
       select account_id,
