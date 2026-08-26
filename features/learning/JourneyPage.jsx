@@ -5,10 +5,13 @@
 // Restricted to what's expected of this account BY NOW: an Intern only
 // sees the Intern tier, a Junior sees Intern + Junior, and so on
 // (isExpectedByNow, shared.js — the same rule the % completion numbers
-// use). The full roadmap, including tiers above the current position, is
-// still visible on the Mind map (Learner Dashboard) — that view is meant
-// to show the road ahead, this one is meant to show what's actually on
-// your plate right now.
+// use). Finishing every course in your own tier earns early access to
+// ONE stage ahead — never more (effectivePosition, shared.js: Intern who's
+// done -> sees through Junior, Junior who's done -> sees through Middle,
+// "max +1 stage"). The full roadmap, including tiers beyond that, is still
+// visible on the Mind map (Learner Dashboard) — that view is meant to show
+// the road ahead, this one is meant to show what's actually on your plate
+// right now (plus whatever you've just earned).
 // Rows are drag-reorderable (persisted per account on
 // course_assignments.position) — a drop only lands on a row in the same
 // position tier, so a drag can never move a course into a different stage.
@@ -33,7 +36,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, HEADER_H, ROW_H, VISIBLE_ROWS, th, td,
   fmtDate, toDateStr, relTime, todayStr, nextAnnualReviewDateStr, addMonthsDateStr, monthsUntilDateStr,
-  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow,
+  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, effectivePosition,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
@@ -334,7 +337,11 @@ function AutoScheduleModal({ currentPosition, annualReviewDate, onClose, onSched
 // progress scoped to whatever the dropdown currently shows. "N/A" instead
 // of a progress bar when the account isn't enrolled in any track yet —
 // not just when the current filter happens to have zero core courses.
-function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTotal }) {
+// scopePosition is the (possibly one-stage-ahead) effective position the
+// core-course count is actually measured against — see effectivePosition,
+// shared.js. position stays the account's raw, officially-assigned
+// seniority (the badge), unaffected by early access.
+function ProfileStrip({ me, position, scopePosition, trackTags, hasTracks, coreComplete, coreTotal }) {
   const pct = coreTotal ? Math.round((coreComplete / coreTotal) * 100) : 0;
   return (
     <section style={{ ...card, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -361,7 +368,7 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
           <>
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>
               <strong style={{ color: "var(--ink)" }}>{coreComplete} of {coreTotal}</strong> core courses complete
-              {position && <span style={{ color: "var(--faint)" }}> · through {POSITION_LABEL[position] || position}</span>}
+              {scopePosition && <span style={{ color: "var(--faint)" }}> · through {POSITION_LABEL[scopePosition] || scopePosition}</span>}
             </div>
             <ProgressBar pct={pct} />
           </>
@@ -662,10 +669,17 @@ export default function JourneyPage() {
   // The List (and Up next, below) only show courses in tiers at or below
   // this account's current position — an Intern sees the Intern tier, a
   // Junior sees Intern + Junior, and so on (isExpectedByNow, shared.js —
-  // same rule the % completion numbers already use). trackOptions/trackTags
-  // above deliberately stay unrestricted: which tracks you're ENROLLED in
-  // is a different fact from which courses are relevant to see right now.
-  const visibleJourney = filteredJourney.filter((c) => isExpectedByNow(c, position));
+  // same rule the % completion numbers use). Once every course in the
+  // account's OWN tier is complete/skipped, they've earned one stage of
+  // early access too (effectivePosition — "max +1 stage": Intern -> Junior,
+  // Junior -> Middle, never further). effectivePosition is computed off the
+  // FULL journey (every enrolled track), not filteredJourney — whether
+  // you've finished your stage shouldn't depend on which track happens to
+  // be selected in the dropdown. trackOptions/trackTags above deliberately
+  // stay unrestricted: which tracks you're ENROLLED in is a different fact
+  // from which courses are relevant to see right now.
+  const visiblePosition = effectivePosition(journey, position);
+  const visibleJourney = filteredJourney.filter((c) => isExpectedByNow(c, visiblePosition));
   // Knowledge artifacts' "waiting on the quiz" row — the account's current
   // in_progress pick, across every enrolled track (not scoped to the track
   // dropdown, same as recentCompletions isn't). Already on hand from the
@@ -736,6 +750,7 @@ export default function JourneyPage() {
             <ProfileStrip
               me={me}
               position={position}
+              scopePosition={visiblePosition}
               trackTags={trackTags}
               hasTracks={journey.length > 0}
               coreComplete={coreComplete}
@@ -760,7 +775,9 @@ export default function JourneyPage() {
                 </div>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
                   {position
-                    ? `Showing Intern through ${POSITION_LABEL[position] || position} — your current stage — across every track you're enrolled in.`
+                    ? visiblePosition !== position
+                      ? `Showing Intern through ${POSITION_LABEL[visiblePosition] || visiblePosition} — you've finished ${POSITION_LABEL[position] || position} and unlocked early access to the next stage — across every track you're enrolled in.`
+                      : `Showing Intern through ${POSITION_LABEL[position] || position} — your current stage — across every track you're enrolled in.`
                     : "Ordered intern → principal, across every track you're enrolled in."}
                   {" "}Drag a row to reorder it within its stage.
                 </p>
@@ -789,7 +806,7 @@ export default function JourneyPage() {
               // a different situation from "no courses in this track," so it gets
               // its own message rather than reusing that one.
               <div style={{ fontSize: 13, color: "var(--muted)" }}>
-                Nothing in this track for the {POSITION_LABEL[position] || position} stage yet — check back as you progress.
+                Nothing in this track for the {POSITION_LABEL[visiblePosition] || visiblePosition} stage yet — check back as you progress.
               </div>
             ) : (
               <JourneyTable courses={visibleJourney} onReorder={reorderStage} readOnly={selectedTrack !== "all"} />
