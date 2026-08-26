@@ -15,7 +15,7 @@
 // every course in its own tier 'not_started' — unlocking the whole tier into
 // its normal, un-started state rather than a synthetic status.
 
-import { HEADER_H, POSITION_LABEL, POSITION_ORDER, STATUS_META, VISIBLE_ROWS, errBanner } from "@/features/learning/shared";
+import { HEADER_H, POSITION_LABEL, POSITION_ORDER, ROW_H, STATUS_META, VISIBLE_ROWS, errBanner } from "@/features/learning/shared";
 
 const DONE_STATUSES = new Set(["complete", "skipped"]);
 
