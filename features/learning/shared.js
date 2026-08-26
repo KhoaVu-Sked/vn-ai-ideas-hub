@@ -23,6 +23,25 @@ export const POSITION_LABEL = { intern: "Intern", junior: "Junior", middle: "Mid
 // (features/learning/queries.js) takes this same array as a query parameter
 // via array_position() rather than hand-copying it into a CASE expression.
 export const POSITION_ORDER = POSITIONS;
+
+// A course counts toward "expected by now" once its own tier is at or below
+// the learner's current position — Intern is expected to have finished the
+// Intern tier, Senior is expected to have finished everything through
+// Senior, not the whole roadmap up to Principal. Used to scope "% complete"
+// fairly (Journey's profile strip, the Learner Dashboard's stat tiles) —
+// features/learning/queries.js's getTeamOverview() does the same comparison
+// server-side, via array_position(), for Team view's roster and stat cards.
+// No position set yet (an admin hasn't assigned one): falls back to true —
+// count the whole roadmap — since "nothing expected yet" reads worse than
+// "count everything until we know better."
+export function isExpectedByNow(course, position) {
+  if (!position) return true;
+  const courseIdx = POSITION_ORDER.indexOf(course.expected_by_position);
+  const posIdx = POSITION_ORDER.indexOf(position);
+  if (courseIdx === -1 || posIdx === -1) return true; // unrecognized tier value — don't silently exclude it
+  return courseIdx <= posIdx;
+}
+
 export const th = { padding: "6px 8px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "left" };
 export const td = { padding: "10px 8px", fontSize: 12.5, color: "var(--body)" };
 

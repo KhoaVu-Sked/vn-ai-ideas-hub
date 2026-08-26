@@ -26,7 +26,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, HEADER_H, ROW_H, VISIBLE_ROWS, th, td,
   fmtDate, toDateStr, relTime, todayStr, nextAnnualReviewDateStr, addMonthsDateStr, monthsUntilDateStr,
-  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY,
+  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
@@ -354,6 +354,7 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
           <>
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>
               <strong style={{ color: "var(--ink)" }}>{coreComplete} of {coreTotal}</strong> core courses complete
+              {position && <span style={{ color: "var(--faint)" }}> · through {POSITION_LABEL[position] || position}</span>}
             </div>
             <ProgressBar pct={pct} />
           </>
@@ -658,8 +659,12 @@ export default function JourneyPage() {
   // there's only ever one, since only the top Up next pick auto-starts.
   const inProgressCourse = journey.find((c) => c.status === "in_progress") || null;
   // Core-course progress for the profile strip, scoped to whatever the
-  // track dropdown currently shows.
-  const coreCourses = filteredJourney.filter((c) => c.priority === "core");
+  // track dropdown currently shows AND to what's actually expected of this
+  // account by now (isExpectedByNow — an Intern is only on the hook for the
+  // Intern tier, a Senior for everything through Senior, not the whole
+  // roadmap up to Principal). Fair comparison, not "penalize everyone for
+  // not yet being Principal."
+  const coreCourses = filteredJourney.filter((c) => c.priority === "core" && isExpectedByNow(c, position));
   const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
   // "All tracks" shows a tag per enrolled track; one specific track shows just that one.
   const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);

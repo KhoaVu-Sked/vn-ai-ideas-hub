@@ -15,6 +15,20 @@ const POSITION_ORDER = POSITIONS;
 // names the oldest such course, for the "In progress over 3 weeks" card's
 // example line. Drill-down reuses getJourney(accountId) below — it was
 // already generic on accountId, not hardcoded to the caller.
+//
+// core_total/core_complete are scoped to what's actually expected of each
+// account BY NOW — every course in every tier at or below their own
+// user_role.position, not the whole roadmap up to Principal. An Intern is
+// only on the hook for the Intern tier; a Senior for everything through
+// Senior. Same array_position() ladder comparison
+// features/learning/shared.js's isExpectedByNow() does client-side for
+// Journey's profile strip and the Learner Dashboard — this is the
+// server-side twin of that rule, for Team view's roster and its "Average
+// completion" stat card (both just read core_total/core_complete off this).
+// No position set yet: in_range falls back to true (count the whole
+// roadmap) rather than 0/0 — same fallback isExpectedByNow() uses.
+// in_progress_count/stalled/last_activity stay UNSCOPED on purpose — those
+// are about engagement, not a graded "% expected done".
 export async function getTeamOverview() {
   return sql`
     with track_names as (
@@ -23,19 +37,29 @@ export async function getTeamOverview() {
       join tracks t on t.id = acct.track_id
       group by acct.account_id
     ),
-    progress as (
-      select acct.account_id,
-        count(*) filter (where c.priority = 'core')::int as core_total,
-        count(*) filter (where c.priority = 'core' and ca.status = 'complete')::int as core_complete,
-        count(*) filter (where ca.status = 'in_progress')::int as in_progress_count,
-        max(ca.updated_at) as last_activity,
-        bool_or(ca.status = 'in_progress' and ca.updated_at < now() - interval '21 days') as stalled,
-        (array_agg(c.title order by ca.updated_at asc)
-          filter (where ca.status = 'in_progress' and ca.updated_at < now() - interval '21 days'))[1] as stalled_course
+    eligible as (
+      select acct.account_id, c.title, c.priority, ca.status, ca.updated_at,
+        (
+          ur.position is null
+          or array_position(${POSITION_ORDER}::text[], c.expected_by_position)
+             <= array_position(${POSITION_ORDER}::text[], ur.position)
+        ) as in_range
       from account_tracks acct
       join courses c on c.track_id = acct.track_id
       left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
-      group by acct.account_id
+      left join user_role ur on ur.account_id = acct.account_id
+    ),
+    progress as (
+      select account_id,
+        count(*) filter (where priority = 'core' and in_range)::int as core_total,
+        count(*) filter (where priority = 'core' and in_range and status = 'complete')::int as core_complete,
+        count(*) filter (where status = 'in_progress')::int as in_progress_count,
+        max(updated_at) as last_activity,
+        bool_or(status = 'in_progress' and updated_at < now() - interval '21 days') as stalled,
+        (array_agg(title order by updated_at asc)
+          filter (where status = 'in_progress' and updated_at < now() - interval '21 days'))[1] as stalled_course
+      from eligible
+      group by account_id
     )
     select a.id, a.name, a.username, a.avatar_color, a.avatar_url,
       ur.position, tn.tracks,

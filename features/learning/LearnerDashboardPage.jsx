@@ -11,7 +11,7 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, POSITION_LABEL } from "@/features/learning/shared";
+import { card, errBanner, POSITION_LABEL, isExpectedByNow } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
 
@@ -70,13 +70,21 @@ export default function LearnerDashboardPage() {
 
   const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
 
-  const coreCourses = filteredJourney.filter((c) => c.priority === "core");
+  // Both stat tiles below are scoped to what's actually expected of this
+  // account by now (isExpectedByNow — Intern is only on the hook for the
+  // Intern tier, Senior for everything through Senior), not the whole
+  // roadmap up to Principal — same rule Journey's profile strip and Team
+  // view's roster use. "Roadmap progress" further down stays whole-roadmap
+  // on purpose: it's the longer-horizon "how far into this track am I"
+  // picture, not a graded expectation.
+  const expected = filteredJourney.filter((c) => isExpectedByNow(c, position));
+  const coreCourses = expected.filter((c) => c.priority === "core");
   const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
   const corePct = coreCourses.length ? Math.round((coreComplete / coreCourses.length) * 100) : 0;
 
-  const completeCount = filteredJourney.filter((c) => c.status === "complete").length;
+  const completeCount = expected.filter((c) => c.status === "complete").length;
   const inProgressCount = filteredJourney.filter((c) => c.status === "in_progress").length;
-  const overallPct = filteredJourney.length ? Math.round((completeCount / filteredJourney.length) * 100) : 0;
+  const overallPct = expected.length ? Math.round((completeCount / expected.length) * 100) : 0;
 
   // Roadmap progress-by-track always covers every enrolled track, independent
   // of the Mind map's own track filter below — switching that filter
@@ -120,9 +128,9 @@ export default function LearnerDashboardPage() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 18 }}>
                   <StatCard label="Level" value={POSITION_LABEL[position] || "—"} hint="Your seniority tier" />
                   <StatCard label="Tracks enrolled" value={trackOptions.length} hint={trackOptions.map((t) => t.name).join(" · ") || "—"} />
-                  <StatCard label="Core courses complete" value={`${corePct}%`} hint={`${coreComplete} of ${coreCourses.length}`} />
+                  <StatCard label="Core courses complete" value={`${corePct}%`} hint={`${coreComplete} of ${coreCourses.length}${position ? ` · through ${POSITION_LABEL[position] || position}` : ""}`} />
                   <StatCard label="In progress" value={inProgressCount} hint="Courses you're currently on" />
-                  <StatCard label="All courses complete" value={`${overallPct}%`} hint={`${completeCount} of ${filteredJourney.length}`} />
+                  <StatCard label="All courses complete" value={`${overallPct}%`} hint={`${completeCount} of ${expected.length}${position ? ` · through ${POSITION_LABEL[position] || position}` : ""}`} />
                 </div>
 
                 <section style={{ ...card, marginBottom: 18 }}>

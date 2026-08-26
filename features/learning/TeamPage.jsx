@@ -237,7 +237,7 @@ export default function TeamPage() {
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 18 }}>
               <StatCard label="Learners" value={members.length} hint={comboSummary || "No one enrolled yet"} />
-              <StatCard label="Average completion" value={`${avgPct}%`} hint="Across all assigned core courses" />
+              <StatCard label="Average completion" value={`${avgPct}%`} hint="Core courses expected by each learner's own level" />
               <StatCard
                 label="In progress over 3 weeks"
                 value={stalledMembers.length}
@@ -276,7 +276,7 @@ export default function TeamPage() {
                         <th style={th}>Name</th>
                         <th style={th}>Level</th>
                         <th style={th}>Track</th>
-                        <th style={th}>% Complete</th>
+                        <th style={th} title="Core courses complete, scoped to what's expected through this person's own level — not the whole roadmap">% Complete</th>
                         <th style={th}>In Progress</th>
                         <th style={th}>Last Activity</th>
                         <th />
