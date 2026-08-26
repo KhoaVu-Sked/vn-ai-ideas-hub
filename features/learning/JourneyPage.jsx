@@ -365,16 +365,68 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
   );
 }
 
-// Up next's action row — labeled pills, not bare icons (see UpNextCard).
-// Auto Schedule gets the accent treatment since it's the headline action
-// here; Refresh/Edit dates stay neutral so they don't compete with it.
-const pillBtn = (busy) => ({
-  display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line)", background: "var(--card)",
-  borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "var(--body)",
-  cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, whiteSpace: "nowrap",
-});
+// Up next's action row (see UpNextCard). Auto Schedule is the headline
+// action — a labeled, accented pill, always visible. Refresh and Edit dates
+// are lower-frequency (Refresh is mostly a defensive re-fetch; editing a
+// target date is occasional, not a per-visit action), so they live behind
+// the "⋯" menu (UpNextMenu below) instead of competing for header space.
 const pillBtnAccent = { display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "var(--blue)", cursor: "pointer", whiteSpace: "nowrap" };
 const pillBtnDone = { display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #bfe3c9", background: "#e6f4ea", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "#1f7a3c", cursor: "pointer", whiteSpace: "nowrap" };
+const ellipsisBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, width: 28, height: 28, fontSize: 15, lineHeight: 1, color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
+const menuPopover = { position: "absolute", top: "calc(100% + 6px)", right: 0, background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 8px 24px rgba(10,22,44,0.16)", padding: 6, display: "flex", flexDirection: "column", gap: 2, minWidth: 170, zIndex: 30 };
+const menuItem = { display: "flex", alignItems: "center", gap: 8, border: "none", background: "none", borderRadius: 6, padding: "8px 10px", fontSize: 12.5, fontWeight: 600, color: "var(--body)", cursor: "pointer", textAlign: "left", width: "100%" };
+
+// "⋯" overflow for Up next's lower-frequency actions (Refresh, Edit dates).
+// Click-to-open, click-outside-to-close — same idiom AppHeader's own avatar
+// menu uses (a mousedown listener checked against a ref), not hover, since
+// hover menus don't work on touch and are easy to trigger by accident.
+function UpNextMenu({ onRefresh, syncing, onEdit }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const hoverable = (e, on) => { e.currentTarget.style.background = on ? "var(--bg)" : "none"; };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label="More actions"
+        aria-haspopup="true"
+        aria-expanded={open}
+        style={ellipsisBtn}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div style={menuPopover}>
+          <button
+            onClick={() => { setOpen(false); onRefresh(); }}
+            disabled={syncing}
+            style={{ ...menuItem, cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.6 : 1 }}
+            onMouseEnter={(e) => hoverable(e, true)}
+            onMouseLeave={(e) => hoverable(e, false)}
+          >
+            🔄 {syncing ? "Refreshing…" : "Refresh"}
+          </button>
+          <button
+            onClick={() => { setOpen(false); onEdit(); }}
+            style={menuItem}
+            onMouseEnter={(e) => hoverable(e, true)}
+            onMouseLeave={(e) => hoverable(e, false)}
+          >
+            ✏️ Edit dates
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // The next 2 courses, not yet complete/skipped: dated ones first (soonest
 // target_date first), then undated ones filling any remaining slots in the
@@ -423,42 +475,28 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, on
 
   return (
     <section style={card}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 15 }}>📅</span>
-        <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: 0 }}>Up next</h2>
-      </div>
-      {/* Labeled pill buttons rather than bare icons — the wand/pencil/refresh
-          glyphs alone weren't self-explanatory (relied entirely on a hover
-          tooltip to say what they did). Own row below the title so they have
-          room to carry text without competing with it; wraps at the sidebar's
-          narrowest width instead of overflowing. Edit/Done share one slot
-          (never both at once) so the row's button count doesn't jump around
-          on click. */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
-        <button
-          onClick={onSync}
-          disabled={syncing}
-          aria-label="Refresh which courses show here"
-          style={pillBtn(syncing)}
-        >
-          🔄 {syncing ? "Refreshing…" : "Refresh"}
-        </button>
-        <button
-          onClick={onAutoSchedule}
-          aria-label="Auto Schedule — book study time on your calendar"
-          style={pillBtnAccent}
-        >
-          🪄 Auto Schedule
-        </button>
-        {editing ? (
-          <button onClick={confirmEditing} aria-label="Done editing target dates" style={pillBtnDone}>
-            ✓ Done
+      {/* Single row: title left, actions right — Auto Schedule is the only
+          always-visible, labeled action; Refresh/Edit dates live behind the
+          "⋯" menu (lower-frequency actions, see UpNextMenu above). While
+          editing, the menu is replaced by a visible "✓ Done" pill in the
+          same slot, so exiting edit mode never requires reopening a menu. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 15 }}>📅</span>
+          <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: 0 }}>Up next</h2>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={onAutoSchedule} aria-label="Auto Schedule — book study time on your calendar" style={pillBtnAccent}>
+            🪄 Auto Schedule
           </button>
-        ) : (
-          <button onClick={startEditing} aria-label="Suggest a target date for these courses" style={pillBtn(false)}>
-            ✏️ Edit dates
-          </button>
-        )}
+          {editing ? (
+            <button onClick={confirmEditing} aria-label="Done editing target dates" style={pillBtnDone}>
+              ✓ Done
+            </button>
+          ) : (
+            <UpNextMenu onRefresh={onSync} syncing={syncing} onEdit={startEditing} />
+          )}
+        </div>
       </div>
       {upcoming.length === 0 ? (
         <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0, lineHeight: 1.5 }}>
