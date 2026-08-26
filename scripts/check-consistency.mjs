@@ -126,7 +126,12 @@ const fail = (check, detail, why) => problems.push({ check, detail, why });
 {
   const consts = read("features/ideas/constants.js");
   const live = new Set([...consts.matchAll(/label:\s*"([^"]+)"/g)].map((m) => m[1]));
-  const retired = ["Accepted by idea lead", "Under discussion", "Requests &amp; input", "Forgot password"];
+  const retired = [
+    "Accepted by idea lead", "Under discussion", "Requests &amp; input", "Forgot password",
+    // The creator is the Initiator now; saying otherwise contradicts the
+    // release note the same deploy shows every user.
+    "you become its <b>Project Lead</b>",
+  ];
   for (const doc of ["docs/user-guide.html", "docs/admin-guide.html"]) {
     const src = read(doc);
     for (const phrase of retired) {
