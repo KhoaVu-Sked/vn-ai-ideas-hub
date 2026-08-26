@@ -365,6 +365,17 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
   );
 }
 
+// Up next's action row — labeled pills, not bare icons (see UpNextCard).
+// Auto Schedule gets the accent treatment since it's the headline action
+// here; Refresh/Edit dates stay neutral so they don't compete with it.
+const pillBtn = (busy) => ({
+  display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line)", background: "var(--card)",
+  borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "var(--body)",
+  cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, whiteSpace: "nowrap",
+});
+const pillBtnAccent = { display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "var(--blue)", cursor: "pointer", whiteSpace: "nowrap" };
+const pillBtnDone = { display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #bfe3c9", background: "#e6f4ea", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "#1f7a3c", cursor: "pointer", whiteSpace: "nowrap" };
+
 // The next 2 courses, not yet complete/skipped: dated ones first (soonest
 // target_date first), then undated ones filling any remaining slots in the
 // roadmap's own order (courses arrives already sorted intern -> principal,
@@ -412,52 +423,42 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, on
 
   return (
     <section style={card}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 15 }}>📅</span>
-          <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: 0 }}>Up next</h2>
-          <button
-            onClick={onSync}
-            disabled={syncing}
-            className="icon-tip"
-            data-tip="Refresh which courses show here"
-            aria-label="Refresh which courses show here"
-            style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.6 : 1 }}
-          >
-            🔄
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 15 }}>📅</span>
+        <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: 0 }}>Up next</h2>
+      </div>
+      {/* Labeled pill buttons rather than bare icons — the wand/pencil/refresh
+          glyphs alone weren't self-explanatory (relied entirely on a hover
+          tooltip to say what they did). Own row below the title so they have
+          room to carry text without competing with it; wraps at the sidebar's
+          narrowest width instead of overflowing. Edit/Done share one slot
+          (never both at once) so the row's button count doesn't jump around
+          on click. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+        <button
+          onClick={onSync}
+          disabled={syncing}
+          aria-label="Refresh which courses show here"
+          style={pillBtn(syncing)}
+        >
+          🔄 {syncing ? "Refreshing…" : "Refresh"}
+        </button>
+        <button
+          onClick={onAutoSchedule}
+          aria-label="Auto Schedule — book study time on your calendar"
+          style={pillBtnAccent}
+        >
+          🪄 Auto Schedule
+        </button>
+        {editing ? (
+          <button onClick={confirmEditing} aria-label="Done editing target dates" style={pillBtnDone}>
+            ✓ Done
           </button>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <button
-            onClick={onAutoSchedule}
-            className="icon-tip"
-            data-tip="Auto Schedule"
-            aria-label="Auto Schedule"
-            style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: "pointer" }}
-          >
-            🪄
+        ) : (
+          <button onClick={startEditing} aria-label="Suggest a target date for these courses" style={pillBtn(false)}>
+            ✏️ Edit dates
           </button>
-          <button
-            onClick={startEditing}
-            className="icon-tip"
-            data-tip="Suggest a target date for these courses"
-            aria-label="Suggest a target date for these courses"
-            style={{ border: "1px solid var(--line)", background: editing ? "var(--bg)" : "var(--card)", borderRadius: 6, width: 26, height: 26, fontSize: 12.5, lineHeight: 1, cursor: "pointer" }}
-          >
-            ✏️
-          </button>
-          {editing && (
-            <button
-              onClick={confirmEditing}
-              className="icon-tip"
-              data-tip="Done editing"
-              aria-label="Done editing"
-              style={{ border: "1px solid #bfe3c9", background: "#e6f4ea", color: "#1f7a3c", borderRadius: 6, width: 26, height: 26, fontSize: 13, lineHeight: 1, cursor: "pointer" }}
-            >
-              ✓
-            </button>
-          )}
-        </div>
+        )}
       </div>
       {upcoming.length === 0 ? (
         <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0, lineHeight: 1.5 }}>
@@ -706,7 +707,6 @@ export default function JourneyPage() {
                 </div>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
                   Ordered intern → principal, across every track you're enrolled in. Drag a row to reorder it within its stage.
-                  {" "}<Link href="/learning-hub/dashboard" style={{ color: "var(--blue)", fontWeight: 700, textDecoration: "none" }}>See the Mind map →</Link>
                 </p>
               </div>
               {journey.length > 0 && (
