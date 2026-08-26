@@ -23,9 +23,72 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, POSITION_LABEL, th, td, relTime } from "@/features/learning/shared";
+import { card, errBanner, POSITION_LABEL, th, td, relTime, formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY } from "@/features/learning/shared";
 import { JourneyTable } from "@/features/learning/JourneyPage";
 import ProgressBar from "@/features/learning/ProgressBar";
+
+// Admin-only inline editor for the app-wide annual review date (an
+// app_settings row — ANNUAL_REVIEW_DATE in features/admin/queries.js). Auto
+// Schedule (features/learning/JourneyPage.jsx) reads this same value to
+// default its "Complete by" field, so changing it here changes what every
+// learner sees there. Stored as MM-DD (no year — it recurs every year); the
+// native date input still needs SOME year to render, so edits are staged
+// against a dummy leap year (2000, so Feb 29 is selectable too) and only the
+// MM-DD slice ever leaves this component.
+function AnnualReviewEditor({ value, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(`2000-${value}`);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const startEditing = () => { setDraft(`2000-${value}`); setErr(""); setEditing(true); };
+
+  const save = async () => {
+    setSaving(true);
+    setErr("");
+    try {
+      await onSave(draft.slice(5)); // "MM-DD"
+      setEditing(false);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        onClick={startEditing}
+        title="Auto Schedule defaults its Complete-by date to this — click to change it"
+        style={{
+          display: "flex", alignItems: "center", gap: 6, border: "1px solid var(--line)", background: "var(--bg)",
+          borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "var(--body)", cursor: "pointer",
+        }}
+      >
+        🗓 Annual review: {formatMonthDay(value)} <span style={{ opacity: 0.6 }}>✎</span>
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <input
+        type="date"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "5px 8px", fontSize: 12.5, color: "var(--ink)", background: "var(--card)" }}
+      />
+      <button onClick={save} disabled={saving} style={{ border: "none", background: "var(--blue)", color: "#fff", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: saving ? "wait" : "pointer" }}>
+        {saving ? "Saving…" : "Save"}
+      </button>
+      <button onClick={() => { setEditing(false); setErr(""); }} disabled={saving} style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, color: "var(--body)", cursor: "pointer" }}>
+        Cancel
+      </button>
+      {err && <span style={{ fontSize: 11.5, color: "#c92a2a" }}>{err}</span>}
+    </div>
+  );
+}
 
 const trackLabel = (tracks) => (!tracks || tracks.length === 0 ? "—" : tracks.join(" + "));
 const pctOf = (m) => (m.core_total ? Math.round((m.core_complete / m.core_total) * 100) : 0);
@@ -112,6 +175,7 @@ export default function TeamPage() {
   const [trackFilter, setTrackFilter] = useState("all");
   const [sortBy, setSortBy] = useState("default");
   const [selected, setSelected] = useState(null);
+  const [annualReviewDate, setAnnualReviewDate] = useState(DEFAULT_ANNUAL_REVIEW_MONTH_DAY);
 
   const load = useCallback(async () => {
     setErr("");
@@ -120,6 +184,23 @@ export default function TeamPage() {
 
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
+
+  // Same app_settings row Auto Schedule reads (features/learning/JourneyPage.jsx)
+  // — fetched independently of load() above since it's a global setting, not
+  // part of the team roster.
+  useEffect(() => {
+    if (!me) return;
+    api("/api/settings").then(({ settings }) => setAnnualReviewDate(settings.annual_review_date))
+      .catch(() => {});
+  }, [me]);
+
+  // PATCHes the shared setting, then updates local state from the server's
+  // own echo — AnnualReviewEditor throws this back to its own try/catch on
+  // failure, so a bad save shows inline rather than silently reverting.
+  const saveAnnualReviewDate = async (monthDay) => {
+    const { settings } = await api("/api/settings", { method: "PATCH", body: JSON.stringify({ annual_review_date: monthDay }) });
+    setAnnualReviewDate(settings.annual_review_date);
+  };
 
   const trackOptions = Array.from(new Set(members.flatMap((m) => m.tracks || []))).sort();
 
@@ -170,7 +251,8 @@ export default function TeamPage() {
                   <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", margin: "0 0 4px" }}>Team progress</h1>
                   <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>Click a row to open that person's roadmap.</p>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <AnnualReviewEditor value={annualReviewDate} onSave={saveAnnualReviewDate} />
                   <select value={trackFilter} onChange={(e) => setTrackFilter(e.target.value)} style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>
                     <option value="all">All tracks</option>
                     {trackOptions.map((t) => <option key={t} value={t}>{t}</option>)}

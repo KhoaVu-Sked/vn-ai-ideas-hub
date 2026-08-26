@@ -122,6 +122,17 @@ export async function archiveFormField(id) {
 // means "use the default", so a fresh database needs no seeding.
 export const EMAIL_NOTIFICATIONS = "email_notifications";
 
+// The annual review's recurring month-day (MM-DD, no year — it happens every
+// year). Auto Schedule's "Complete by" field (features/learning/JourneyPage.jsx)
+// defaults to the next occurrence of this date; an admin edits it from Team
+// view's header (features/learning/TeamPage.jsx), not Manage — it's the only
+// place that reads it today. features/learning/shared.js keeps its own copy
+// of the same default for the brief window before a page's settings fetch
+// resolves; keep the two in sync if this ever changes.
+export const ANNUAL_REVIEW_DATE = "annual_review_date";
+const DEFAULT_ANNUAL_REVIEW_DATE = "10-13";
+const MONTH_DAY_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
 export async function listSettings() {
   const rows = await sql`select key, value from app_settings`;
   const out = {};
@@ -129,7 +140,14 @@ export async function listSettings() {
   return {
     // Default ON: a new install should behave normally without being configured.
     [EMAIL_NOTIFICATIONS]: out[EMAIL_NOTIFICATIONS] !== "off",
+    [ANNUAL_REVIEW_DATE]: out[ANNUAL_REVIEW_DATE] || DEFAULT_ANNUAL_REVIEW_DATE,
   };
+}
+
+// MM-DD only — never a real calendar-day check (no "Feb 30" rejection), since
+// the point is just "did this land in a sane range", not full date validity.
+export function isValidMonthDay(value) {
+  return typeof value === "string" && MONTH_DAY_RE.test(value);
 }
 
 export async function setSetting(key, value, accountId = null) {

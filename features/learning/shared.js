@@ -26,6 +26,13 @@ export const POSITION_ORDER = POSITIONS;
 export const th = { padding: "6px 8px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "left" };
 export const td = { padding: "10px 8px", fontSize: 12.5, color: "var(--body)" };
 
+// Row/header sizing shared by the List view's scrollable table (JourneyPage)
+// and the Mind map's per-column scroll height (MindMap) — same visible-rows
+// budget in both places.
+export const VISIBLE_ROWS = 7;
+export const ROW_H = 42;
+export const HEADER_H = 34;
+
 // target_date is a date-only value (no time-of-day) — always parsed and
 // displayed in UTC so the calendar date shown matches what was actually set,
 // regardless of the viewer's browser timezone. Without the explicit UTC
@@ -41,6 +48,58 @@ export function fmtDate(d) {
 // client (Up next's date input) and the server (the target route's past-date
 // check) — one normalization point instead of two independent `.slice(0,10)`s.
 export const toDateStr = (d) => (d ? String(d).slice(0, 10) : "");
+
+// Today as a yyyy-mm-dd string — same `.toISOString().slice(0, 10)` shape
+// used everywhere else a date input needs a `min`, so "today" means the same
+// calendar date across every date field in this feature.
+export const todayStr = () => new Date().toISOString().slice(0, 10);
+
+// Fallback annual-review month-day (MM-DD) used until the real one — an
+// admin-editable app_settings row, ANNUAL_REVIEW_DATE in
+// features/admin/queries.js — has loaded. Recurs every year, so it's a
+// month-day, not a full date; keep this in sync with that file's own
+// default so a not-yet-loaded page and a freshly-seeded database agree.
+export const DEFAULT_ANNUAL_REVIEW_MONTH_DAY = "10-13";
+
+// Auto Schedule's "Complete by" field defaults to the next occurrence of the
+// annual review — this year's if it hasn't passed yet, otherwise next year's.
+// `monthDay` is admin-editable (Team view's header — see TeamPage.jsx); this
+// function itself only knows how to project it forward. Plain string
+// comparison is enough since both sides are yyyy-mm-dd — lexicographic order
+// matches calendar order.
+export function nextAnnualReviewDateStr(monthDay = DEFAULT_ANNUAL_REVIEW_MONTH_DAY, today = todayStr()) {
+  const year = today.slice(0, 4);
+  const thisYear = `${year}-${monthDay}`;
+  return today <= thisYear ? thisYear : `${Number(year) + 1}-${monthDay}`;
+}
+
+// "10-13" -> "Oct 13" — for display only (the quick-pick label, the Team
+// view editor's collapsed state). Anchored to a dummy leap year so Feb 29
+// formats fine too.
+export function formatMonthDay(monthDay) {
+  const [m, d] = monthDay.split("-").map(Number);
+  return new Date(Date.UTC(2000, m - 1, d)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+// A yyyy-mm-dd string `months` calendar-months from `today` — used by Auto
+// Schedule's quick-pick shortcuts ("3 months", "6 months"). Calendar-accurate
+// (via setUTCMonth, which rolls year/day correctly), unlike the ~30.44-day
+// approximation monthsUntilDateStr uses to convert back for the server.
+export function addMonthsDateStr(months, today = todayStr()) {
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+// Inverse of the server's `timelineDays = Math.round(months * 30.44)`
+// (app/api/courses/auto-schedule/route.js) — converts a picked "Complete by"
+// date back into the fractional-months number that endpoint expects. Same
+// 30.44 constant on both ends so the round trip lands on the date the
+// learner actually picked, not some drifted approximation of it.
+export function monthsUntilDateStr(dateStr, today = todayStr()) {
+  const days = (new Date(`${dateStr}T00:00:00Z`) - new Date(`${today}T00:00:00Z`)) / 86400000;
+  return days / 30.44;
+}
 
 // "3 days ago" / "1 week ago" — used by Team view's Last activity column and
 // the Journey page's Knowledge artifacts card, so it lives here once instead

@@ -1,8 +1,8 @@
 # AI Learning Platform — Requirements
 
-**Status:** In progress — Learning Hub, Your Journey (including the wrap-up quiz), and Team view are built and live in this repo; the agent layer (Planner, Knowledge Builder, Scheduler) is not.
+**Status:** In progress — Learning Hub, Your Journey (including the wrap-up quiz and Auto Schedule), a Learner Dashboard, and Team view are built and live in this repo. The Planner and Knowledge Builder agents are not built; Scheduler is split — Auto Schedule itself is real (deterministic, not Claude-driven), reminders and preference-aware sequencing are not.
 **Owner:** The Kiet
-**Purpose:** One place for a learner to see the tracks available to them, enroll, and work through a roadmap of courses by seniority level (Intern → Principal) — currently self-serve and manual; the original plan to automate planning, note-generation, and scheduling with agents is still ahead, not behind, this build.
+**Purpose:** One place for a learner to see the tracks available to them, enroll, and work through a roadmap of courses by seniority level (Intern → Principal) — mostly self-serve and manual, with one real exception: Auto Schedule books actual study time on the learner's Google Calendar. The rest of the original plan to automate planning, note-generation, and Claude-driven scheduling with agents is still ahead, not behind, this build.
 
 This file describes what the AI Learning feature actually is today, section by section, each tagged:
 - ✅ **Built** — live in this repo, in real use
@@ -18,7 +18,7 @@ This file describes what the AI Learning feature actually is today, section by s
 | Application data (accounts, tracks, courses, progress) | **Neon Postgres** — the same database as the rest of this app (`vn-ai-ideas-hub`), not a separate Supabase project | ✅ Built |
 | Course catalog + quiz content | Lives in `courses` and `course_quiz_questions`. The AI Track's 20 real courses (imported from a roadmap spreadsheet) and quiz questions for 15 of them (imported from a separate course-framework spreadsheet) are seeded via **`ai-track-seed.sql`** — a standalone, idempotent, run-once-by-hand file, same pattern as `seed.sql`, kept out of `schema.sql` so that file stays pure table design. No live Google Sheets integration, no sync button, no editorial workflow for non-technical editors | ✅ Built (as data), ⬜ (as an editable catalog workflow) |
 | Wrap-up quiz | A learner opens a course's quiz (`/learning-hub/journey/[courseId]/quiz`), clicks any option to check it against the stored answer — no locking, no attempt limit, no per-click history recorded. Finishing the last question marks the course `complete` and snapshots question count + first-try accuracy onto `course_assignments` | ✅ Built |
-| Web app / dashboards | **Next.js on Vercel**, same deployment as the Ideas Hub. Four pages: `/learning-hub`, `/learning-hub/journey`, `/learning-hub/journey/[courseId]/quiz`, `/learning-hub/team` | ✅ Built |
+| Web app / dashboards | **Next.js on Vercel**, same deployment as the Ideas Hub. Five pages: `/learning-hub`, `/learning-hub/journey`, `/learning-hub/journey/[courseId]/quiz`, `/learning-hub/dashboard`, `/learning-hub/team` | ✅ Built |
 | Course Planner & Progress Monitor | Would read a learner's roadmap and sequence it with target dates | ⬜ Not started — no agent, no automated sequencing. The only "order" that exists is course insertion order plus a learner's own manual drag-reorder within a stage |
 | Knowledge Builder (NotebookLM) | Would generate a mind map, summary, and exam per completed course | ⬜ Not started — no mind-map/summary generation exists anywhere. The "Knowledge artifacts" card on Your Journey is real now, but it isn't this: it shows the learner's own recent wrap-up quiz results (see Section 4.8), not NotebookLM output |
 | Scheduler & Reminders (Claude + Google Calendar) | Would place study time on a calendar and send reminders | 🚧 Partial — **Auto Schedule is real** (books actual Google Calendar events, freebusy-aware, across a chosen position range and timeline — see Section 8); reminders and Claude-driven preference-aware sequencing are not built |
@@ -82,7 +82,7 @@ The original plan (auto-generate a roadmap from an uploaded `.xlsx` competency m
 
 ## 4. Feature: Your Journey (the learner's roadmap view)
 
-Lives at `/learning-hub/journey`. Replaces the originally-planned "Learner Dashboard" section.
+Lives at `/learning-hub/journey`. Originally conceived as replacing a planned "Learner Dashboard" section — a real Learner Dashboard now exists too (4.10), at a separate URL, covering a different slice: this page is the roadmap itself (the **List** view only, as of this pass — see 4.4), the dashboard is progress-at-a-glance plus the **Mind map**, which used to live here.
 
 ### 4.1 Empty states — ✅ Built
 - Zero enrolled tracks: "Nothing here yet — enroll in a track from the Learning Hub to start your journey," profile strip shows only name + position (no track tags), progress shows **N/A** instead of a bar.
@@ -93,31 +93,29 @@ Lives at `/learning-hub/journey`. Replaces the originally-planned "Learner Dashb
 - Progress: **"N of M core courses complete"** + bar, `priority = 'core'` only, scoped to whatever the track dropdown currently shows.
 
 ### 4.3 Track filter — ✅ Built
-A dropdown next to the "Your Journey" title: "All tracks" or one specific enrolled track. Filters both the List and Mind map views and the profile strip's progress count. Falls back to "All tracks" automatically if the selected track is un-enrolled out from under it (e.g. after a Reset).
+A dropdown next to the "Your Journey" title: "All tracks" or one specific enrolled track. Filters the List view and the profile strip's progress count (the Mind map has its own, independent copy of this same filter now — 4.10). Falls back to "All tracks" automatically if the selected track is un-enrolled out from under it (e.g. after a Reset).
 
-### 4.4 Roadmap view — ✅ Built, two modes
-- **List**: table (`#`, Course, Track, Platform, Est. hrs, Target, Status), ordered Intern → Principal then by the learner's own custom order within a tier (see 4.6), scrollable after ~7 rows with a pinned header. A row expands to show the course link, its "after this course" outcome, and a real **Wrap-up** link into that course's quiz (see 4.9).
-- **Mind map**: one column per position tier that actually has courses in it, nodes rendered as an explicit chain (course 1 → 2 → 3) within a column via a dot/line rail, headline text is the course's `outcome` (not its title — hover for the real title via a native tooltip).
+### 4.4 Roadmap view — ✅ Built, List only
+**List**: table (`#`, Course, Track, Platform, Est. hrs, Target, Status), ordered Intern → Principal then by the learner's own custom order within a tier (see 4.6), scrollable after ~7 rows with a pinned header. A row expands to show the course link, its "after this course" outcome, and a real **Wrap-up** link into that course's quiz (see 4.9).
 
-**Difference from the original plan:** the original Map view described per-course prerequisite arrows (course A requires specifically course B). That data doesn't exist — there's no `course_prerequisites` table, only the position ladder. What's built instead is a **tier gate**: a course is Locked until every course in the tier below it is `complete` or `skipped`, and the connector between columns names the tier requirement ("Requires all Intern courses") rather than a specific course.
+**Changed this pass:** this page used to also render a **Mind map** as a second, toggleable view. That toggle is gone — the Mind map moved wholesale to the Learner Dashboard (4.10), and this page now shows the List unconditionally. A "See the Mind map →" link in the page's own subtext points there, so the option isn't just silently gone. `features/learning/JourneyTable`/`JourneyRow` (the List) and the Mind map's components (`computeLocks`, `MindMapNode`, `NodeRail`, `JourneyMindMap`, `SkipConfirmModal`) live in separate files now — `JourneyPage.jsx` and the new `MindMap.jsx` — so both this page and the dashboard can use the List/Mind map independently without duplicating either.
 
-### 4.5 Locking and Skip prerequisite — ✅ Built
+### 4.5 Locking and Skip prerequisite — ✅ Built (now on the Learner Dashboard — 4.10)
 - A course is **Locked** (Mind map only) until every course in the tier below it is `complete`/`skipped`. An empty or missing lower tier can't block anything.
 - **Skip prerequisite** on a locked course: marks every course in the tier *below* it `skipped`, and every course in *its own* tier `not_started` — unlocking the whole tier at once, not just the clicked course. Confirms first, with the exact wording: *"Previous courses are required before "{title}". Skipping lets you move on now. The skip is recorded on your roadmap and visible to your manager."* (No manager view reads this yet — the data is recorded correctly, just nothing surfaces it to a manager today.)
-- **Reset**: clears all `course_assignments` rows for the account, reverting everything to `not_started` — same effect as never having touched the journey.
+- **Difference from the original plan:** the original Map view described per-course prerequisite arrows (course A requires specifically course B). That data doesn't exist — there's no `course_prerequisites` table, only the position ladder. What's built instead is a **tier gate**: a course is Locked until every course in the tier below it is `complete` or `skipped`, and the connector between columns names the tier requirement ("Requires all Intern courses") rather than a specific course.
+- **Reset**: clears all `course_assignments` rows for the account, reverting everything to `not_started` — same effect as never having touched the journey. Also deletes any Auto Schedule events on the account's connected Google Calendar (best-effort — see Section 8.5), so a demo account resets cleanly on both sides, not just this app's own data. (Reset itself is still a Your Journey control, not a Learner Dashboard one.)
 
 ### 4.6 Reordering — ✅ Built
 Rows in the **List** view are drag-reorderable, persisted per-account (`course_assignments.position`) — a drop only lands on a row in the same position tier, so a course can never be dragged into a different stage. The Mind map view is read-only display of whatever order the query returns; there's only one place reordering happens.
 
-### 4.7 Up next — 🚧 Partial (sidebar card)
-Shows the next 2 courses that aren't complete/skipped: dated ones first (soonest `target_date`), then undated ones filling remaining slots in the roadmap's own order — a date is no longer required to appear here.
+### 4.7 Up next — ✅ Built (sidebar card)
+Shows the next 2 courses that aren't complete/skipped: dated ones first (soonest `target_date`), then undated ones filling remaining slots in the roadmap's own order — a date is no longer required to appear here. Nothing under this card is a placeholder anymore:
 
-**Real, not placeholder:**
 - The learner can set their own `target_date` on the courses shown here — a **pencil** icon reveals a date input per course (native picker, past dates greyed out via `min=today`), edits are staged locally and only sent to the server when the **green tick** confirms them. This is a genuine write to `course_assignments.target_date` — a suggestion, never an enforced deadline, editable anytime.
 - The moment a course becomes the #1 pick, it **automatically flips from `not_started` to `in_progress`** — "this is the one you're on now" needs no click. Never reverts real progress (a guard skips the write if the course is already anything other than `not_started`).
 - A **sync** icon next to the title re-fetches, in case editing elsewhere changed which courses qualify.
-
-**Real, not placeholder:** the **Auto Schedule** icon (magic wand) opens a modal asking for a position range and a timeline, then books real Google Calendar events for every not-yet-done course in that range — see Section 8 for how. Empty state when nothing qualifies: *"Nothing left to plan — every course is complete or skipped."*
+- The **Auto Schedule** icon (magic wand) opens a modal asking for a position range and a **"Complete by" date** (not a number-of-months timeline anymore — see 8.5), then books real Google Calendar events for every not-yet-done course in that range — see Section 8 for how. Empty state when nothing qualifies: *"Nothing left to plan — every course is complete or skipped."*
 
 ### 4.8 Knowledge artifacts — ✅ Built (sidebar card, different shape than planned)
 Re-scoped from "NotebookLM-generated mind map/summary/exam" (Section 7, still not started) to something real and much simpler: **the learner's own wrap-up quiz results.**
@@ -136,6 +134,14 @@ Lives at `/learning-hub/journey/[courseId]/quiz`. The **Wrap-up** link in a List
 - A course with no quiz seeded (5 of the 20 — see Section 2.1) shows "No quiz for this course yet" instead of a dead end.
 - Already-completed courses can be retaken freely; retaking just re-writes the same snapshot.
 
+### 4.10 Learner Dashboard — ✅ Built
+Lives at `/learning-hub/dashboard` (`features/learning/LearnerDashboardPage.jsx`). New this pass, built alongside pulling the Mind map out of Your Journey (4.4) — this is where it moved to. Reuses the same `GET /api/journey` fetch Your Journey already made; no new endpoint or table behind it.
+
+- **Stat tiles**: seniority level, tracks enrolled, core courses complete (%), courses in progress, all courses complete (%) — all scoped to this page's own track-filter dropdown, independent of whatever's selected on Your Journey.
+- **Roadmap progress**: one completion bar per enrolled track (complete / total courses for that track), always covering every enrolled track regardless of the Mind map's own filter below it — switching that filter doesn't collapse this list down to one row.
+- **Mind map**: the same tier-gated view described in 4.4/4.5 — same columns-by-position-tier layout, same Locked/Skip-prerequisite behavior and confirm wording, same components (now `features/learning/MindMap.jsx`, extracted out of `JourneyPage.jsx` so this page and Your Journey can both use it). Has its own track-filter dropdown, separate from the stat tiles' one above it.
+- A nav link ("My Dashboard," in the app header, next to "Learning Hub") and a "See the Mind map →" link from Your Journey both point here.
+
 **Acceptance criteria:**
 - [x] A learner with zero enrolled tracks sees the empty state, never a broken roadmap
 - [x] Locked courses (Mind map) can't be worked around without Skip prerequisite
@@ -144,6 +150,7 @@ Lives at `/learning-hub/journey/[courseId]/quiz`. The **Wrap-up** link in a List
 - [x] Knowledge artifacts show real quiz results for completed courses, plus a nudge for what's in progress
 - [x] Wrap-up is a real quiz that marks a course complete, not a placeholder button
 - [x] Up next reflects a real scheduled plan *(Auto Schedule writes real `target_date`s from real Google Calendar events — Section 8)*
+- [x] The Mind map and its Skip-prerequisite flow work identically on the Learner Dashboard as they did on Your Journey before the move
 
 ---
 
@@ -157,6 +164,7 @@ Lives at `/learning-hub/team`.
 - **Stat cards**: Learners (count + breakdown by track combination), Average completion (pooled `core` course completion across everyone), In progress over 3 weeks ("stalled" — an `in_progress` course whose `course_assignments.updated_at` hasn't moved in 21+ days, with an example course + name).
 - **Team progress table**: name, `user_role.position`, enrolled track(s), % core-course complete + bar, in-progress count, last activity (relative time from `updated_at`). Filterable by track, sortable by name or % complete.
 - **Drill-down**: clicking a row opens that person's roadmap **read-only** — literally the same `JourneyTable` component the learner's own Journey page uses, given `readOnly` (disables drag-reorder) and `ownRoadmap={false}` (hides the Wrap-up link entirely, not just disables it — an admin can't jump into someone else's quiz from here).
+- **Annual review date editor** — new this pass, in the Team progress card's header, next to the track/sort filters: a pill (`🗓 Annual review: Oct 13 ✎`) that expands into a native date picker on click. Saving PATCHes the same `app_settings.annual_review_date` row Auto Schedule's "Complete by" field defaults to (8.5/8.6) — the only cross-linked control in this app where an admin setting changes what every learner sees on their own page, live, with no redeploy.
 
 **Deliberately not included:** the "Sync courses" / "Catalog last synced" control from early mockups — that's the Google Sheets pipeline in Section 2.2, never built and not planned. No unmatched-skills review either, since the upload/matching flow it would review (old Section 3) doesn't exist.
 
@@ -195,16 +203,25 @@ Adding a redirect URI to that client needs Editor/Owner rights on its Cloud proj
 The calculation (`features/learning/scheduler.js`) is a plain freebusy-diff: courses are spread proportionally across the timeline, each placed in the first open weekday work-hours slot (learner's own `accounts.timezone`, default `Asia/Ho_Chi_Minh`), overlap-checked against both real Google busy blocks and every slot Auto Schedule itself just placed. No LLM call anywhere in this path — a Claude API call for preference-aware sequencing ("mornings only," multi-course spacing beyond simple proportional spread) is still a possible Phase 2, not started.
 
 ### 8.5 Real behavior, not a placeholder
-- Learner picks From/To position (defaults to their own `user_role.position` on both ends) and a timeline (number + months/years).
+- Learner picks From/To position (defaults to their own `user_role.position` on both ends) and a **"Complete by" date** — changed this pass from a number + months/years timeline to a native date field, defaulting to the next occurrence of the annual review date (8.6). Quick-pick chips ("Annual review · Oct 13", "3 months", "6 months") jump the field; any other date can be typed directly for a tighter or looser schedule. Converted to the fractional-months number the endpoint below actually wants (`monthsUntilDateStr`, client-side, in `features/learning/shared.js`) only on submit — the API contract itself (`{ from_position, to_position, timeline_months }`) didn't change.
 - Each not-yet-done course in that range across their enrolled tracks gets one study-block event (`Study: {title}`), capped at 4 hours per block regardless of `est_hours` (one session per course, not a multi-day split — `capped: true` surfaces in the result when this kicks in).
 - Writes land on the same `course_assignments.target_date` Up next's pencil-edit already writes, so results appear there immediately — plus `calendar_event_id`, so re-running Auto Schedule updates existing events instead of duplicating them (falls back to creating a new one if the learner deleted it on their own calendar).
 - A revoked/expired Google connection (`invalid_grant`) drops the stored `calendar_connections` row automatically, so the next attempt correctly asks to reconnect rather than failing the same way silently.
 - **Reset** (4.5) also deletes whatever Auto Schedule booked on the caller's Google Calendar, not just this app's own rows — best-effort: the roadmap reset always lands even if the calendar cleanup partly fails (surfaced as a non-fatal message), useful for re-running a demo cleanly.
 
+### 8.6 The annual review date — admin-editable — ✅ Built
+The "Complete by" field's default (8.5) isn't hardcoded — it reads `app_settings.annual_review_date` (`MM-DD`, no year, since it recurs every year), the same key/value table `email_notifications` already used (Section 1's architecture decision to keep one Neon database, extended — no new table, no migration).
+
+- **Read** — `GET /api/settings` (`features/admin/queries.js` → `listSettings()`), open to any signed-in user (loosened from admin-only this pass), since every learner's Auto Schedule modal needs it, not just admins. Falls back to `10-13` if never set (a fresh database needs no seeding).
+- **Write** — `PATCH /api/settings { annual_review_date: "MM-DD" }`, admin-only (`requireAdmin`), validated server-side (`isValidMonthDay` — a real MM-DD shape, not calendar-day-accurate, e.g. `02-30` still passes). Edited from Team view's header (5) — no Manage → Settings entry for this; Team view is the only admin surface that reads or writes it today.
+- **The link itself**: an admin changes the date on Team view → every learner's Auto Schedule modal (Your Journey, 4.7) picks it up on next open, live, no redeploy. Nothing caches it beyond the page load that fetched it.
+
 **Acceptance criteria:**
 - [x] Not-connected learners are prompted to connect Google Calendar inline, redirected back to the same modal on success
 - [x] Auto Schedule never double-books a Google Calendar busy block it can see, or two of its own newly placed courses against each other
 - [x] Re-running Auto Schedule updates previously created events rather than creating duplicates
+- [x] The "Complete by" date defaults to the (admin-editable) annual review date and can be overridden per run
+- [x] Changing the annual review date on Team view changes the default every learner sees, without a redeploy
 - [ ] Reminders (a notification ahead of an upcoming study block) — not started
 - [ ] Preference-aware scheduling via Claude (Phase 2) — not started
 
@@ -216,14 +233,15 @@ All of these live in the same database as the rest of `vn-ai-ideas-hub`. Table d
 
 | Table | Purpose |
 |---|---|
-| `accounts` | Existing app-wide identity table (not learning-specific) — username, email, role, etc. |
-| `user_role` | One seniority `position` per account: `intern` / `junior` / `middle` / `senior` / `principal` |
+| `accounts` | Existing app-wide identity table (not learning-specific) — username, email, role, etc. Its `timezone` column (self-service, set on `/profile`) is what Auto Schedule reads to place study blocks at sensible local hours — Section 8 |
+| `user_role` | One seniority `position` per account: `intern` / `junior` / `middle` / `senior` / `principal`. **Set by an admin only** — a dropdown on Manage → Users (`features/admin/manage/UsersSection.jsx`), not self-service. Nothing in Your Journey lets a learner set their own; this drives tier-gating, the Mind map's columns, the profile-strip badge, and Auto Schedule's From/To defaults everywhere in Sections 4 and 8 |
 | `tracks` | Reference list of tracks (`AI Track`, `Core Competency`) |
 | `account_tracks` | Many-to-many: which accounts are enrolled in which tracks |
 | `courses` | The catalog — see Section 2.1 for columns |
 | `course_assignments` | One row per (account, course): `status` (`not_started`/`in_progress`/`complete`/`skipped`), `target_date` (the learner's own suggested date, set from Up next's pencil-edit **or** by Auto Schedule — a suggestion, not an enforced deadline), `position` (the learner's own drag-reorder within a tier), `quiz_total_questions` / `quiz_correct_first_try` (a one-time snapshot written when the course is marked complete — see Section 4.9), `calendar_event_id` (the Google Calendar event Auto Schedule created for this course, if any — migration 027, Section 8) |
 | `course_quiz_questions` | The wrap-up quiz's actual content — see Section 2.1 |
 | `calendar_connections` | One row per account that's connected Google Calendar: an AES-256-GCM-encrypted refresh token (`lib/crypto.js`, `CALENDAR_TOKEN_KEY`) plus the scope actually granted — Section 8 |
+| `app_settings` | Existing app-wide key/value settings table (not learning-specific) — `key`/`value`/`updated_by`. This feature reads/writes one key, `annual_review_date` (Section 8.6); `email_notifications` in the same table is the Ideas Hub's own, unrelated to learning |
 
 **Not built, and not currently planned:** `courses_ref`, `assignments`, `progress`, `knowledge_artifacts` (the Knowledge artifacts *card* is real — Section 4.8 — but it reads `course_assignments`' own snapshot columns, not a dedicated table), `reminders_log` (Auto Schedule books events but sends no reminders — Section 8), `competency_uploads`, `skill_course_map`, `unmatched_skills`, `course_quiz_attempts`/`course_quiz_answers` (deliberately not built — no per-click or per-attempt history, just the one snapshot pair above), any `roadmap_status` column. If the upload/matching flow (old Section 3) gets built later, expect new tables — don't assume these old names are what they'll be called.
 

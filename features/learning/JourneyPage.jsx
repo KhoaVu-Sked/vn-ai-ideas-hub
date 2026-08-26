@@ -1,25 +1,19 @@
 "use client";
 
-// Your Journey: every course across the tracks you're enrolled in.
-// List view: ordered intern -> principal, scrolled after ~7 rows. Rows are
-// drag-reorderable (persisted per account on course_assignments.position) —
-// a drop only lands on a row in the same position tier, so a drag can never
-// move a course into a different stage. This is the ONLY place reordering
-// happens; Mind map just displays whatever order the query already returns.
+// Your Journey: every course across the tracks you're enrolled in, as a
+// List view only — ordered intern -> principal, scrolled after ~7 rows.
+// Rows are drag-reorderable (persisted per account on
+// course_assignments.position) — a drop only lands on a row in the same
+// position tier, so a drag can never move a course into a different stage.
+// This is the ONLY place reordering happens; the Mind map (moved to the
+// Learner Dashboard — features/learning/LearnerDashboardPage.jsx) just
+// displays whatever order this table's query already returns.
 // Reordering is disabled (readOnly) whenever a single track is selected in
 // the filter, rather than "All tracks": reorderStage writes position for
 // every course in a tier at once, but a tier can span more than one track —
 // dragging while filtered to one track would only see (and rewrite) that
 // track's slice of the tier, leaving the other track's same-tier courses
 // with stale positions.
-// Mind map view: columns by expected_by_position, each node explicitly
-// linked to the next in list order within a column. A course is Locked
-// until every course in the tier below it is complete or skipped — a tier
-// gate, not a per-course prerequisite graph (this app has no course-to-
-// course dependency data). "Skip prerequisite" on a locked course marks
-// every course in the tier below it 'skipped' (satisfying the gate) and
-// every course in its own tier 'not_started' — unlocking the whole tier
-// into its normal, un-started state rather than a synthetic status.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -29,12 +23,12 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, th, td, fmtDate, toDateStr, relTime } from "@/features/learning/shared";
+import {
+  card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, HEADER_H, ROW_H, VISIBLE_ROWS, th, td,
+  fmtDate, toDateStr, relTime, todayStr, nextAnnualReviewDateStr, addMonthsDateStr, monthsUntilDateStr,
+  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY,
+} from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
-
-const VISIBLE_ROWS = 7;
-const ROW_H = 42;
-const HEADER_H = 34;
 
 // Draggable row (native HTML5 DnD, no library) — drop is only accepted onto
 // a row in the SAME position tier (checked in JourneyTable.handleDrop), so a
@@ -180,158 +174,26 @@ export function JourneyTable({ courses, onReorder, readOnly = false, ownRoadmap 
   );
 }
 
-const DONE_STATUSES = new Set(["complete", "skipped"]);
-
-// A node is Locked when it's not itself done/skipped AND the tier below it
-// isn't fully done/skipped yet. An empty (or missing) lower tier can't block
-// anything — .every() on an empty array is vacuously true.
-function computeLocks(groups) {
-  const locked = new Map();
-  let prevTierClear = true;
-  for (const g of groups) {
-    for (const c of g.courses) {
-      locked.set(c.id, prevTierClear ? false : !DONE_STATUSES.has(c.status));
-    }
-    prevTierClear = g.courses.every((c) => DONE_STATUSES.has(c.status));
-  }
-  return locked;
-}
-
-function MindMapNode({ course, index, locked, onRequestSkip }) {
-  const status = locked ? { label: "Locked", bg: "#eef0f4", color: "#5e687a" } : (STATUS_META[course.status] || STATUS_META.not_started);
-  return (
-    <div style={{
-      border: locked ? "1px dashed #c9d3e6" : "1px solid var(--line)", borderRadius: 10, padding: "10px 12px",
-      background: locked ? "var(--bg)" : "var(--card)", display: "flex", flexDirection: "column", gap: 6, opacity: locked ? 0.85 : 1,
-    }}>
-      <div style={{ fontWeight: 700, fontSize: 13, color: locked ? "var(--muted)" : "var(--ink)", display: "flex", alignItems: "flex-start", gap: 6 }} title={course.title}>
-        <span style={{ fontSize: 11, color: "var(--faint)", flexShrink: 0, marginTop: 1 }}>{index}</span>
-        {course.status === "complete" && (
-          <span style={{ width: 16, height: 16, borderRadius: "50%", background: "#1f7a3c", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>✓</span>
-        )}
-        <span>{course.outcome || course.title}</span>
-      </div>
-      <div style={{ fontSize: 11, color: "var(--muted)" }}>{course.track_name}{course.platform ? ` · ${course.platform}` : ""}</div>
-      <span style={{ alignSelf: "flex-start", fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "2px 9px", background: status.bg, color: status.color }}>{status.label}</span>
-      {locked && (
-        <button
-          onClick={() => onRequestSkip(course)}
-          style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11.5, color: "var(--blue)", fontWeight: 700, textDecoration: "underline" }}
-        >
-          Skip prerequisite
-        </button>
-      )}
-    </div>
-  );
-}
-
-// Each node explicitly links to the next — course 1 -> course 2 -> course 3
-// — via a dot-line-arrow-dot connector. Purely a display of whatever order
-// the courses arrive in; the order itself is set on the List view's table
-// (drag-reorder lives there), not here, so there's only one place that
-// implements reordering.
-function NodeRail({ courses, locked, onRequestSkip }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      {courses.map((c, i) => (
-        <div key={c.id}>
-          <div style={{ display: "flex", gap: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: locked.get(c.id) ? "#c9d3e6" : "var(--blue)", flexShrink: 0, marginTop: 6 }} />
-            <div style={{ flex: 1 }}>
-              <MindMapNode course={c} index={i + 1} locked={locked.get(c.id)} onRequestSkip={onRequestSkip} />
-            </div>
-          </div>
-          {i < courses.length - 1 && (
-            <div style={{ display: "flex", justifyContent: "flex-start", width: 8 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 8 }}>
-                <div style={{ width: 2, height: 10, background: "var(--line)" }} />
-                <div style={{ fontSize: 11, color: "var(--faint)", lineHeight: 1 }}>↓</div>
-                <div style={{ width: 2, height: 10, background: "var(--line)" }} />
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Columns by expected_by_position, in ladder order. A gate connector sits
-// between adjacent columns: green + "Unlocked" once every course in the
-// column to its left is complete/skipped, otherwise gray + naming what's
-// required. This is a tier gate (all of one position before the next),
-// not a per-course prerequisite graph — nothing here models individual
-// course-to-course dependencies.
-function JourneyMindMap({ courses, onRequestSkip }) {
-  const groups = POSITION_ORDER
-    .map((pos) => ({ position: pos, courses: courses.filter((c) => c.expected_by_position === pos) }))
-    .filter((g) => g.courses.length > 0);
-  const other = courses.filter((c) => !POSITION_ORDER.includes(c.expected_by_position));
-  if (other.length) groups.push({ position: null, courses: other });
-
-  const locked = computeLocks(groups);
-  const colMaxHeight = HEADER_H + VISIBLE_ROWS * ROW_H;
-
-  return (
-    <div style={{ display: "flex", alignItems: "flex-start", overflowX: "auto", paddingBottom: 8 }}>
-      {groups.map((g, i) => {
-        const clear = g.courses.every((c) => DONE_STATUSES.has(c.status));
-        return (
-          <div key={g.position || "other"} style={{ display: "flex", alignItems: "flex-start" }}>
-            <div style={{ minWidth: 230, maxWidth: 230 }}>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 10, textAlign: "center" }}>
-                {g.position ? POSITION_LABEL[g.position] : "Other"}
-              </div>
-              <div style={{ maxHeight: colMaxHeight, overflowY: "auto", paddingRight: 4 }}>
-                <NodeRail courses={g.courses} locked={locked} onRequestSkip={onRequestSkip} />
-              </div>
-            </div>
-            {i < groups.length - 1 && (
-              <div style={{ width: 74, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 40 }}>
-                <div style={{ fontSize: 18, color: clear ? "#1f7a3c" : "var(--faint)" }}>→</div>
-                <div style={{ fontSize: 10, color: clear ? "#1f7a3c" : "var(--muted)", textAlign: "center", marginTop: 4 }}>
-                  {clear ? "Unlocked" : `Requires all ${POSITION_LABEL[g.position] || "previous"} courses`}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function SkipConfirmModal({ course, onCancel, onConfirm, busy, err }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.5)", zIndex: 220, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
-      <div style={{ background: "var(--card)", borderRadius: 14, padding: 24, width: 420, maxWidth: "100%", boxShadow: "0 20px 60px rgba(10,22,44,0.35)" }}>
-        <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", marginBottom: 10 }}>Skip prerequisite?</div>
-        <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 18px", lineHeight: 1.5 }}>
-          Previous courses are required before "{course.title}". Skipping lets you move on now. The skip is recorded on your roadmap and visible to your manager.
-        </p>
-        {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button onClick={onCancel} disabled={busy} style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "var(--body)", cursor: "pointer" }}>Cancel</button>
-          <button onClick={onConfirm} disabled={busy} style={{ border: "none", background: "#a15c00", color: "#fff", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 }}>
-            {busy ? "Skipping…" : "Skip prerequisite"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const modalBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "var(--body)", cursor: "pointer", textDecoration: "none", display: "inline-block" };
 const modalBtnPrimary = (busy) => ({ border: "none", background: "var(--blue)", color: "#fff", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 });
 const modalField = { display: "flex", flexDirection: "column", gap: 5, fontSize: 11.5, fontWeight: 700, color: "var(--muted)", flex: 1 };
 const modalSelect = { border: "1px solid var(--line)", borderRadius: 8, padding: "7px 8px", fontSize: 13, color: "var(--ink)", fontWeight: 500, background: "var(--card)" };
+const quickPick = { border: "1px solid var(--line)", background: "var(--bg)", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "var(--body)", cursor: "pointer" };
 
 // Asks for a position range ("From" defaults to the learner's own current
-// seniority) and a timeline (a number + unit, converted to months on submit
-// — the server only knows months). Save calls the auto-schedule endpoint,
-// which both books Google Calendar events AND writes target_date on each
-// course, same field Up next's own pencil-edit writes — so results show up
-// there immediately once onScheduled() reloads the journey.
+// seniority) and a "Complete by" date — defaults to the next occurrence of
+// the annual review (annualReviewDate, an admin-editable MM-DD — see Team
+// view's header, TeamPage.jsx), so a roadmap naturally targets "done before
+// the review" unless the learner picks something tighter (the quick-picks
+// below, or typing any other date directly — e.g. someone busy who'd rather
+// compress the same courses into 3 months). The date is converted to the
+// fractional-months number the server actually wants (monthsUntilDateStr —
+// see shared.js) only on submit; the field itself always shows the real
+// calendar date, not a derived duration.
+// Save calls the auto-schedule endpoint, which both books Google Calendar
+// events AND writes target_date on each course, same field Up next's own
+// pencil-edit writes — so results show up there immediately once
+// onScheduled() reloads the journey.
 //
 // A 409 with error: "not_connected" means this account has never granted
 // (or has since revoked) Google Calendar access — that's not a failure to
@@ -339,19 +201,19 @@ const modalSelect = { border: "1px solid var(--line)", borderRadius: 8, padding:
 // its own "Connect Google Calendar" screen instead. That's a real browser
 // navigation (an <a>, not a fetch), since it has to leave the app for
 // Google's consent screen and come back to a fresh page load.
-function AutoScheduleModal({ currentPosition, onClose, onScheduled }) {
+function AutoScheduleModal({ currentPosition, annualReviewDate, onClose, onScheduled }) {
   const [from, setFrom] = useState(currentPosition || POSITION_ORDER[0]);
   const [to, setTo] = useState(currentPosition || POSITION_ORDER[POSITION_ORDER.length - 1]);
-  const [amount, setAmount] = useState(6);
-  const [unit, setUnit] = useState("months");
+  const [targetDate, setTargetDate] = useState(nextAnnualReviewDateStr(annualReviewDate));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [needsConnect, setNeedsConnect] = useState(false);
 
   const submit = async () => {
+    if (targetDate <= todayStr()) { setError("Pick a date after today."); return; }
     setBusy(true); setError(""); setResult(null); setNeedsConnect(false);
-    const timeline_months = unit === "years" ? Number(amount) * 12 : Number(amount);
+    const timeline_months = monthsUntilDateStr(targetDate);
     try {
       const res = await api("/api/courses/auto-schedule", {
         method: "POST",
@@ -429,15 +291,25 @@ function AutoScheduleModal({ currentPosition, onClose, onScheduled }) {
                 </select>
               </label>
             </div>
-            <label style={{ ...modalField, marginBottom: 18 }}>Timeline
-              <div style={{ display: "flex", gap: 8 }}>
-                <input type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ ...modalSelect, width: 80 }} />
-                <select value={unit} onChange={(e) => setUnit(e.target.value)} style={modalSelect}>
-                  <option value="months">months</option>
-                  <option value="years">years</option>
-                </select>
-              </div>
+            <label style={modalField}>Complete by
+              <input
+                type="date"
+                min={todayStr()}
+                value={targetDate}
+                onChange={(e) => setTargetDate(e.target.value)}
+                style={modalSelect}
+              />
             </label>
+            <p style={{ fontSize: 11, color: "var(--muted)", margin: "6px 0 8px" }}>
+              Defaults to this year's annual review ({formatMonthDay(annualReviewDate || DEFAULT_ANNUAL_REVIEW_MONTH_DAY)}). Busy? Pick a closer date to compress the same courses into a tighter timeline.
+            </p>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
+              <button type="button" onClick={() => setTargetDate(nextAnnualReviewDateStr(annualReviewDate))} style={quickPick}>
+                Annual review · {formatMonthDay(annualReviewDate || DEFAULT_ANNUAL_REVIEW_MONTH_DAY)}
+              </button>
+              <button type="button" onClick={() => setTargetDate(addMonthsDateStr(3))} style={quickPick}>3 months</button>
+              <button type="button" onClick={() => setTargetDate(addMonthsDateStr(6))} style={quickPick}>6 months</button>
+            </div>
             {error && <div style={{ ...errBanner, marginBottom: 14 }}>{error}</div>}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button onClick={onClose} disabled={busy} style={modalBtn}>Cancel</button>
@@ -446,19 +318,6 @@ function AutoScheduleModal({ currentPosition, onClose, onScheduled }) {
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-function ViewToggle({ view, onChange }) {
-  const seg = (active) => ({
-    height: 30, padding: "0 16px", fontSize: 12.5, fontWeight: 700, fontFamily: "inherit",
-    border: "none", cursor: "pointer", background: active ? "var(--bg)" : "var(--card)", color: active ? "var(--ink)" : "var(--muted)",
-  });
-  return (
-    <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "1px solid var(--line)", flexShrink: 0 }}>
-      <button onClick={() => onChange("list")} style={{ ...seg(view === "list"), borderRight: "1px solid var(--line)" }}>List</button>
-      <button onClick={() => onChange("mindmap")} style={seg(view === "mindmap")}>Mind map</button>
     </div>
   );
 }
@@ -697,15 +556,25 @@ export default function JourneyPage() {
   const [recentCompletions, setRecentCompletions] = useState([]);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
-  const [view, setView] = useState("list");
-  const [skipTarget, setSkipTarget] = useState(null);
-  const [skipping, setSkipping] = useState(false);
-  const [skipErr, setSkipErr] = useState("");
   const [resetting, setResetting] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState("all");
   const [position, setPosition] = useState(null);
   const [syncingUpNext, setSyncingUpNext] = useState(false);
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false);
+  const [annualReviewDate, setAnnualReviewDate] = useState(DEFAULT_ANNUAL_REVIEW_MONTH_DAY);
+
+  // The admin-editable annual review date (Team view's header — TeamPage.jsx)
+  // that Auto Schedule defaults its "Complete by" field to. Fetched once on
+  // mount, independent of load() below — it's a global setting, not part of
+  // this account's own journey, and any signed-in user can read it (GET
+  // /api/settings — only writing it is admin-only). Falls back to the same
+  // default shared.js itself uses if this fails, so Auto Schedule still has
+  // a sane date to default to.
+  useEffect(() => {
+    if (!me) return;
+    api("/api/settings").then(({ settings }) => setAnnualReviewDate(settings.annual_review_date))
+      .catch(() => {});
+  }, [me]);
 
   // Landing back here from /api/calendar/connect/callback — ?calendar=connected
   // means the consent just succeeded, so reopen Auto Schedule right where the
@@ -802,22 +671,6 @@ export default function JourneyPage() {
     api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
   };
 
-  // Completes every course in the tier below the clicked one, not just that
-  // course — so a full reload rather than a single-row patch.
-  const confirmSkip = async () => {
-    setSkipping(true);
-    setSkipErr("");
-    try {
-      await api(`/api/courses/${skipTarget.id}/skip`, { method: "POST" });
-      await load();
-      setSkipTarget(null);
-    } catch (e) {
-      setSkipErr(e.message);
-    } finally {
-      setSkipping(false);
-    }
-  };
-
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <AppHeader crumb="Your Journey" />
@@ -852,8 +705,8 @@ export default function JourneyPage() {
                   )}
                 </div>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
-                  Ordered intern → principal, across every track you're enrolled in.
-                  {view === "list" && " Drag a row to reorder it within its stage."}
+                  Ordered intern → principal, across every track you're enrolled in. Drag a row to reorder it within its stage.
+                  {" "}<Link href="/learning-hub/dashboard" style={{ color: "var(--blue)", fontWeight: 700, textDecoration: "none" }}>See the Mind map →</Link>
                 </p>
               </div>
               {journey.length > 0 && (
@@ -866,7 +719,6 @@ export default function JourneyPage() {
                   >
                     {resetting ? "Resetting…" : "Reset"}
                   </button>
-                  <ViewToggle view={view} onChange={setView} />
                 </div>
               )}
             </div>
@@ -875,10 +727,8 @@ export default function JourneyPage() {
               <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing here yet — enroll in a track from the Learning Hub to start your journey.</div>
             ) : filteredJourney.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>No courses in this track.</div>
-            ) : view === "list" ? (
-              <JourneyTable courses={filteredJourney} onReorder={reorderStage} readOnly={selectedTrack !== "all"} />
             ) : (
-              <JourneyMindMap courses={filteredJourney} onRequestSkip={(c) => { setSkipErr(""); setSkipTarget(c); }} />
+              <JourneyTable courses={filteredJourney} onReorder={reorderStage} readOnly={selectedTrack !== "all"} />
             )}
           </section>
 
@@ -891,19 +741,10 @@ export default function JourneyPage() {
         )}
       </main>
 
-      {skipTarget && (
-        <SkipConfirmModal
-          course={skipTarget}
-          busy={skipping}
-          err={skipErr}
-          onCancel={() => setSkipTarget(null)}
-          onConfirm={confirmSkip}
-        />
-      )}
-
       {autoScheduleOpen && (
         <AutoScheduleModal
           currentPosition={position}
+          annualReviewDate={annualReviewDate}
           onClose={() => setAutoScheduleOpen(false)}
           onScheduled={load}
         />
