@@ -128,23 +128,93 @@ function QuestionCard({ question, index, total, answer, onAnswer, onNext, isLast
   );
 }
 
-function CompletionCard({ courseTitle }) {
+// Skedulo brand blues + the green already used everywhere for "complete"
+// status, plus two warm accents for festivity — five colors is enough
+// variety without straying from the palette the rest of the app uses.
+const CONFETTI_COLORS = ["#0055ff", "#007ee6", "#1f7a3c", "#f4b400", "#ff6b6b"];
+
+// Full-viewport, not scoped to the completion card — a burst confined to a
+// small card reads as a scribble, not a celebration. pointer-events: none
+// and aria-hidden so it never gets in the way of the real content behind
+// it. Pieces are generated once per mount (lazy useState initializer) so
+// re-renders don't restart the fall mid-animation.
+function Confetti({ count = 48 }) {
+  const [pieces] = useState(() =>
+    Array.from({ length: count }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      round: i % 3 === 0,
+      fallY: 360 + Math.random() * 200,
+      driftX: (Math.random() - 0.5) * 180,
+      spin: (360 + Math.random() * 540) * (Math.random() < 0.5 ? -1 : 1),
+      delay: Math.random() * 450,
+      duration: 2000 + Math.random() * 900,
+    }))
+  );
   return (
-    <section style={{ ...card, textAlign: "center", padding: "36px 24px" }}>
-      <div style={{ fontSize: 32, marginBottom: 10 }}>🎉</div>
-      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", marginBottom: 6 }}>
-        Course complete!
-      </div>
-      <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 20px" }}>
-        "{courseTitle}" is now marked complete on your journey.
-      </p>
-      <Link
-        href="/learning-hub/journey"
-        style={{ display: "inline-block", background: "var(--blue)", color: "#fff", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}
-      >
-        Back to Your Journey
-      </Link>
-    </section>
+    <div aria-hidden="true" style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 300 }}>
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="confetti-piece"
+          style={{
+            left: `${p.left}%`,
+            background: p.color,
+            borderRadius: p.round ? "50%" : 2,
+            animationDelay: `${p.delay}ms`,
+            animationDuration: `${p.duration}ms`,
+            "--fall-y": `${p.fallY}px`,
+            "--drift-x": `${p.driftX}px`,
+            "--spin": `${p.spin}deg`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+const completionBtn = { display: "inline-block", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, textDecoration: "none" };
+
+// correct/total: the same first-try snapshot the completion write itself
+// sent (QuizPage's handleNext) — shown here so finishing feels like it
+// actually counted for something, not just a silent status flip. Confetti
+// auto-clears itself after its longest piece finishes falling, so it
+// doesn't sit in the DOM (invisible but present) indefinitely.
+function CompletionCard({ courseTitle, correct, total }) {
+  const [celebrating, setCelebrating] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setCelebrating(false), 3200);
+    return () => clearTimeout(t);
+  }, []);
+  const hasScore = total != null && total > 0;
+
+  return (
+    <>
+      {celebrating && <Confetti />}
+      <section className="celebrate-pop" style={{ ...card, textAlign: "center", padding: "40px 24px" }}>
+        <div className="celebrate-icon" style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
+        <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 19, color: "var(--ink)", marginBottom: 6 }}>
+          Nice work — course complete!
+        </div>
+        <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "0 0 4px" }}>
+          "{courseTitle}" is now marked complete on your journey.
+        </p>
+        {hasScore && (
+          <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 22px" }}>
+            {correct} of {total} correct on the first try · {Math.round((correct / total) * 100)}%
+          </p>
+        )}
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: hasScore ? 0 : 20 }}>
+          <Link href="/learning-hub/journey" style={{ ...completionBtn, background: "var(--blue)", color: "#fff" }}>
+            Back to Your Journey
+          </Link>
+          <Link href="/learning-hub/dashboard" style={{ ...completionBtn, border: "1px solid var(--line)", background: "var(--card)", color: "var(--body)" }}>
+            View your progress
+          </Link>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -165,6 +235,7 @@ export default function QuizPage() {
   const [err, setErr] = useState("");
   const [finishing, setFinishing] = useState(false);
   const [done, setDone] = useState(false);
+  const [result, setResult] = useState(null); // { correct, total } — set alongside done, for CompletionCard's score line
 
   useEffect(() => {
     if (!me) return;
@@ -218,6 +289,7 @@ export default function QuizPage() {
       const total = questions.length;
       const correct = questions.filter((q) => answers[q.id]?.firstTryCorrect).length;
       await api(`/api/courses/${courseId}/complete`, { method: "POST", body: JSON.stringify({ correct, total }) });
+      setResult({ correct, total });
       setDone(true);
     } catch (e) {
       setErr(e.message);
@@ -239,7 +311,7 @@ export default function QuizPage() {
             </Link>
             {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
             {done ? (
-              <CompletionCard courseTitle={course?.title} />
+              <CompletionCard courseTitle={course?.title} correct={result?.correct} total={result?.total} />
             ) : !course ? null : questions.length === 0 ? (
               <section style={card}>
                 <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 6 }}>{course.title}</div>

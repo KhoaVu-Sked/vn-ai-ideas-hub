@@ -2,6 +2,13 @@
 
 // Your Journey: every course across the tracks you're enrolled in, as a
 // List view only — ordered intern -> principal, scrolled after ~7 rows.
+// Restricted to what's expected of this account BY NOW: an Intern only
+// sees the Intern tier, a Junior sees Intern + Junior, and so on
+// (isExpectedByNow, shared.js — the same rule the % completion numbers
+// use). The full roadmap, including tiers above the current position, is
+// still visible on the Mind map (Learner Dashboard) — that view is meant
+// to show the road ahead, this one is meant to show what's actually on
+// your plate right now.
 // Rows are drag-reorderable (persisted per account on
 // course_assignments.position) — a drop only lands on a row in the same
 // position tier, so a drag can never move a course into a different stage.
@@ -652,19 +659,22 @@ export default function JourneyPage() {
     if (selectedTrack !== "all" && !trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack("all");
   }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
   const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
+  // The List (and Up next, below) only show courses in tiers at or below
+  // this account's current position — an Intern sees the Intern tier, a
+  // Junior sees Intern + Junior, and so on (isExpectedByNow, shared.js —
+  // same rule the % completion numbers already use). trackOptions/trackTags
+  // above deliberately stay unrestricted: which tracks you're ENROLLED in
+  // is a different fact from which courses are relevant to see right now.
+  const visibleJourney = filteredJourney.filter((c) => isExpectedByNow(c, position));
   // Knowledge artifacts' "waiting on the quiz" row — the account's current
   // in_progress pick, across every enrolled track (not scoped to the track
   // dropdown, same as recentCompletions isn't). Already on hand from the
   // journey fetch, so no extra request. First match is enough: in practice
   // there's only ever one, since only the top Up next pick auto-starts.
   const inProgressCourse = journey.find((c) => c.status === "in_progress") || null;
-  // Core-course progress for the profile strip, scoped to whatever the
-  // track dropdown currently shows AND to what's actually expected of this
-  // account by now (isExpectedByNow — an Intern is only on the hook for the
-  // Intern tier, a Senior for everything through Senior, not the whole
-  // roadmap up to Principal). Fair comparison, not "penalize everyone for
-  // not yet being Principal."
-  const coreCourses = filteredJourney.filter((c) => c.priority === "core" && isExpectedByNow(c, position));
+  // Core-course progress for the profile strip — visibleJourney is already
+  // scoped to what's expected by now, so this just narrows to core.
+  const coreCourses = visibleJourney.filter((c) => c.priority === "core");
   const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
   // "All tracks" shows a tag per enrolled track; one specific track shows just that one.
   const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
@@ -749,7 +759,10 @@ export default function JourneyPage() {
                   )}
                 </div>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
-                  Ordered intern → principal, across every track you're enrolled in. Drag a row to reorder it within its stage.
+                  {position
+                    ? `Showing Intern through ${POSITION_LABEL[position] || position} — your current stage — across every track you're enrolled in.`
+                    : "Ordered intern → principal, across every track you're enrolled in."}
+                  {" "}Drag a row to reorder it within its stage.
                 </p>
               </div>
               {journey.length > 0 && (
@@ -770,13 +783,21 @@ export default function JourneyPage() {
               <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing here yet — enroll in a track from the Learning Hub to start your journey.</div>
             ) : filteredJourney.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>No courses in this track.</div>
+            ) : visibleJourney.length === 0 ? (
+              // The track has courses, just none at or below the current stage yet
+              // (e.g. a track whose earliest tier is above where this account is) —
+              // a different situation from "no courses in this track," so it gets
+              // its own message rather than reusing that one.
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>
+                Nothing in this track for the {POSITION_LABEL[position] || position} stage yet — check back as you progress.
+              </div>
             ) : (
-              <JourneyTable courses={filteredJourney} onReorder={reorderStage} readOnly={selectedTrack !== "all"} />
+              <JourneyTable courses={visibleJourney} onReorder={reorderStage} readOnly={selectedTrack !== "all"} />
             )}
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
-            <UpNextCard courses={filteredJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} onAutoStart={autoStartCourse} onAutoSchedule={() => setAutoScheduleOpen(true)} />
+            <UpNextCard courses={visibleJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} onAutoStart={autoStartCourse} onAutoSchedule={() => setAutoScheduleOpen(true)} />
             <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourse={inProgressCourse} />
           </div>
           </div>
