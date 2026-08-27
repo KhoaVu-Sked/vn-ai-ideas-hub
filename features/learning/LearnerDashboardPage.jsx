@@ -25,11 +25,23 @@ function StatCard({ label, value, hint }) {
   );
 }
 
-function TrackProgressRow({ name, complete, total }) {
+// `total` here is the track's course count SCOPED to what's expected of
+// this account's own position (isExpectedByNow, shared.js) — not every
+// course the track has. Easy to misread as "the whole track" otherwise, so
+// the row spells it out right under the track name rather than relying on
+// the section's own caption above it.
+function TrackProgressRow({ name, complete, total, position }) {
   const pct = total ? Math.round((complete / total) * 100) : 0;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid var(--line)" }}>
-      <div style={{ flex: "0 0 180px", fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{name}</div>
+      <div style={{ flex: "0 0 180px" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{name}</div>
+        {position && (
+          <div style={{ fontSize: 10.5, color: "var(--muted)" }} title="Courses expected for your current level, not the whole track">
+            Through {POSITION_LABEL[position] || position}
+          </div>
+        )}
+      </div>
       {/* ProgressBar defaults to width: "100%", which — with no flex-basis
           of its own — resolves against the WHOLE row, not the space left
           after the label, blowing past the % and count columns entirely
@@ -155,7 +167,7 @@ export default function LearnerDashboardPage() {
                     Course completion by track{position ? `, through ${POSITION_LABEL[position] || position}` : ""}.
                   </p>
                   <div>
-                    {perTrack.map((t) => <TrackProgressRow key={t.name} {...t} />)}
+                    {perTrack.map((t) => <TrackProgressRow key={t.name} {...t} position={position} />)}
                   </div>
                 </section>
 
