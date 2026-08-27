@@ -12,6 +12,8 @@ import Loading from "@/components/Loading";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import useLive from "@/features/realtime/useLive";
 import { api } from "@/lib/apiClient";
+import useFittedPageSize from "@/features/ideas/useFittedPageSize";
+import { STAR_GOLD } from "@/features/ideas/constants";
 
 // ─────────────────────────────────────────────────────────────
 // TS - AI Ideas Hub — board
@@ -62,6 +64,8 @@ function Board() {
   const [detailBusy, setDetailBusy] = useState(false);
   const [detailError, setDetailError] = useState("");
   const detailCache = useRef({});
+  const gridRef = useRef(null);
+  const [page, setPage] = useState(1);
 
   const [showSubmit, setShowSubmit] = useState(false);
   const [search, setSearch] = useState("");
@@ -108,6 +112,9 @@ function Board() {
     catch (e) { setDetailError(e.message); } finally { setDetailBusy(false); }
   }, []);
 
+  // How many cards fit without scrolling, measured from the real grid.
+  const pageSize = useFittedPageSize(gridRef, { deps: [projects.length] });
+
   const filtered = useMemo(() => projects.filter((p) => {
     if (mineOnly && !p.mine) return false;
     if (statusFilter !== "All" && p.status !== statusFilter) return false;
@@ -115,6 +122,16 @@ function Board() {
     if (search && !`${p.number || ""} ${p.name}`.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   }), [projects, statusFilter, search, mineOnly]);
+
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  // Filtering or a smaller window can strand you past the end.
+  useEffect(() => { if (page > pages) setPage(pages); }, [page, pages]);
+  // A new filter should start at the beginning, not halfway through.
+  useEffect(() => { setPage(1); }, [statusFilter, search, mineOnly]);
+  const shown = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  );
 
   const pipeline = useMemo(() => {
     const c = {}; STATUS_ORDER.forEach((s) => (c[s] = 0));
@@ -156,15 +173,17 @@ function Board() {
         ) : filtered.length === 0 ? (
           <div style={{ ...cardStyle, padding: "40px 20px", textAlign: "center", color: "#7a889d", fontSize: 13 }}>No ideas match. Clear the filters, or submit the first one.</div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-            {filtered.map((p) => {
+          <>
+          <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+            {shown.map((p) => {
               const m = STATUS_META[p.status] || STATUS_META.Submitted;
               const cached = !!detailCache.current[p.id];
               return (
                 // The body is a <Link> so Next prefetches the idea route as the
                 // card scrolls into view — the click then navigates instantly.
                 // Preview sits outside the anchor to keep the markup valid.
-                <div key={p.id} style={{ ...cardStyle, display: "flex", flexDirection: "column" }}>
+                <div key={p.id} className={p.starred ? "starred-card" : undefined}
+                  style={{ ...cardStyle, display: "flex", flexDirection: "column" }}>
                   <Link href={`/idea/${p.id}`} style={{ padding: "14px 16px 10px", display: "flex", flexDirection: "column", gap: 9, textDecoration: "none", flex: 1 }}>
                     <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
                       <Pill bg={m.bg} fg={m.fg}>{p.status}</Pill>
@@ -172,7 +191,7 @@ function Board() {
                     </div>
                     <div title={p.name} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>
                       {/* Starred ideas already sort to the top; the star says why. */}
-                      {p.starred && <span title="A starred idea" style={{ marginRight: 5 }}>★</span>}
+                      {p.starred && <span title="A starred idea" style={{ marginRight: 5, color: STAR_GOLD }}>★</span>}
                       {p.name}
                     </div>
                     {p.context && (
@@ -192,6 +211,51 @@ function Board() {
               );
             })}
           </div>
+
+          {/* Pager: the page numbers sit bottom-right, the two arrows in the
+              middle. Only shown when there is more than one page — a single
+              page of ideas should look like a board, not a paginated table. */}
+          {pages > 1 && (
+            <div style={{ display: "flex", alignItems: "center", marginTop: 16, minHeight: 34, gap: 12 }}>
+              <span style={{ flex: 1, fontSize: 12, color: "var(--muted)" }}>
+                {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of {filtered.length}
+              </span>
+
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  onClick={() => setPage((n) => Math.max(1, n - 1))}
+                  disabled={page === 1} aria-label="Previous page"
+                  style={arrowStyle(page === 1)}
+                >‹</button>
+                <button
+                  onClick={() => setPage((n) => Math.min(pages, n + 1))}
+                  disabled={page === pages} aria-label="Next page"
+                  style={arrowStyle(page === pages)}
+                >›</button>
+              </span>
+
+              <span style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: 5, flexWrap: "wrap" }}>
+                {pageNumbers(page, pages).map((n, i) => (
+                  n === "…" ? (
+                    <span key={`gap${i}`} style={{ fontSize: 12, color: "var(--faint)", padding: "0 2px", alignSelf: "center" }}>…</span>
+                  ) : (
+                    <button
+                      key={n} onClick={() => setPage(n)}
+                      aria-current={n === page ? "page" : undefined}
+                      style={{
+                        minWidth: 28, height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 700,
+                        cursor: n === page ? "default" : "pointer",
+                        border: `1px solid ${n === page ? "var(--blue)" : "#d5dce6"}`,
+                        background: n === page ? "var(--blue)" : "#fff",
+                        color: n === page ? "#fff" : "#44536b",
+                      }}
+                    >{n}</button>
+                  )
+                ))}
+              </span>
+            </div>
+          )}
+          </>
         )}
       </main>
 
@@ -254,4 +318,28 @@ function Board() {
       {showSubmit && <SubmitModal onClose={() => setShowSubmit(false)} onCreated={async () => { setShowSubmit(false); await loadList(); }} />}
     </div>
   );
+}
+
+const arrowStyle = (disabled) => ({
+  width: 30, height: 30, borderRadius: 8, fontSize: 16, lineHeight: 1,
+  border: "1px solid #d5dce6", background: "#fff",
+  color: disabled ? "#c3cbd8" : "#44536b",
+  cursor: disabled ? "default" : "pointer",
+});
+
+// 1 … 4 5 6 … 12 — always the first and last, and a window around the current
+// page, so the row never grows past about nine controls however many pages
+// there are.
+function pageNumbers(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const out = new Set([1, pages, page, page - 1, page + 1]);
+  if (page <= 3) [2, 3, 4].forEach((n) => out.add(n));
+  if (page >= pages - 2) [pages - 1, pages - 2, pages - 3].forEach((n) => out.add(n));
+  const list = [...out].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+  const withGaps = [];
+  list.forEach((n, i) => {
+    if (i > 0 && n - list[i - 1] > 1) withGaps.push("…");
+    withGaps.push(n);
+  });
+  return withGaps;
 }

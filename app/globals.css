@@ -197,3 +197,30 @@ a {
 .drawer-panel { animation: drawerIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 @keyframes scrimIn  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes drawerIn { from { transform: translateX(100%) } to { transform: none } }
+
+/* ── Starred ideas ────────────────────────────────────────────────
+   A starred idea is meant to catch your eye from across the board, so
+   it gets a gold ring and a slow sheen that travels across the card.
+   Deliberately slow and low-contrast: this sits in a grid of a dozen
+   cards, and anything faster reads as an alert. The reduced-motion
+   block above stops the sheen for anyone who has asked it to.        */
+.starred-card {
+  position: relative;
+  border-color: #e8a913 !important;
+  box-shadow: 0 0 0 1px rgba(232, 169, 19, 0.35), 0 6px 18px rgba(232, 169, 19, 0.18);
+  overflow: hidden;
+}
+.starred-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;          /* the whole card is a link */
+  background: linear-gradient(105deg,
+    transparent 30%, rgba(255, 214, 102, 0.28) 48%, transparent 66%);
+  transform: translateX(-100%);
+  animation: starSheen 4.5s ease-in-out infinite;
+}
+@keyframes starSheen {
+  0%, 62% { transform: translateX(-100%); }
+  92%, 100% { transform: translateX(100%); }
+}

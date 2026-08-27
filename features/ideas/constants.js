@@ -72,3 +72,8 @@ export function actsAsLead(myRoles, members) {
   if (!Array.isArray(members)) return false;
   return !members.some((m) => (m.roles || []).includes(LEAD_ROLE));
 }
+
+// One gold, used by the idea page, the board card and anywhere a star appears.
+// Chosen to read as gold rather than as the amber the app already uses for
+// warnings, and dark enough to stay legible on white at 13px.
+export const STAR_GOLD = "#e8a913";
