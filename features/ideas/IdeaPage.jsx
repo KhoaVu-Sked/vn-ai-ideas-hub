@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { tagPill } from "@/features/admin/tagColors";
-import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, ROLES, STATUS_META, STATUS_ORDER, actsAsLead } from "@/features/ideas/constants";
+import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, ROLES, STAR_GOLD, STATUS_META, STATUS_ORDER, actsAsLead } from "@/features/ideas/constants";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import Avatar from "@/components/Avatar";
 import TagChip from "@/components/TagChip";
@@ -535,10 +535,10 @@ export default function IdeaPage() {
             {isAdmin ? (
               <button onClick={toggleStar} title={idea.starred ? "Remove the star" : "Mark as a starred idea"}
                 style={{ border: "none", background: "none", cursor: "pointer", fontSize: 24, lineHeight: 1,
-                         padding: "2px 4px", filter: idea.starred ? "none" : "grayscale(1)",
-                         opacity: idea.starred ? 1 : 0.35 }}>★</button>
+                         padding: "2px 4px", color: idea.starred ? STAR_GOLD : "#c8d0dc",
+                         transition: "color 160ms" }}>★</button>
             ) : idea.starred ? (
-              <span title="A starred idea" style={{ fontSize: 24, lineHeight: 1, padding: "2px 4px" }}>★</span>
+              <span title="A starred idea" style={{ fontSize: 24, lineHeight: 1, padding: "2px 4px", color: STAR_GOLD }}>★</span>
             ) : null}
           </div>
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
@@ -572,7 +572,7 @@ export default function IdeaPage() {
             )}
             <button onClick={() => setTaskModal({})} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none" }}>+ Add request</button>
             {isAdmin && <button onClick={deleteIdea} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Delete idea</button>}
-            {canEdit && <button onClick={() => setShowMerge(true)} style={btnBase} title="Fold duplicate ideas into this one">Merge…</button>}
+            {canEdit && <button onClick={() => setShowMerge(true)} style={btnBase} title="Fold duplicate ideas into this one">Merge ideas</button>}
             {!isAdmin && isLead && !deleteRequested && <button onClick={requestDeletion} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Request deletion</button>}
           </div>
 
