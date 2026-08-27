@@ -30,8 +30,18 @@ function TrackProgressRow({ name, complete, total }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid var(--line)" }}>
       <div style={{ flex: "0 0 180px", fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{name}</div>
-      <ProgressBar pct={pct} />
-      <div style={{ flex: "0 0 60px", textAlign: "right", fontSize: 12, color: "var(--muted)" }}>{pct}%</div>
+      {/* ProgressBar defaults to width: "100%", which — with no flex-basis
+          of its own — resolves against the WHOLE row, not the space left
+          after the label, blowing past the % and count columns entirely
+          (they were still in the DOM, just squeezed out of view). Wrapping
+          it in a flex: 1 / min-width: 0 container gives it just the
+          remaining space instead — min-width: 0 overrides a flex item's
+          default min-width: auto, which is what let width: 100% win out
+          over its siblings in the first place. */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <ProgressBar pct={pct} />
+      </div>
+      <div style={{ flex: "0 0 44px", textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{pct}%</div>
       <div style={{ flex: "0 0 60px", textAlign: "right", fontSize: 12, color: "var(--muted)" }}>{complete}/{total}</div>
     </div>
   );
