@@ -7,38 +7,54 @@
 //
 // A null last_seen_release counts as "not seen", so someone joining today gets
 // the current note rather than nothing.
+//
+// Bump RELEASE whenever NEWS changes, or nobody who dismissed the previous note
+// will ever see the new one.
 
-export const RELEASE = "2026-08-26-merge-star-docs";
+export const RELEASE = "2026-08-26-merge-star-docs-v2";
 
 export const NEWS = {
-  title: "Merging, stars, and documentation",
-  // Written for someone who does not know how any of it is built.
+  greeting: "Thank you for keep using AI Ideas Hub 𓇼 ⋆.˚ 𓆉 𓆝 𓆡⋆.˚ 𓇼",
+  title: "What's New: Idea Merging, Stars, and Better Documentation",
+  intro: "We're excited to share our latest updates designed to help you organize ideas, "
+       + "clarify ownership, and keep your workspace clutter-free.",
+
+  // Served from public/, so it needs no blob store and no signed URL. The panel
+  // simply omits it if the file is not there, rather than showing a broken
+  // image to everyone on the first load after a release.
+  image: { src: "/whats-new/2026-08-26.png", alt: "Waiting for a new update" },
+
   items: [
     {
-      heading: "Duplicate ideas can be merged",
-      body: "If two people raise the same idea, the lead can ask for them to be merged. "
-          + "The idea you keep gathers the others' write-ups as comments, and their files move across. "
-          + "An admin approves every merge, so nothing disappears on one person's say-so.",
+      heading: "Merge duplicate ideas",
+      body: "Great minds think alike! If multiple people submit the same idea, Project Leads can now "
+          + "request to merge them. The primary idea will automatically gather the others' write-ups as "
+          + "comments and smoothly migrate all attached files. To keep your data safe, an Admin must "
+          + "approve every merge, ensuring nothing gets lost by mistake.",
     },
     {
-      heading: "Important ideas get a star",
-      body: "Admins can star an idea. Starred ideas sit at the top of the board and count for "
-          + "a little more on the contributors list, so the work on them is easier to see.",
+      heading: "Highlight what matters with Stars",
+      body: "Admins can now add a star to high-priority ideas. Starred ideas are pinned to the top of "
+          + "the board for easy visibility and carry a bit more weight on the contributors list, making "
+          + "important work easier to track and recognize.",
     },
     {
-      heading: "Somewhere to keep links and files",
-      body: "Every idea now has a Documentation box next to the team. Add a link or upload a file "
-          + "and give it a name. Anyone can add; the person who added it, the lead, or an admin can remove it.",
+      heading: "A dedicated home for links and files",
+      body: "Every idea now features a dedicated Documentation box next to the team section. Anyone can "
+          + "easily add links or upload files to keep context all in one place. To maintain order, only "
+          + "the person who added the file, the Project Lead, or an Admin can remove it.",
     },
     {
-      heading: "Whoever raises an idea now owns it",
-      body: "You used to be recorded as Project Lead on an idea you submitted. You are now the "
-          + "Initiator — you keep every permission until someone takes the lead, and Project Lead "
-          + "is open for whoever is actually going to drive it.",
+      heading: "Clearer roles: Initiator vs. Project Lead",
+      body: "We've updated how ownership works to better reflect reality. When you submit an idea, you "
+          + "are now recorded as the Initiator. You retain full permissions until someone officially "
+          + "takes over, leaving the Project Lead role open for the person who is actually going to "
+          + "drive the work forward.",
     },
     {
-      heading: "Deleting a comment asks first",
-      body: "A small one: removing a comment now confirms before it goes.",
+      heading: "Accident-proof comment deletion",
+      body: "A small but mighty update: you'll now see a confirmation prompt before deleting a comment, "
+          + "saving you from accidental clicks.",
     },
   ],
 };

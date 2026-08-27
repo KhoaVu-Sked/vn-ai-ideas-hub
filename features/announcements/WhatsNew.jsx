@@ -21,6 +21,7 @@ let asked = false;
 
 export default function WhatsNew() {
   const [news, setNews] = useState(null);
+  const [imgFailed, setImgFailed] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -56,8 +57,32 @@ export default function WhatsNew() {
       >
         <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase",
                       color: "var(--blue)", marginBottom: 6 }}>What&apos;s new</div>
+
+        {news.greeting && (
+          <div style={{ fontSize: 14, color: "var(--body)", marginBottom: 10 }}>{news.greeting}</div>
+        )}
+
         <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20,
-                     color: "var(--ink)", margin: "0 0 18px" }}>{news.title}</h2>
+                     color: "var(--ink)", margin: "0 0 10px", lineHeight: 1.3 }}>{news.title}</h2>
+
+        {news.intro && (
+          <p style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6, margin: "0 0 16px" }}>{news.intro}</p>
+        )}
+
+        {/* Hidden rather than broken: if the file was not deployed alongside the
+            note, everyone would otherwise see an alt-text placeholder. */}
+        {news.image?.src && !imgFailed && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={news.image.src} alt={news.image.alt || ""}
+            onError={() => setImgFailed(true)}
+            // Capped: at full width a wide image pushed all five items below the
+            // fold, so the first thing anyone saw was a picture and no news.
+            style={{ display: "block", width: "100%", maxHeight: 240, objectFit: "contain",
+                     objectPosition: "left", borderRadius: 10, background: "#f6f8fb",
+                     border: "1px solid var(--line)", marginBottom: 18 }}
+          />
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {(news.items || []).map((it) => (
