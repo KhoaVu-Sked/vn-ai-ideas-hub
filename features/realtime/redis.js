@@ -7,7 +7,12 @@
 import Redis from "ioredis";
 import { CHANNEL, decode } from "./channel";
 
-export const realtimeConfigured = () => Boolean(process.env.REDIS_URL);
+// Marketplace integrations disagree on the name: Upstash and Redis Cloud set
+// REDIS_URL, the older Vercel KV store sets KV_URL. Accept either, so nobody has
+// to hand-copy a value between two variables and redeploy to find out.
+const redisUrl = () => process.env.REDIS_URL || process.env.KV_URL || "";
+
+export const realtimeConfigured = () => Boolean(redisUrl());
 
 let warned = false;
 function warn(msg) {
@@ -23,7 +28,7 @@ function warn(msg) {
 function connect(label) {
   let client;
   try {
-    client = new Redis(process.env.REDIS_URL, {
+    client = new Redis(redisUrl(), {
       // A hung Redis must never hold up an HTTP response.
       maxRetriesPerRequest: 2,
       connectTimeout: 3000,
