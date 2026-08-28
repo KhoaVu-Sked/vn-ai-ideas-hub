@@ -13,9 +13,17 @@
 
 import { useEffect, useState } from "react";
 
-// Cards get shorter as the grid narrows, so a floor stops a small window from
-// paginating down to one or two.
-const MIN = 4;
+// A page is always whole rows. A count that is not a multiple of the column
+// count strands cards in a ragged final row — three across, then one alone
+// beside two empty slots, which reads as a rendering fault rather than a page
+// boundary.
+//
+// MIN_ROWS is two because one row is not a board. A wide window whose cards
+// happen to be tall enough that only a single row fits would otherwise show
+// three cards and a screenful of nothing; a little scrolling is the better
+// trade. MIN_CARDS then keeps a one-column phone from paginating two at a time.
+const MIN_ROWS = 2;
+const MIN_CARDS = 4;
 const MAX = 60;
 const FALLBACK = 9;   // before the first measurement, and if the DOM isn't there
 
@@ -51,7 +59,14 @@ export default function useFittedPageSize(gridRef, { deps = [], bottomGap = 96 }
         (available + rowGap) / (cardRect.height + rowGap),
       ));
 
-      const next = Math.min(MAX, Math.max(MIN, rows * columns));
+      // Decide in rows and multiply last, so a whole final row is structural
+      // rather than something the arithmetic has to be trusted to preserve.
+      // The old code clamped the card count instead, which is what produced
+      // "three across, then one alone beside two empty slots".
+      const capRows = Math.max(1, Math.floor(MAX / columns));
+      const rowsForMin = Math.ceil(MIN_CARDS / columns);
+      const finalRows = Math.min(capRows, Math.max(rows, MIN_ROWS, rowsForMin));
+      const next = finalRows * columns;
       setSize((prev) => (prev === next ? prev : next));
     };
 
