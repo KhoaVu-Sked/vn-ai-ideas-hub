@@ -1,9 +1,19 @@
 "use client";
 
-// Learner Dashboard: course + roadmap progress at a glance, plus the roadmap
-// Mind map — moved here from Your Journey (features/learning/JourneyPage.jsx),
-// which now shows the List view only. Reuses the same /api/journey fetch
-// Your Journey already uses, so there's no new endpoint or table behind this.
+// Learner Dashboard — rebuilt to follow the "AI Learning dashboards" mockup
+// (repo root, member/"My Progress" view): a KPI row, a Learning card (fully
+// wired — the roadmap-by-level bars + course table use data we already have
+// via /api/journey), a column of not-yet-wired card holders (Consistency,
+// Retention, What's next), and a full-width Application card holder for the
+// AI Ideas Hub link-back (no idea↔course relationship exists yet).
+//
+// The mockup's own "My Progress / Team View" toggle is dropped here — this
+// app already separates those as two nav links in AppHeader ("My Dashboard"
+// vs "Team"), so an in-page tab would just duplicate that.
+//
+// The pre-existing Roadmap-by-track section and Mind map (with its
+// skip-a-tier action) aren't part of the mockup, but stay below the new
+// layout rather than being dropped — kept at the user's request.
 
 import { useCallback, useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
@@ -11,19 +21,12 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, POSITION_LABEL, isExpectedByNow } from "@/features/learning/shared";
+import { card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, STATUS_META, statusPill } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
 
-function StatCard({ label, value, hint }) {
-  return (
-    <div style={{ ...card, flex: "1 1 190px" }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
-      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 28, color: "var(--ink)", marginBottom: 6 }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>{hint}</div>
-    </div>
-  );
-}
+const cardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" };
+const cardCaption = { fontSize: 12, color: "var(--muted)", margin: "0 0 14px" };
 
 // `total` here is the track's course count SCOPED to what's expected of
 // this account's own position (isExpectedByNow, shared.js) — not every
@@ -56,6 +59,77 @@ function TrackProgressRow({ name, complete, total, position }) {
       <div style={{ flex: "0 0 44px", textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{pct}%</div>
       <div style={{ flex: "0 0 60px", textAlign: "right", fontSize: 12, color: "var(--muted)" }}>{complete}/{total}</div>
     </div>
+  );
+}
+
+// ── New (mockup-driven) pieces below ────────────────────────────────────
+
+// Top KPI row — visual shell only for now (label + dash + "Coming soon"),
+// same 4 tiles the mockup shows. `accent` gives the last tile the mockup's
+// dark navy treatment.
+function KpiHolder({ label, accent }) {
+  return (
+    <div style={{
+      ...card, flex: "1 1 220px", padding: "16px 18px",
+      ...(accent ? { background: "var(--navy)", borderColor: "var(--navy)" } : {}),
+    }}>
+      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 11.5, letterSpacing: 0.6, textTransform: "uppercase", color: accent ? "#8fa6c2" : "var(--muted)" }}>{label}</div>
+      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 30, letterSpacing: -0.3, margin: "6px 0 2px", color: accent ? "#fff" : "var(--ink)" }}>—</div>
+      <div style={{ fontSize: 12, color: accent ? "#b9c6d8" : "var(--muted)" }}>Coming soon</div>
+    </div>
+  );
+}
+
+// A card whose chrome (kicker/title/caption) matches the mockup but whose
+// body isn't wired up to real data yet — Consistency, Retention, What's
+// next, and the Ideas Hub application card all use this until there's data
+// behind them.
+function PlaceholderCard({ kicker, title, caption, style }) {
+  return (
+    <div style={{ ...card, ...style }}>
+      <p style={eyebrow}>{kicker}</p>
+      <h2 style={cardTitle}>{title}</h2>
+      {caption && <p style={cardCaption}>{caption}</p>}
+      <div style={{ fontSize: 12.5, color: "var(--muted)", padding: caption ? "2px 0 0" : "0" }}>Coming soon.</div>
+    </div>
+  );
+}
+
+// One row of the "Progress by level" breakdown — completion for a whole
+// seniority tier across every enrolled track (not scoped to isExpectedByNow,
+// unlike the stat tiles/Roadmap-by-track section below: the point of this
+// view is to show the full ladder, tiers ahead of the learner included, most
+// of them just sitting at 0% until they get there).
+function LevelRow({ label, complete, total, current }) {
+  const pct = total ? Math.round((complete / total) * 100) : 0;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 44px", alignItems: "center", gap: 12, margin: "11px 0" }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+        {label}{current && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: "var(--blue)" }}>· you</span>}
+      </div>
+      <ProgressBar pct={pct} height={10} />
+      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 12.5, textAlign: "right", color: "var(--muted)" }}>{pct}%</div>
+    </div>
+  );
+}
+
+// One row of "My courses" — status chip reuses the same STATUS_META the
+// rest of the app uses; the exam score comes from the quiz snapshot taken
+// at completion time (course_assignments.quiz_total_questions /
+// quiz_correct_first_try — now returned by getJourney for every course, not
+// just the 3 most recent completions the Knowledge artifacts card uses).
+function CourseRow({ c }) {
+  const meta = STATUS_META[c.status] || STATUS_META.not_started;
+  const score = c.quiz_total_questions ? Math.round((c.quiz_correct_first_try / c.quiz_total_questions) * 100) : null;
+  return (
+    <tr>
+      <td style={{ fontSize: 13, padding: "10px 8px", borderTop: "1px solid var(--line)", color: "var(--ink)" }}>{c.title}</td>
+      <td style={{ fontSize: 11.5, padding: "10px 8px", borderTop: "1px solid var(--line)", color: "var(--muted)" }}>{c.platform || "—"}</td>
+      <td style={{ padding: "10px 8px", borderTop: "1px solid var(--line)" }}><span style={statusPill(c.status)}>{meta.label}</span></td>
+      <td style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 13, padding: "10px 8px", borderTop: "1px solid var(--line)", textAlign: "right", color: score != null ? "#1f7a3c" : "var(--muted)" }}>
+        {score != null ? `${score}%` : "—"}
+      </td>
+    </tr>
   );
 }
 
@@ -92,25 +166,6 @@ export default function LearnerDashboardPage() {
 
   const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
 
-  // Everything below — both stat tiles AND "Roadmap progress" — is scoped
-  // to what's actually expected of this account by now, on their RAW
-  // officially-assigned position (isExpectedByNow — Intern is only on the
-  // hook for the Intern tier, Senior for everything through Senior), not
-  // the whole roadmap up to Principal — same rule Journey's profile strip
-  // and Team view's roster use. Deliberately NOT the one-stage-ahead
-  // "early access" position Journey's List grants once a tier is finished
-  // (effectivePosition, shared.js) — % completion is a graded expectation,
-  // and earning early access to bonus material you haven't had time to
-  // touch yet shouldn't make your score go down the moment you unlock it.
-  const expected = filteredJourney.filter((c) => isExpectedByNow(c, position));
-  const coreCourses = expected.filter((c) => c.priority === "core");
-  const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
-  const corePct = coreCourses.length ? Math.round((coreComplete / coreCourses.length) * 100) : 0;
-
-  const completeCount = expected.filter((c) => c.status === "complete").length;
-  const inProgressCount = filteredJourney.filter((c) => c.status === "in_progress").length;
-  const overallPct = expected.length ? Math.round((completeCount / expected.length) * 100) : 0;
-
   // Roadmap progress-by-track always covers every enrolled track, independent
   // of the Mind map's own track filter below — switching that filter
   // shouldn't collapse this list down to one row. Scoped the same way as
@@ -121,6 +176,13 @@ export default function LearnerDashboardPage() {
     const courses = journey.filter((c) => c.track_id === t.id && isExpectedByNow(c, position));
     return { name: t.name, total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
   });
+
+  // "Progress by level" — completion per seniority tier across every
+  // enrolled track, unscoped by isExpectedByNow on purpose (see LevelRow).
+  const perLevel = POSITION_ORDER.map((tier) => {
+    const courses = journey.filter((c) => c.expected_by_position === tier);
+    return { tier, label: POSITION_LABEL[tier] || tier, total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
+  }).filter((l) => l.total > 0);
 
   // Same skip-a-tier action the Mind map has always had — moved here with it.
   const confirmSkip = async () => {
@@ -153,14 +215,58 @@ export default function LearnerDashboardPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 18 }}>
-                  <StatCard label="Level" value={POSITION_LABEL[position] || "—"} hint="Your seniority tier" />
-                  <StatCard label="Tracks enrolled" value={trackOptions.length} hint={trackOptions.map((t) => t.name).join(" · ") || "—"} />
-                  <StatCard label="Core courses complete" value={`${corePct}%`} hint={`${coreComplete} of ${coreCourses.length}${position ? ` · through ${POSITION_LABEL[position] || position}` : ""}`} />
-                  <StatCard label="In progress" value={inProgressCount} hint="Courses you're currently on" />
-                  <StatCard label="All courses complete" value={`${overallPct}%`} hint={`${completeCount} of ${expected.length}${position ? ` · through ${POSITION_LABEL[position] || position}` : ""}`} />
+                {/* ── KPI row (mockup card holders — not wired yet) ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
+                  <KpiHolder label="Roadmap complete" />
+                  <KpiHolder label="Level" />
+                  <KpiHolder label="Weekly streak" />
+                  <KpiHolder label="Skills applied" accent />
                 </div>
 
+                {/* ── Learning + side column ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 14, marginBottom: 16 }}>
+                  <section style={card}>
+                    <p style={eyebrow}>Learning</p>
+                    <h2 style={{ ...cardTitle, fontSize: 16 }}>Progress by level</h2>
+                    <p style={cardCaption}>Completion by seniority tier, across every track you're enrolled in.</p>
+                    <div>
+                      {perLevel.map((l) => <LevelRow key={l.tier} label={l.label} complete={l.complete} total={l.total} current={l.tier === position} />)}
+                    </div>
+
+                    <h2 style={{ ...cardTitle, fontSize: 16, marginTop: 20 }}>My courses</h2>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--muted)", textAlign: "left", padding: "0 8px 9px" }}>Course</th>
+                            <th style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--muted)", textAlign: "left", padding: "0 8px 9px" }}>Platform</th>
+                            <th style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--muted)", textAlign: "left", padding: "0 8px 9px" }}>Status</th>
+                            <th style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--muted)", textAlign: "right", padding: "0 8px 9px" }}>Exam</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {journey.map((c) => <CourseRow key={c.id} c={c} />)}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <PlaceholderCard kicker="Consistency" title="This month" />
+                    <PlaceholderCard kicker="Retention" title="Confidence by skill" />
+                    <PlaceholderCard kicker="What's next" title="Keep the momentum" />
+                  </div>
+                </div>
+
+                {/* ── Application · AI Ideas Hub (mockup card holder) ── */}
+                <PlaceholderCard
+                  kicker="Application · AI Ideas Hub"
+                  title="What I've built from what I learned"
+                  caption="Each idea will link back to the course or skill it came from."
+                  style={{ marginBottom: 16 }}
+                />
+
+                {/* ── Kept from the previous dashboard, per request ── */}
                 <section style={{ ...card, marginBottom: 18 }}>
                   <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", margin: "0 0 4px" }}>Roadmap progress</h1>
                   <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>

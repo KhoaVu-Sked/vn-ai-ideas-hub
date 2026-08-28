@@ -7,9 +7,9 @@
 // invisible on any card. --line is the same neutral already used for
 // borders/dividers everywhere else in this app, so it reads as a clear,
 // intentional "unfilled" track rather than a new color being introduced.
-export default function ProgressBar({ pct, width = "100%" }) {
+export default function ProgressBar({ pct, width = "100%", height = 6 }) {
   return (
-    <div style={{ width, height: 6, borderRadius: 999, background: "var(--line)", overflow: "hidden", flexShrink: 0 }}>
+    <div style={{ width, height, borderRadius: 999, background: "var(--line)", overflow: "hidden", flexShrink: 0 }}>
       <div style={{ height: "100%", width: `${pct}%`, background: "var(--blue)", borderRadius: 999 }} />
     </div>
   );

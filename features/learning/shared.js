@@ -4,6 +4,9 @@ import { POSITIONS } from "@/features/accounts/constants";
 
 export const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
 export const errBanner = { background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5 };
+// Small uppercase section kicker (Learner Dashboard's card groups) — bold
+// Manrope, blue, wide letter-spacing.
+export const eyebrow = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 10.5, letterSpacing: 0.9, textTransform: "uppercase", color: "var(--blue)", margin: "0 0 8px" };
 
 export const STATUS_META = {
   complete: { label: "Complete", bg: "#e6f4ea", color: "#1f7a3c" },

@@ -156,7 +156,8 @@ export async function getJourney(accountId) {
           'est_hours', c.est_hours, 'link', c.link, 'outcome', c.outcome,
           'expected_by_position', c.expected_by_position, 'priority', c.priority,
           'track_id', t.id, 'track_name', t.name,
-          'status', coalesce(ca.status, 'not_started'), 'target_date', ca.target_date
+          'status', coalesce(ca.status, 'not_started'), 'target_date', ca.target_date,
+          'quiz_total_questions', ca.quiz_total_questions, 'quiz_correct_first_try', ca.quiz_correct_first_try
         ) order by
           coalesce(array_position(${POSITION_ORDER}::text[], c.expected_by_position), 999),
           coalesce(ca.position, 2147483647), t.name asc, c.stage asc, c.created_at asc
