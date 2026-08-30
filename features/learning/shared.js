@@ -27,6 +27,34 @@ export const POSITION_LABEL = { intern: "Intern", junior: "Junior", middle: "Mid
 // via array_position() rather than hand-copying it into a CASE expression.
 export const POSITION_ORDER = POSITIONS;
 
+// "Progress by level" (Learner Dashboard) groups the 5-tier role ladder into
+// 4 named roadmap stages — Foundations/Applied/Intermediate/Advanced — for
+// that one overview chart. This is display-only: it's a coarser VIEW derived
+// from a course's existing expected_by_position, not a new column or a
+// replacement for it. Every gating rule that actually cares about seniority
+// (isExpectedByNow below, MindMap's tier locks, Team view's roster/heatmap,
+// Auto Schedule's from/to range, JourneyTable's same-tier drag check) keeps
+// reading the raw 5-value position exactly as before — Senior and Principal
+// stay fully distinct everywhere except this one chart, where they share the
+// "Advanced" bar simply because there's one more role than there are named
+// levels, not because either role's own tracking changes anywhere else.
+export const PROGRESS_LEVEL_ORDER = ["foundations", "applied", "intermediate", "advanced"];
+export const PROGRESS_LEVEL_LABEL = { foundations: "Foundations", applied: "Applied", intermediate: "Intermediate", advanced: "Advanced" };
+// The one place the role->level pairing is spelled out — everything else
+// (rolesForProgressLevel below, and progressLevelForPosition) derives from
+// this single object rather than hand-copying the pairing a second time.
+export const POSITION_TO_PROGRESS_LEVEL = { intern: "foundations", junior: "applied", middle: "intermediate", senior: "advanced", principal: "advanced" };
+
+export function progressLevelForPosition(position) {
+  return POSITION_TO_PROGRESS_LEVEL[position] || null;
+}
+// Which role(s) fall under a given progress level (e.g. "advanced" ->
+// ["senior", "principal"]) — used to caption each level bar with the role(s)
+// it corresponds to, in ladder order.
+export function rolesForProgressLevel(level) {
+  return POSITION_ORDER.filter((p) => POSITION_TO_PROGRESS_LEVEL[p] === level);
+}
+
 // A course counts toward "expected by now" once its own tier is at or below
 // the learner's current position — Intern is expected to have finished the
 // Intern tier, Senior is expected to have finished everything through

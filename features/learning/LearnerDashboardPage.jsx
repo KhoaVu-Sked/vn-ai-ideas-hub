@@ -21,9 +21,13 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, STATUS_META, statusPill } from "@/features/learning/shared";
+import {
+  card, eyebrow, errBanner, POSITION_LABEL, isExpectedByNow, effectivePosition,
+  PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel,
+} from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
+import { JourneyTable } from "@/features/learning/JourneyPage";
 
 const cardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" };
 const cardCaption = { fontSize: 12, color: "var(--muted)", margin: "0 0 14px" };
@@ -96,40 +100,26 @@ function PlaceholderCard({ kicker, title, caption, style }) {
 }
 
 // One row of the "Progress by level" breakdown — completion for a whole
-// seniority tier across every enrolled track (not scoped to isExpectedByNow,
-// unlike the stat tiles/Roadmap-by-track section below: the point of this
-// view is to show the full ladder, tiers ahead of the learner included, most
-// of them just sitting at 0% until they get there).
-function LevelRow({ label, complete, total, current }) {
+// progress level (Foundations/Applied/Intermediate/Advanced) across every
+// enrolled track (not scoped to isExpectedByNow, unlike the stat
+// tiles/Roadmap-by-track section below: the point of this view is to show
+// the full roadmap, stages ahead of the learner included, most of them just
+// sitting at 0% until they get there). `roleLabel` names the role(s) that
+// map to this level (progressLevelForPosition/rolesForProgressLevel,
+// shared.js) — the visible form of that mapping, not just an internal one.
+function LevelRow({ label, roleLabel, complete, total, current }) {
   const pct = total ? Math.round((complete / total) * 100) : 0;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 44px", alignItems: "center", gap: 12, margin: "11px 0" }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
-        {label}{current && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: "var(--blue)" }}>· you</span>}
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+          {label}{current && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: "var(--blue)" }}>· you</span>}
+        </div>
+        {roleLabel && <div style={{ fontSize: 10.5, color: "var(--muted)" }}>{roleLabel}</div>}
       </div>
       <ProgressBar pct={pct} height={10} />
       <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 12.5, textAlign: "right", color: "var(--muted)" }}>{pct}%</div>
     </div>
-  );
-}
-
-// One row of "My courses" — status chip reuses the same STATUS_META the
-// rest of the app uses; the exam score comes from the quiz snapshot taken
-// at completion time (course_assignments.quiz_total_questions /
-// quiz_correct_first_try — now returned by getJourney for every course, not
-// just the 3 most recent completions the Knowledge artifacts card uses).
-function CourseRow({ c }) {
-  const meta = STATUS_META[c.status] || STATUS_META.not_started;
-  const score = c.quiz_total_questions ? Math.round((c.quiz_correct_first_try / c.quiz_total_questions) * 100) : null;
-  return (
-    <tr>
-      <td style={{ fontSize: 13, padding: "10px 8px", borderTop: "1px solid var(--line)", color: "var(--ink)" }}>{c.title}</td>
-      <td style={{ fontSize: 11.5, padding: "10px 8px", borderTop: "1px solid var(--line)", color: "var(--muted)" }}>{c.platform || "—"}</td>
-      <td style={{ padding: "10px 8px", borderTop: "1px solid var(--line)" }}><span style={statusPill(c.status)}>{meta.label}</span></td>
-      <td style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 13, padding: "10px 8px", borderTop: "1px solid var(--line)", textAlign: "right", color: score != null ? "#1f7a3c" : "var(--muted)" }}>
-        {score != null ? `${score}%` : "—"}
-      </td>
-    </tr>
   );
 }
 
@@ -177,12 +167,33 @@ export default function LearnerDashboardPage() {
     return { name: t.name, total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
   });
 
-  // "Progress by level" — completion per seniority tier across every
-  // enrolled track, unscoped by isExpectedByNow on purpose (see LevelRow).
-  const perLevel = POSITION_ORDER.map((tier) => {
-    const courses = journey.filter((c) => c.expected_by_position === tier);
-    return { tier, label: POSITION_LABEL[tier] || tier, total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
+  // "Progress by level" — completion per progress level (not raw role;
+  // see PROGRESS_LEVEL_ORDER, shared.js) across every enrolled track,
+  // unscoped by isExpectedByNow on purpose (see LevelRow). A course's level
+  // is derived from its existing expected_by_position via
+  // progressLevelForPosition — no new course field, no change to gating.
+  const myLevel = progressLevelForPosition(position);
+  const perLevel = PROGRESS_LEVEL_ORDER.map((level) => {
+    const courses = journey.filter((c) => progressLevelForPosition(c.expected_by_position) === level);
+    const roles = rolesForProgressLevel(level).map((p) => POSITION_LABEL[p] || p);
+    return { level, label: PROGRESS_LEVEL_LABEL[level], roleLabel: roles.join(" & "), total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
   }).filter((l) => l.total > 0);
+
+  // "My courses" reuses Your Journey's own list (JourneyTable) as-is, so it
+  // behaves and scopes identically: what's expected by now (own tier, or one
+  // stage of early access once that tier's fully done — effectivePosition/
+  // isExpectedByNow, shared.js), across every enrolled track. Not the Mind
+  // map's own track filter below — same as Roadmap progress above it.
+  const visiblePosition = effectivePosition(journey, position);
+  const visibleJourney = journey.filter((c) => isExpectedByNow(c, visiblePosition));
+
+  // JourneyTable already reorders itself locally for instant feedback (same
+  // component Your Journey uses); this just persists it. No reload — see
+  // JourneyPage's own reorderStage for why.
+  const reorderCourses = (tierPosition, courseIds) => {
+    api("/api/journey/reorder", { method: "POST", body: JSON.stringify({ position: tierPosition, courseIds }) })
+      .catch((e) => setErr(e.message));
+  };
 
   // Same skip-a-tier action the Mind map has always had — moved here with it.
   const confirmSkip = async () => {
@@ -228,27 +239,20 @@ export default function LearnerDashboardPage() {
                   <section style={card}>
                     <p style={eyebrow}>Learning</p>
                     <h2 style={{ ...cardTitle, fontSize: 16 }}>Progress by level</h2>
-                    <p style={cardCaption}>Completion by seniority tier, across every track you're enrolled in.</p>
+                    <p style={cardCaption}>Completion by roadmap stage, across every track you're enrolled in.</p>
                     <div>
-                      {perLevel.map((l) => <LevelRow key={l.tier} label={l.label} complete={l.complete} total={l.total} current={l.tier === position} />)}
+                      {perLevel.map((l) => (
+                        <LevelRow key={l.level} label={l.label} roleLabel={l.roleLabel} complete={l.complete} total={l.total} current={l.level === myLevel} />
+                      ))}
                     </div>
 
                     <h2 style={{ ...cardTitle, fontSize: 16, marginTop: 20 }}>My courses</h2>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead>
-                          <tr>
-                            <th style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--muted)", textAlign: "left", padding: "0 8px 9px" }}>Course</th>
-                            <th style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--muted)", textAlign: "left", padding: "0 8px 9px" }}>Platform</th>
-                            <th style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--muted)", textAlign: "left", padding: "0 8px 9px" }}>Status</th>
-                            <th style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--muted)", textAlign: "right", padding: "0 8px 9px" }}>Exam</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {journey.map((c) => <CourseRow key={c.id} c={c} />)}
-                        </tbody>
-                      </table>
-                    </div>
+                    <p style={cardCaption}>Same list as Your Journey — drag a row to reorder it within its stage.</p>
+                    {visibleJourney.length === 0 ? (
+                      <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing expected yet for your stage.</div>
+                    ) : (
+                      <JourneyTable courses={visibleJourney} onReorder={reorderCourses} />
+                    )}
                   </section>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
