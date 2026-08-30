@@ -1,11 +1,21 @@
 "use client";
 
 // Learner Dashboard — rebuilt to follow the "AI Learning dashboards" mockup
-// (repo root, member/"My Progress" view): a KPI row, a Learning card (fully
-// wired — the roadmap-by-level bars + course table use data we already have
-// via /api/journey), a column of not-yet-wired card holders (Consistency,
-// Retention, What's next), and a full-width Application card holder for the
-// AI Ideas Hub link-back (no idea↔course relationship exists yet).
+// (repo root, member/"My Progress" view). Wired to real data: the KPI row's
+// Roadmap complete/Level, the Learning card (progress-by-level bars + My
+// courses), and the Consistency + What's next side cards. Two things stay
+// placeholders because there's genuinely no honest data behind them yet,
+// not because they were skipped:
+//   - Weekly streak (KPI) and any streak/session count on Consistency —
+//     course_assignments keeps one updated_at per row (the latest change),
+//     not a change log, so a weekly cadence isn't derivable.
+//   - Retention "Confidence by skill" — courses.focus_area is a per-course
+//     description (1:1 with title), not a shared skill taxonomy multiple
+//     courses group under, so there's nothing real to bucket by yet.
+// Skills applied (KPI) and the full-width Application card stay placeholders
+// for a different reason: both need an idea<->course link, which lives in
+// the Ideas Hub's schema (the `ideas` table), not this feature's — left
+// alone on purpose, see the chat for why.
 //
 // The mockup's own "My Progress / Team View" toggle is dropped here — this
 // app already separates those as two nav links in AppHeader ("My Dashboard"
@@ -22,7 +32,7 @@ import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
-  card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, effectivePosition,
+  card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, effectivePosition, fmtDate,
   PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
@@ -100,12 +110,25 @@ function PlaceholderCard({ kicker, title, caption, style }) {
   );
 }
 
-// A label/value row — mockup's ".mini" rows (Consistency, What's next).
+// A label/value row — mockup's ".mini" rows (Consistency).
 function MiniRow({ k, v }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: "1px solid var(--line)" }}>
       <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{k}</span>
       <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{v}</span>
+    </div>
+  );
+}
+
+// An icon + title + description row — mockup's ".nextrow" (What's next).
+function NextRow({ icon, title, detail }) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+      <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--bg)", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>{icon}</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{title}</div>
+        <div style={{ fontSize: 12, color: "var(--muted)" }}>{detail}</div>
+      </div>
     </div>
   );
 }
@@ -138,6 +161,7 @@ export default function LearnerDashboardPage() {
   const { user: me } = useSession();
   const [journey, setJourney] = useState([]);
   const [position, setPosition] = useState(null);
+  const [recentCompletions, setRecentCompletions] = useState([]);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState("all");
@@ -148,9 +172,10 @@ export default function LearnerDashboardPage() {
   const load = useCallback(async () => {
     setErr("");
     try {
-      const { courses, position: pos } = await api("/api/journey");
+      const { courses, position: pos, recentCompletions: completions } = await api("/api/journey");
       setJourney(courses);
       setPosition(pos);
+      setRecentCompletions(completions || []);
     } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
 
@@ -218,6 +243,23 @@ export default function LearnerDashboardPage() {
   const completeCourses = journey.filter((c) => c.status === "complete");
   const hoursLogged = completeCourses.reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
   const inProgressCount = journey.filter((c) => c.status === "in_progress").length;
+
+  // What's next — same "upcoming" pick as Your Journey's Up next card (dated
+  // soonest-first, then undated filling the roadmap's own order), just the
+  // top one rather than 2. Its target_date is shown plainly as "Target", not
+  // "from your calendar" — a live calendar read would need its own API call
+  // (see googleCalendar.js) beyond what this pass covers, and target_date is
+  // real, already-fetched data either way, calendar-booked or not.
+  const eligibleNext = visibleJourney.filter((c) => c.status !== "complete" && c.status !== "skipped");
+  const datedNext = eligibleNext.filter((c) => c.target_date).sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
+  const undatedNext = eligibleNext.filter((c) => !c.target_date);
+  const nextCourse = datedNext[0] || undatedNext[0] || null;
+
+  // The most recently completed course's own "outcome" copy — already
+  // written per-course (courses.outcome, e.g. "Use Claude for writing,
+  // summarizing..."), reused as-is rather than fabricating a suggestion.
+  const lastCompletion = recentCompletions[0];
+  const lastCompletionCourse = lastCompletion ? journey.find((c) => c.id === lastCompletion.id) : null;
 
   // KPI: "Level" — current role, plus the next rung up (POSITION_ORDER,
   // shared.js). Already at the top of the ladder: say so instead of
@@ -313,7 +355,26 @@ export default function LearnerDashboardPage() {
                       </div>
                     </div>
                     <PlaceholderCard kicker="Retention" title="Confidence by skill" />
-                    <PlaceholderCard kicker="What's next" title="Keep the momentum" />
+                    <div style={card}>
+                      <p style={eyebrow}>What's next</p>
+                      <h2 style={cardTitle}>Keep the momentum</h2>
+                      {!nextCourse && !lastCompletionCourse ? (
+                        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "10px 0 0" }}>Nothing left to plan — every course is complete or skipped.</p>
+                      ) : (
+                        <div>
+                          {nextCourse && (
+                            <NextRow
+                              icon="📘"
+                              title={`Finish "${nextCourse.title}"`}
+                              detail={nextCourse.target_date ? `Target ${fmtDate(nextCourse.target_date)}` : nextCourse.est_hours != null ? `~${nextCourse.est_hours} hrs` : "No target set"}
+                            />
+                          )}
+                          {lastCompletionCourse?.outcome && (
+                            <NextRow icon="💡" title={lastCompletionCourse.outcome} detail={`From "${lastCompletionCourse.title}"`} />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
