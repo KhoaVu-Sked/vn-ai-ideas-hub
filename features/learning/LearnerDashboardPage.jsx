@@ -87,9 +87,8 @@ function KpiHolder({ label, value, hint, accent }) {
 }
 
 // A card whose chrome (kicker/title/caption) matches the mockup but whose
-// body isn't wired up to real data yet — Consistency, Retention, What's
-// next, and the Ideas Hub application card all use this until there's data
-// behind them.
+// body isn't wired up to real data yet — Retention and the Ideas Hub
+// application card use this (see the file header comment for why).
 function PlaceholderCard({ kicker, title, caption, style }) {
   return (
     <div style={{ ...card, ...style }}>
@@ -97,6 +96,16 @@ function PlaceholderCard({ kicker, title, caption, style }) {
       <h2 style={cardTitle}>{title}</h2>
       {caption && <p style={cardCaption}>{caption}</p>}
       <div style={{ fontSize: 12.5, color: "var(--muted)", padding: caption ? "2px 0 0" : "0" }}>Coming soon.</div>
+    </div>
+  );
+}
+
+// A label/value row — mockup's ".mini" rows (Consistency, What's next).
+function MiniRow({ k, v }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: "1px solid var(--line)" }}>
+      <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{k}</span>
+      <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{v}</span>
     </div>
   );
 }
@@ -196,6 +205,20 @@ export default function LearnerDashboardPage() {
   const roadmapComplete = visibleJourney.filter((c) => c.status === "complete").length;
   const roadmapPct = visibleJourney.length ? Math.round((roadmapComplete / visibleJourney.length) * 100) : 0;
 
+  // Consistency card — all-time, not "this month": course_assignments only
+  // keeps ONE updated_at per row (the last change), not a change log, so
+  // "completed this month" can't be told apart from "completed 3 months ago,
+  // untouched since" for anything beyond the 3 most recent completions
+  // (recentCompletions, which getJourney also returns but this page doesn't
+  // fetch). Scoped to the FULL journey, not visibleJourney — a completion
+  // earned via early access still counts as hours actually put in. No
+  // "sessions"/streak rows here — there's no session log to derive either
+  // from, unlike hours (est_hours) and a plain completed count, which are
+  // real fields already on hand.
+  const completeCourses = journey.filter((c) => c.status === "complete");
+  const hoursLogged = completeCourses.reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
+  const inProgressCount = journey.filter((c) => c.status === "in_progress").length;
+
   // KPI: "Level" — current role, plus the next rung up (POSITION_ORDER,
   // shared.js). Already at the top of the ladder: say so instead of
   // showing an empty "Target: — · 0 levels left".
@@ -279,7 +302,16 @@ export default function LearnerDashboardPage() {
                   </section>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <PlaceholderCard kicker="Consistency" title="This month" />
+                    <div style={card}>
+                      <p style={eyebrow}>Consistency</p>
+                      <h2 style={cardTitle}>Learning activity</h2>
+                      <p style={cardCaption}>All time, not "this month" — course records keep the latest state, not a change history, so a monthly window isn't derivable yet.</p>
+                      <div>
+                        <MiniRow k="Courses completed" v={completeCourses.length} />
+                        <MiniRow k="Hours logged" v={hoursLogged.toFixed(1).replace(/\.0$/, "")} />
+                        <MiniRow k="In progress" v={inProgressCount} />
+                      </div>
+                    </div>
                     <PlaceholderCard kicker="Retention" title="Confidence by skill" />
                     <PlaceholderCard kicker="What's next" title="Keep the momentum" />
                   </div>
