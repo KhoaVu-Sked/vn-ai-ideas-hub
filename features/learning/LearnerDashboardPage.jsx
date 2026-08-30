@@ -22,7 +22,7 @@ import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
-  card, eyebrow, errBanner, POSITION_LABEL, isExpectedByNow, effectivePosition,
+  card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, effectivePosition,
   PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
@@ -68,18 +68,20 @@ function TrackProgressRow({ name, complete, total, position }) {
 
 // ── New (mockup-driven) pieces below ────────────────────────────────────
 
-// Top KPI row — visual shell only for now (label + dash + "Coming soon"),
-// same 4 tiles the mockup shows. `accent` gives the last tile the mockup's
-// dark navy treatment.
-function KpiHolder({ label, accent }) {
+// Top KPI row — same 4 tiles the mockup shows. `accent` gives the last tile
+// the mockup's dark navy treatment. Wired tiles pass `value`/`hint`; the
+// ones with no honest data behind them yet (Weekly streak, Skills applied —
+// see the file header comment) omit both and fall back to a dash +
+// "Coming soon" rather than a fabricated number.
+function KpiHolder({ label, value, hint, accent }) {
   return (
     <div style={{
       ...card, flex: "1 1 220px", padding: "16px 18px",
       ...(accent ? { background: "var(--navy)", borderColor: "var(--navy)" } : {}),
     }}>
       <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 11.5, letterSpacing: 0.6, textTransform: "uppercase", color: accent ? "#8fa6c2" : "var(--muted)" }}>{label}</div>
-      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 30, letterSpacing: -0.3, margin: "6px 0 2px", color: accent ? "#fff" : "var(--ink)" }}>—</div>
-      <div style={{ fontSize: 12, color: accent ? "#b9c6d8" : "var(--muted)" }}>Coming soon</div>
+      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 30, letterSpacing: -0.3, margin: "6px 0 2px", color: accent ? "#fff" : "var(--ink)" }}>{value ?? "—"}</div>
+      <div style={{ fontSize: 12, color: accent ? "#b9c6d8" : "var(--muted)" }}>{hint || "Coming soon"}</div>
     </div>
   );
 }
@@ -187,6 +189,24 @@ export default function LearnerDashboardPage() {
   const visiblePosition = effectivePosition(journey, position);
   const visibleJourney = journey.filter((c) => isExpectedByNow(c, visiblePosition));
 
+  // KPI: "Roadmap complete" — % of what's expected by now (same scope as
+  // My courses above) that's actually done. No "+X% this month" trend, on
+  // purpose — that would need a snapshot history we don't keep, and a
+  // fabricated delta would be worse than none.
+  const roadmapComplete = visibleJourney.filter((c) => c.status === "complete").length;
+  const roadmapPct = visibleJourney.length ? Math.round((roadmapComplete / visibleJourney.length) * 100) : 0;
+
+  // KPI: "Level" — current role, plus the next rung up (POSITION_ORDER,
+  // shared.js). Already at the top of the ladder: say so instead of
+  // showing an empty "Target: — · 0 levels left".
+  const posIdx = position ? POSITION_ORDER.indexOf(position) : -1;
+  const nextPosition = posIdx >= 0 ? POSITION_ORDER[posIdx + 1] : null;
+  const levelHint = !position
+    ? "Not yet assigned"
+    : nextPosition
+      ? `Target: ${POSITION_LABEL[nextPosition] || nextPosition} · ${POSITION_ORDER.length - 1 - posIdx} stage${POSITION_ORDER.length - 1 - posIdx === 1 ? "" : "s"} left`
+      : "Top of the ladder";
+
   // JourneyTable already reorders itself locally for instant feedback (same
   // component Your Journey uses); this just persists it. No reload — see
   // JourneyPage's own reorderStage for why.
@@ -226,10 +246,13 @@ export default function LearnerDashboardPage() {
               </div>
             ) : (
               <>
-                {/* ── KPI row (mockup card holders — not wired yet) ── */}
+                {/* ── KPI row — Roadmap complete/Level wired to real data;
+                    Weekly streak has no session log to derive from, Skills
+                    applied needs an idea↔course link (Ideas Hub), so both
+                    stay placeholders — see the file header comment. ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
-                  <KpiHolder label="Roadmap complete" />
-                  <KpiHolder label="Level" />
+                  <KpiHolder label="Roadmap complete" value={`${roadmapPct}%`} hint={`${roadmapComplete} of ${visibleJourney.length}${visiblePosition ? ` · through ${POSITION_LABEL[visiblePosition] || visiblePosition}` : ""}`} />
+                  <KpiHolder label="Level" value={POSITION_LABEL[position] || "—"} hint={levelHint} />
                   <KpiHolder label="Weekly streak" />
                   <KpiHolder label="Skills applied" accent />
                 </div>
