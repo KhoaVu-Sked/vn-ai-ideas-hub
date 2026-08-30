@@ -2,13 +2,10 @@
 
 // Learner Dashboard — rebuilt to follow the "AI Learning dashboards" mockup
 // (repo root, member/"My Progress" view). Wired to real data: the KPI row's
-// Roadmap complete/Level, the Learning card (progress-by-level bars + My
-// courses), and the Consistency + What's next side cards. Two things stay
-// placeholders because there's genuinely no honest data behind them yet,
-// not because they were skipped:
-//   - Weekly streak (KPI) and any streak/session count on Consistency —
-//     course_assignments keeps one updated_at per row (the latest change),
-//     not a change log, so a weekly cadence isn't derivable.
+// Roadmap complete/Level/Weekly streak, the Learning card (progress-by-level
+// bars + My courses), and the Consistency + What's next side cards. One
+// thing stays a placeholder because there's genuinely no honest data behind
+// it yet, not because it was skipped:
 //   - Retention "Confidence by skill" — courses.focus_area is a per-course
 //     description (1:1 with title), not a shared skill taxonomy multiple
 //     courses group under, so there's nothing real to bucket by yet.
@@ -16,6 +13,16 @@
 // for a different reason: both need an idea<->course link, which lives in
 // the Ideas Hub's schema (the `ideas` table), not this feature's — left
 // alone on purpose, see the chat for why.
+//
+// Weekly streak (weeklyStreak, shared.js) is scoped to courses actually
+// booked through Auto Schedule (calendar_event_id set) — Auto Schedule is
+// the only place this app has anything resembling a "session," so that's
+// the signal, not every completion regardless of how it was scheduled. No
+// live Google Calendar read: completion only ever lives in
+// course_assignments.status, never in the calendar event itself, so
+// calendar_event_id already carries the one bit a live fetch would add
+// ("was this actually booked") without the token-refresh/revoked-access
+// failure modes a live call brings.
 //
 // The mockup's own "My Progress / Team View" toggle is dropped here — this
 // app already separates those as two nav links in AppHeader ("My Dashboard"
@@ -33,7 +40,7 @@ import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, effectivePosition, fmtDate,
-  PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel,
+  PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel, weeklyStreak,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
@@ -235,18 +242,20 @@ export default function LearnerDashboardPage() {
   const roadmapPct = visibleJourney.length ? Math.round((roadmapComplete / visibleJourney.length) * 100) : 0;
 
   // Consistency card — all-time, not "this month": course_assignments only
-  // keeps ONE updated_at per row (the last change), not a change log, so
+  // keeps ONE updated_at per row (the latest change), not a change log, so
   // "completed this month" can't be told apart from "completed 3 months ago,
-  // untouched since" for anything beyond the 3 most recent completions
-  // (recentCompletions, which getJourney also returns but this page doesn't
-  // fetch). Scoped to the FULL journey, not visibleJourney — a completion
-  // earned via early access still counts as hours actually put in. No
-  // "sessions"/streak rows here — there's no session log to derive either
-  // from, unlike hours (est_hours) and a plain completed count, which are
-  // real fields already on hand.
+  // untouched since" — a monthly window isn't derivable from it. Scoped to
+  // the FULL journey, not visibleJourney — a completion earned via early
+  // access still counts as hours actually put in. No "sessions" row here —
+  // Auto Schedule is the closest thing to a "session" this app has, and
+  // that's what Weekly streak (below) already covers.
   const completeCourses = journey.filter((c) => c.status === "complete");
   const hoursLogged = completeCourses.reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
   const inProgressCount = journey.filter((c) => c.status === "in_progress").length;
+
+  // KPI + Consistency's "Weekly streak" (weeklyStreak, shared.js) — see the
+  // file header comment for what this does and doesn't count.
+  const streak = weeklyStreak(journey);
 
   // What's next — same "upcoming" pick as Your Journey's Up next card (dated
   // soonest-first, then undated filling the roadmap's own order), just the
@@ -315,14 +324,14 @@ export default function LearnerDashboardPage() {
               </div>
             ) : (
               <>
-                {/* ── KPI row — Roadmap complete/Level wired to real data;
-                    Weekly streak has no session log to derive from, Skills
-                    applied needs an idea↔course link (Ideas Hub), so both
-                    stay placeholders — see the file header comment. ── */}
+                {/* ── KPI row — Roadmap complete/Level/Weekly streak wired to
+                    real data; Skills applied needs an idea↔course link
+                    (Ideas Hub), so it stays a placeholder — see the file
+                    header comment. ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
                   <KpiHolder label="Roadmap complete" value={`${roadmapPct}%`} hint={`${roadmapComplete} of ${visibleJourney.length}${visiblePosition ? ` · through ${POSITION_LABEL[visiblePosition] || visiblePosition}` : ""}`} />
                   <KpiHolder label="Level" value={POSITION_LABEL[position] || "—"} hint={levelHint} />
-                  <KpiHolder label="Weekly streak" />
+                  <KpiHolder label="Weekly streak" value={`${streak} wk${streak === 1 ? "" : "s"}`} hint="From Auto Schedule sessions" />
                   <KpiHolder label="Skills applied" hint="Coming soon · Phase 2" accent />
                 </div>
 
@@ -356,6 +365,7 @@ export default function LearnerDashboardPage() {
                         <MiniRow k="Courses completed" v={completeCourses.length} />
                         <MiniRow k="Hours logged" v={hoursLogged.toFixed(1).replace(/\.0$/, "")} />
                         <MiniRow k="In progress" v={inProgressCount} />
+                        <MiniRow k="Current streak" v={`${streak} wk${streak === 1 ? "" : "s"}`} />
                       </div>
                     </div>
                     <PlaceholderCard kicker="Retention" title="Confidence by skill" />

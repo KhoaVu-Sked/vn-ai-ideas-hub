@@ -199,3 +199,54 @@ export function relTime(d) {
   const months = Math.floor(days / 30);
   return months <= 1 ? "1 month ago" : `${months} months ago`;
 }
+
+// Monday-anchored week key (that week's Monday, as a yyyy-mm-dd string, UTC)
+// — two timestamps in the same Mon-Sun week collapse to the same key,
+// regardless of which day within it they actually fall on.
+function weekKeyUTC(dateInput) {
+  const d = new Date(dateInput);
+  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dayIdx = (monday.getUTCDay() + 6) % 7; // Mon=0 .. Sun=6
+  monday.setUTCDate(monday.getUTCDate() - dayIdx);
+  return monday.toISOString().slice(0, 10);
+}
+
+// Learner Dashboard's "Weekly streak" KPI — consecutive weeks (ending at the
+// current week, or last week if this week hasn't landed one yet) with at
+// least one course actually completed THROUGH Auto Schedule. Scoped to
+// calendar_event_id courses on purpose: Auto Schedule is the only place this
+// app has anything resembling a "session," so that's the signal used, not
+// every completion regardless of how it was scheduled (a course completed
+// with no calendar booking at all doesn't count toward this one). A learner
+// who's never used Auto Schedule reads a plain 0, not a broken number.
+//
+// No live Google Calendar read here — calendar_event_id already tells us
+// "this course had a real booked session," and completion itself only ever
+// lives in course_assignments.status, never in the calendar event, so
+// fetching the live event wouldn't add a signal we don't already have; it'd
+// just add a network round trip, token-refresh handling, and a "calendar
+// access revoked" failure mode for no extra information.
+//
+// updated_at doubles as "when this was completed": once a course reaches the
+// terminal 'complete' status nothing touches that row again, so its most
+// recent update IS the completion moment in the overwhelming common case.
+export function weeklyStreak(courses, today = new Date()) {
+  const completedWeeks = new Set(
+    courses
+      .filter((c) => c.calendar_event_id && c.status === "complete" && c.updated_at)
+      .map((c) => weekKeyUTC(c.updated_at))
+  );
+  const cursor = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  let cursorKey = weekKeyUTC(cursor);
+  if (!completedWeeks.has(cursorKey)) {
+    cursor.setUTCDate(cursor.getUTCDate() - 7); // this week's still open — try last week instead of breaking the streak early
+    cursorKey = weekKeyUTC(cursor);
+  }
+  let streak = 0;
+  while (completedWeeks.has(cursorKey)) {
+    streak++;
+    cursor.setUTCDate(cursor.getUTCDate() - 7);
+    cursorKey = weekKeyUTC(cursor);
+  }
+  return streak;
+}
