@@ -98,14 +98,18 @@ function KpiHolder({ label, value, hint, accent }) {
 
 // A card whose chrome (kicker/title/caption) matches the mockup but whose
 // body isn't wired up to real data yet — Retention and the Ideas Hub
-// application card use this (see the file header comment for why).
-function PlaceholderCard({ kicker, title, caption, style }) {
+// application card use this (see the file header comment for why). `note`
+// defaults to a plain "Coming soon." (Retention — no skill taxonomy exists
+// yet); the Application card passes its own "Phase 2" wording since that one
+// needs a cross-feature change (an idea<->course link in the Ideas Hub's own
+// schema), not just more time on this feature.
+function PlaceholderCard({ kicker, title, caption, note = "Coming soon.", style }) {
   return (
     <div style={{ ...card, ...style }}>
       <p style={eyebrow}>{kicker}</p>
       <h2 style={cardTitle}>{title}</h2>
       {caption && <p style={cardCaption}>{caption}</p>}
-      <div style={{ fontSize: 12.5, color: "var(--muted)", padding: caption ? "2px 0 0" : "0" }}>Coming soon.</div>
+      <div style={{ fontSize: 12.5, color: "var(--muted)", padding: caption ? "2px 0 0" : "0" }}>{note}</div>
     </div>
   );
 }
@@ -319,7 +323,7 @@ export default function LearnerDashboardPage() {
                   <KpiHolder label="Roadmap complete" value={`${roadmapPct}%`} hint={`${roadmapComplete} of ${visibleJourney.length}${visiblePosition ? ` · through ${POSITION_LABEL[visiblePosition] || visiblePosition}` : ""}`} />
                   <KpiHolder label="Level" value={POSITION_LABEL[position] || "—"} hint={levelHint} />
                   <KpiHolder label="Weekly streak" />
-                  <KpiHolder label="Skills applied" accent />
+                  <KpiHolder label="Skills applied" hint="Coming soon · Phase 2" accent />
                 </div>
 
                 {/* ── Learning + side column ── */}
@@ -383,6 +387,7 @@ export default function LearnerDashboardPage() {
                   kicker="Application · AI Ideas Hub"
                   title="What I've built from what I learned"
                   caption="Each idea will link back to the course or skill it came from."
+                  note="Coming soon · Phase 2 — needs an idea↔course link on the Ideas Hub side."
                   style={{ marginBottom: 16 }}
                 />
 
