@@ -1,16 +1,38 @@
 "use client";
 
-// Team view (admin only): a roll-up of every enrolled learner's progress,
-// with a read-only drill-down into any one person's roadmap.
+// Team view (admin only): rebuilt to follow the "AI Learning dashboards"
+// mockup's Team View tab (repo root, manager view) — same relationship
+// LearnerDashboardPage.jsx already has to that mockup's "My Progress" tab.
+// KPI row, a "Needs support" card, the roster table (now with Level→target/
+// Pace/Avg exam columns), a skills heatmap, and a level-distribution chart
+// are all real, derived from data that already exists — no new schema.
+//
+// Two mockup pieces stay out, for the same honest-data reason the Learner
+// Dashboard's own Application card does: "Ideas shipped" (KPI) and the
+// "Application · Ideas Hub" funnel both need an idea<->course link that
+// lives in the Ideas Hub's own schema, not this feature's — nothing here
+// can compute them yet.
+//
+// The mockup's "Needs support" card flags three categories (Stalled,
+// Struggling, Stuck) with fabricated-sounding thresholds ("two exam scores
+// below 70%"). This app has no notion of a passing quiz score anywhere — the
+// wrap-up quiz is deliberately un-scored/un-gated (03-your-journey.md) — so
+// "Struggling"/"Stuck" would mean inventing a threshold with no basis in the
+// product. Only "Stalled" (in_progress, untouched 21+ days — already
+// computed server-side) is real here; that's the one category this card
+// shows, one row per person instead of the two-examples-squeezed-into-a-
+// stat-card-hint it used to be.
+//
+// Skills heatmap and the roster's "Avg exam" column reuse skillConfidence()/
+// avgExamScore() (shared.js) — the exact same formulas the learner's own
+// Dashboard uses for "Confidence by skill"/"Avg exam score" — computed
+// client-side per member off the lean `courses` array getTeamOverview() now
+// returns per row (features/learning/queries.js), not a second copy of that
+// math in SQL.
 //
 // Access: reuses accounts.role = 'admin', the same gate as Dashboard/Manage/
 // Activity — this app has no manager/report hierarchy, so it's org-wide
 // ("any admin sees every learner"), not scoped to "my direct reports".
-//
-// Stats and the roster are all computed from data that already exists
-// (account_tracks, user_role, courses, course_assignments) — no new schema.
-// "Stalled" = an in_progress course whose status hasn't moved in 21+ days
-// (course_assignments.updated_at), computed server-side in getTeamOverview.
 //
 // Deliberately does NOT include a "Sync courses" control — that's the
 // Google Sheets catalog-sync pipeline from the original spec, which was
@@ -23,9 +45,15 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, POSITION_LABEL, th, td, relTime, formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY } from "@/features/learning/shared";
+import {
+  card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, th, td, relTime,
+  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, skillConfidence, avgExamScore,
+} from "@/features/learning/shared";
 import { JourneyTable } from "@/features/learning/JourneyPage";
 import ProgressBar from "@/features/learning/ProgressBar";
+
+const cardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" };
+const cardCaption = { fontSize: 12, color: "var(--muted)", margin: "0 0 14px" };
 
 // Admin-only inline editor for the app-wide annual review date (an
 // app_settings row — ANNUAL_REVIEW_DATE in features/admin/queries.js). Auto
@@ -93,30 +121,72 @@ function AnnualReviewEditor({ value, onSave }) {
 const trackLabel = (tracks) => (!tracks || tracks.length === 0 ? "—" : tracks.join(" + "));
 const pctOf = (m) => (m.core_total ? Math.round((m.core_complete / m.core_total) * 100) : 0);
 
-function StatCard({ label, value, hint }) {
+// "Intern → Junior" style label for the roster's Level column — same ladder
+// (POSITION_ORDER, shared.js) the Learner Dashboard's own "Level" KPI walks
+// (levelHint, LearnerDashboardPage.jsx), just rendered as one compact string
+// here since this is a table cell, not a KPI tile.
+function levelTarget(position) {
+  if (!position) return "—";
+  const label = POSITION_LABEL[position] || position;
+  const idx = POSITION_ORDER.indexOf(position);
+  if (idx === -1) return label;
+  const next = POSITION_ORDER[idx + 1];
+  return next ? `${label} → ${POSITION_LABEL[next] || next}` : `${label} · top`;
+}
+
+// Whether `dateVal` falls within the last `days` days — used for "Active
+// this week". A plain rolling window, not weeklyStreak's own Mon–Sun
+// boundary (shared.js) — there's no streak concept here, just "has this
+// person touched anything recently."
+function withinDays(dateVal, days) {
+  if (!dateVal) return false;
+  return Date.now() - new Date(dateVal).getTime() < days * 86400000;
+}
+
+// Top KPI row — same 4 tiles the mockup shows. `accent` gives the last tile
+// the mockup's dark navy treatment, same shape as the Learner Dashboard's
+// own KpiHolder (LearnerDashboardPage.jsx) — kept as its own copy here
+// rather than a shared import, matching how this file already had its own
+// StatCard before this pass.
+function KpiTile({ label, value, hint, accent }) {
   return (
-    <div style={{ ...card, flex: "1 1 220px" }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
-      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 28, color: "var(--ink)", marginBottom: 6 }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>{hint}</div>
+    <div style={{
+      ...card, flex: "1 1 220px", padding: "16px 18px",
+      ...(accent ? { background: "var(--navy)", borderColor: "var(--navy)" } : {}),
+    }}>
+      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 11.5, letterSpacing: 0.6, textTransform: "uppercase", color: accent ? "#8fa6c2" : "var(--muted)" }}>{label}</div>
+      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 30, letterSpacing: -0.3, margin: "6px 0 2px", color: accent ? "#fff" : "var(--ink)" }}>{value ?? "—"}</div>
+      <div style={{ fontSize: 12, color: accent ? "#b9c6d8" : "var(--muted)" }}>{hint || "Coming soon"}</div>
     </div>
+  );
+}
+
+// Roster's Pace column — "Stalled" is the one real signal (server-computed,
+// getTeamOverview). No fabricated middle "Behind" state — see file header
+// comment for why: there's no tracked pacing target to compare against.
+function PacePill({ stalled }) {
+  return (
+    <span style={{
+      fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap",
+      background: stalled ? "#fff4e0" : "#e6f4ea", color: stalled ? "#a15c00" : "#1f7a3c",
+    }}>
+      {stalled ? "Stalled" : "On track"}
+    </span>
   );
 }
 
 function MemberRow({ member, onOpen }) {
   const pct = pctOf(member);
+  const exam = avgExamScore(member.courses || []);
   return (
     <tr style={{ borderTop: "1px solid var(--line)", cursor: "pointer" }} onClick={() => onOpen(member)}>
       <td style={td}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar person={member} size={28} />
           <span style={{ fontWeight: 700, color: "var(--ink)" }}>{member.name || member.username}</span>
-          {member.stalled && (
-            <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "2px 8px", background: "#fff4e0", color: "#a15c00" }}>Stalled</span>
-          )}
         </div>
       </td>
-      <td style={td}>{POSITION_LABEL[member.position] || member.position || "—"}</td>
+      <td style={td}>{levelTarget(member.position)}</td>
       <td style={td}>{trackLabel(member.tracks)}</td>
       <td style={td}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -125,9 +195,158 @@ function MemberRow({ member, onOpen }) {
         </div>
       </td>
       <td style={td}>{member.in_progress_count}</td>
+      <td style={td}><PacePill stalled={member.stalled} /></td>
+      <td style={{ ...td, textAlign: "right" }}>{exam != null ? `${exam}%` : "—"}</td>
       <td style={td}>{relTime(member.last_activity)}</td>
       <td style={{ ...td, textAlign: "right", color: "var(--muted)" }}>›</td>
     </tr>
+  );
+}
+
+// "Needs support" — one row per stalled person (real signal: an in_progress
+// course untouched 21+ days, computed server-side). A real "View roadmap"
+// action (opens the same drill-down a roster row does), not the mockup's
+// decorative "Book a 1:1 · pair with buddy" button — nothing in this app
+// could actually do that.
+function NeedsSupportRow({ member, onOpen }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <Avatar person={member} size={28} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{member.name || member.username}</div>
+          <div style={{ fontSize: 12, color: "var(--muted)" }}>
+            Last active {relTime(member.last_activity)} · {member.stalled_course ? `stuck on "${member.stalled_course}"` : "an in-progress course"}
+          </div>
+        </div>
+      </div>
+      <button
+        onClick={() => onOpen(member)}
+        style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "var(--body)", cursor: "pointer", flexShrink: 0 }}
+      >
+        View roadmap
+      </button>
+    </div>
+  );
+}
+
+function NeedsSupportCard({ members, onOpen }) {
+  const stalled = members.filter((m) => m.stalled);
+  return (
+    <div style={{ ...card, marginBottom: 18 }}>
+      <p style={eyebrow}>Needs support</p>
+      <h2 style={cardTitle}>Where you can help this week</h2>
+      {stalled.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Nothing stalled — everyone's active.</div>
+      ) : (
+        <div>{stalled.map((m) => <NeedsSupportRow key={m.id} member={m} onOpen={onOpen} />)}</div>
+      )}
+    </div>
+  );
+}
+
+// Bucket a 0-100 confidence % into the mockup's 4-step heat scale — None (no
+// engaged courses for this skill yet, not a fabricated 0), Learning,
+// Proficient, Strong. Colors step from --line (this app's own "empty" token
+// — the individual Confidence meter's unfilled segments already use it) up
+// to --blue, the same two tokens the rest of this feature's meters use — no
+// new hues introduced for this one chart.
+const HEAT_COLORS = ["var(--line)", "#CFE0FF", "#6D9BFF", "var(--blue)"];
+const HEAT_LABELS = ["None", "Learning", "Proficient", "Strong"];
+function heatBucket(pct) {
+  if (pct == null) return 0;
+  if (pct < 40) return 1;
+  if (pct < 75) return 2;
+  return 3;
+}
+
+// One row per skill (courses.skills, migration 028), one column per member —
+// each cell colored by that member's own skillConfidence() (shared.js) for
+// that skill, the exact same per-skill percentage the Learner Dashboard's
+// own Retention card renders as a dot meter, bucketed here into 4 steps and
+// laid out as a grid so gaps across the team are visible at a glance. Skills
+// shown are whichever the team's own courses are actually tagged with (no
+// hardcoded list), sorted by team-wide average confidence, strongest first.
+function SkillHeatmap({ members }) {
+  const byMember = new Map(members.map((m) => [m.id, skillConfidence(m.courses || [])]));
+  const skillTotals = new Map(); // skill -> [pct, pct, ...] across members with any signal for it
+  for (const rows of byMember.values()) {
+    for (const r of rows) {
+      if (!skillTotals.has(r.skill)) skillTotals.set(r.skill, []);
+      skillTotals.get(r.skill).push(r.pct);
+    }
+  }
+  const skills = [...skillTotals.entries()]
+    .map(([skill, pcts]) => ({ skill, avg: pcts.reduce((a, b) => a + b, 0) / pcts.length }))
+    .sort((a, b) => b.avg - a.avg)
+    .map((s) => s.skill);
+
+  if (skills.length === 0) {
+    return <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No one has started a tagged course yet.</div>;
+  }
+
+  const pctFor = (memberId, skill) => (byMember.get(memberId) || []).find((r) => r.skill === skill)?.pct ?? null;
+
+  return (
+    <>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "separate", borderSpacing: 4 }}>
+          <thead>
+            <tr>
+              <th style={{ width: 120 }} />
+              {members.map((m) => (
+                <th key={m.id} style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", padding: "0 2px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
+                  {(m.name || m.username).split(" ")[0]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {skills.map((skill) => (
+              <tr key={skill}>
+                <td style={{ fontSize: 12, fontWeight: 600, color: "var(--navy)", padding: "0 8px 0 0", whiteSpace: "nowrap" }}>{skill}</td>
+                {members.map((m) => {
+                  const pct = pctFor(m.id, skill);
+                  return (
+                    <td key={m.id} style={{ padding: 0 }} title={`${m.name || m.username} · ${skill}: ${pct != null ? `${pct}%` : "no data yet"}`}>
+                      <div style={{ width: 30, height: 26, borderRadius: 6, background: HEAT_COLORS[heatBucket(pct)] }} />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ display: "flex", gap: 14, marginTop: 12, fontSize: 11.5, color: "var(--muted)", flexWrap: "wrap" }}>
+        {HEAT_LABELS.map((label, i) => (
+          <span key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 14, height: 14, borderRadius: 4, background: HEAT_COLORS[i], display: "inline-block" }} />
+            {label}
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// Count of enrolled learners at each seniority level — plain group-by-count
+// over the same POSITION_ORDER ladder every other gating rule in this
+// feature uses, not a new taxonomy. Bar height is relative to the largest
+// bucket, not a fixed scale, so this reads sensibly at any team size.
+function LevelDistribution({ members }) {
+  const counts = POSITION_ORDER.map((p) => ({ position: p, count: members.filter((m) => m.position === p).length }));
+  const max = Math.max(1, ...counts.map((c) => c.count));
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 120, marginTop: 8, paddingTop: 6 }}>
+      {counts.map((c) => (
+        <div key={c.position} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
+          <div style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 13, color: "var(--ink)" }}>{c.count}</div>
+          <div style={{ width: "70%", height: `${Math.max(4, (c.count / max) * 100)}%`, background: "var(--navy)", borderRadius: "8px 8px 0 0" }} />
+          <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>{POSITION_LABEL[c.position] || c.position}</div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -209,6 +428,10 @@ export default function TeamPage() {
   else if (sortBy === "pct_asc") rows = [...rows].sort((a, b) => pctOf(a) - pctOf(b));
   else if (sortBy === "name") rows = [...rows].sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username));
 
+  // Track-combination breakdown ("3 on AI Track · 2 on AI Track + Core
+  // Competency") — folded into the Team progress caption below rather than
+  // its own KPI tile, so the KPI row can match the mockup's 4-tile set
+  // exactly (Team completion/Active this week/Avg exam score/Ideas shipped).
   const comboCounts = new Map();
   members.forEach((m) => {
     const key = trackLabel((m.tracks || []).slice().sort());
@@ -216,12 +439,29 @@ export default function TeamPage() {
   });
   const comboSummary = [...comboCounts.entries()].map(([label, count]) => `${count} on ${label}`).join(" · ");
 
+  // KPI: "Team completion" — pooled core-course completion across everyone,
+  // unfiltered by the roster's own track filter (same as every KPI/card on
+  // this page — that filter only ever scoped the table itself, same
+  // precedent as the Mind map's own independent filter on the Learner
+  // Dashboard). No "+X% MoM" trend, on purpose — same reasoning as the
+  // Learner Dashboard's "Roadmap complete" KPI: no snapshot history exists,
+  // and a fabricated delta would be worse than none.
   const totalCoreTotal = members.reduce((s, m) => s + m.core_total, 0);
   const totalCoreComplete = members.reduce((s, m) => s + m.core_complete, 0);
   const avgPct = totalCoreTotal ? Math.round((totalCoreComplete / totalCoreTotal) * 100) : 0;
 
-  const stalledMembers = members.filter((m) => m.stalled);
-  const stalledExamples = stalledMembers.slice(0, 2).map((m) => `${m.stalled_course || "a course"} · ${m.name || m.username}`).join(", ");
+  // KPI: "Active this week" — plain 7-day activity window (withinDays,
+  // above). A member who's never touched a course (last_activity null)
+  // counts as inactive, not excluded.
+  const activeCount = members.filter((m) => withinDays(m.last_activity, 7)).length;
+  const inactiveCount = members.length - activeCount;
+
+  // KPI: "Avg exam score" — avgExamScore (shared.js) over every member's
+  // courses flattened into one list, so this is one team-wide average
+  // rather than an average-of-per-member-averages (a member with more
+  // quiz-graded completions naturally weighs more, same as if this were one
+  // big list of completions to begin with rather than one list per person).
+  const teamAvgExamScore = avgExamScore(members.flatMap((m) => m.courses || []));
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
@@ -235,62 +475,100 @@ export default function TeamPage() {
           <>
             {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 18 }}>
-              <StatCard label="Learners" value={members.length} hint={comboSummary || "No one enrolled yet"} />
-              <StatCard label="Average completion" value={`${avgPct}%`} hint="Core courses expected by each learner's own level" />
-              <StatCard
-                label="In progress over 3 weeks"
-                value={stalledMembers.length}
-                hint={stalledMembers.length === 0 ? "Nothing stalled" : stalledExamples}
-              />
-            </div>
-
-            <section style={card}>
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
-                <div>
-                  <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", margin: "0 0 4px" }}>Team progress</h1>
-                  <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>Click a row to open that person's roadmap.</p>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <AnnualReviewEditor value={annualReviewDate} onSave={saveAnnualReviewDate} />
-                  <select value={trackFilter} onChange={(e) => setTrackFilter(e.target.value)} style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>
-                    <option value="all">All tracks</option>
-                    {trackOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>
-                    <option value="default">Default order</option>
-                    <option value="pct_desc">% complete (high → low)</option>
-                    <option value="pct_asc">% complete (low → high)</option>
-                    <option value="name">Name</option>
-                  </select>
-                </div>
-              </div>
-
-              {rows.length === 0 ? (
+            {members.length === 0 ? (
+              <div style={card}>
                 <div style={{ fontSize: 13, color: "var(--muted)" }}>No one enrolled in a track yet.</div>
-              ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ color: "var(--muted)" }}>
-                        <th style={th}>Name</th>
-                        <th style={th}>Level</th>
-                        <th style={th}>Track</th>
-                        <th style={th} title="Core courses complete, scoped to what's expected through this person's own level — not the whole roadmap">% Complete</th>
-                        <th style={th}>In Progress</th>
-                        <th style={th}>Last Activity</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((m) => <MemberRow key={m.id} member={m} onOpen={setSelected} />)}
-                    </tbody>
-                  </table>
+              </div>
+            ) : (
+              <>
+                {/* ── KPI row — Team completion/Active this week/Avg exam
+                    score wired to real data; Ideas shipped needs an
+                    idea↔course link (Ideas Hub), so it stays a placeholder —
+                    see the file header comment. ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
+                  <KpiTile label="Team completion" value={`${avgPct}%`} hint={`avg across ${members.length} learner${members.length === 1 ? "" : "s"}`} />
+                  <KpiTile label="Active this week" value={`${activeCount} / ${members.length}`} hint={inactiveCount === 0 ? "Everyone's active" : `${inactiveCount} inactive 7+ days`} />
+                  <KpiTile label="Avg exam score" value={teamAvgExamScore != null ? `${teamAvgExamScore}%` : "—"} hint="First-try accuracy, quiz-graded completions" />
+                  <KpiTile label="Ideas shipped" hint="Coming soon · Phase 2" accent />
                 </div>
-              )}
-            </section>
 
-            {selected && <MemberDrilldown member={selected} onClose={() => setSelected(null)} />}
+                <NeedsSupportCard members={members} onOpen={setSelected} />
+
+                <section style={card}>
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+                    <div>
+                      <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", margin: "0 0 4px" }}>Team progress</h1>
+                      <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>
+                        {comboSummary || "No one enrolled yet"} · click a row to open that person's roadmap.
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <AnnualReviewEditor value={annualReviewDate} onSave={saveAnnualReviewDate} />
+                      <select value={trackFilter} onChange={(e) => setTrackFilter(e.target.value)} style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>
+                        <option value="all">All tracks</option>
+                        {trackOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>
+                        <option value="default">Default order</option>
+                        <option value="pct_desc">% complete (high → low)</option>
+                        <option value="pct_asc">% complete (low → high)</option>
+                        <option value="name">Name</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {rows.length === 0 ? (
+                    <div style={{ fontSize: 13, color: "var(--muted)" }}>No one enrolled in this track.</div>
+                  ) : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ color: "var(--muted)" }}>
+                            <th style={th}>Name</th>
+                            <th style={th}>Level → target</th>
+                            <th style={th}>Track</th>
+                            <th style={th} title="Core courses complete, scoped to what's expected through this person's own level — not the whole roadmap">% Complete</th>
+                            <th style={th}>In Progress</th>
+                            <th style={th}>Pace</th>
+                            <th style={{ ...th, textAlign: "right" }} title="First-try accuracy across this person's completed, quiz-graded courses">Avg Exam</th>
+                            <th style={th}>Last Activity</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((m) => <MemberRow key={m.id} member={m} onOpen={setSelected} />)}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+
+                {/* ── Coverage + Distribution — mockup's two-column row ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 14, marginTop: 16 }}>
+                  <div style={card}>
+                    <p style={eyebrow}>Coverage</p>
+                    <h2 style={cardTitle}>Skills across the team</h2>
+                    <p style={cardCaption}>Spot gaps at a glance — darker means stronger.</p>
+                    <SkillHeatmap members={members} />
+                  </div>
+                  <div style={card}>
+                    <p style={eyebrow}>Distribution</p>
+                    <h2 style={cardTitle}>Where the team sits</h2>
+                    <p style={cardCaption}>Learners per seniority level.</p>
+                    <LevelDistribution members={members} />
+                  </div>
+                </div>
+
+                {/* ── Application · AI Ideas Hub (mockup card holder) ── */}
+                <div style={{ ...card, marginTop: 16 }}>
+                  <p style={eyebrow}>Application · AI Ideas Hub</p>
+                  <h2 style={cardTitle}>From learning to impact</h2>
+                  <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>Coming soon · Phase 2 — needs an idea↔course link on the Ideas Hub side.</p>
+                </div>
+
+                {selected && <MemberDrilldown member={selected} onClose={() => setSelected(null)} />}
+              </>
+            )}
           </>
         )}
       </main>

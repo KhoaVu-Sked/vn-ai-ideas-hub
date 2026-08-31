@@ -37,6 +37,14 @@ const POSITION_ORDER = POSITIONS;
 // roadmap) rather than 0/0 — same fallback isExpectedByNow() uses.
 // in_progress_count/stalled/last_activity stay UNSCOPED on purpose — those
 // are about engagement, not a graded "% expected done".
+//
+// courses (added for the Team view rebuild) is UNSCOPED by in_range too, and
+// deliberately lean — status/skills/quiz snapshot only, not the full course
+// row getJourney() returns. It exists so skillConfidence()/avgExamScore()
+// (shared.js) can run client-side per member for the "Skills across the
+// team" heatmap and the roster's "Avg exam" column, off the exact same
+// formula the learner's own Dashboard uses — not a second, SQL-side copy of
+// that math that could quietly drift from it.
 export async function getTeamOverview() {
   return sql`
     with track_names as (
@@ -46,7 +54,9 @@ export async function getTeamOverview() {
       group by acct.account_id
     ),
     eligible as (
-      select acct.account_id, c.title, c.priority, ca.status, ca.updated_at,
+      select acct.account_id, c.title, c.priority, c.skills,
+        coalesce(ca.status, 'not_started') as status, ca.updated_at,
+        ca.quiz_total_questions, ca.quiz_correct_first_try,
         (
           ur.position is null
           or array_position(${POSITION_ORDER}::text[], c.expected_by_position)
@@ -65,7 +75,16 @@ export async function getTeamOverview() {
         max(updated_at) as last_activity,
         bool_or(status = 'in_progress' and updated_at < now() - interval '21 days') as stalled,
         (array_agg(title order by updated_at asc)
-          filter (where status = 'in_progress' and updated_at < now() - interval '21 days'))[1] as stalled_course
+          filter (where status = 'in_progress' and updated_at < now() - interval '21 days'))[1] as stalled_course,
+        -- Lean per-course fields only (status/skills/quiz snapshot) — enough
+        -- for skillConfidence()/avgExamScore() (shared.js) to run client-side
+        -- on this same shape getJourney() already produces for the learner's
+        -- own Dashboard, so Team view's heatmap and "Avg exam" column reuse
+        -- that exact formula instead of a second copy of it in SQL.
+        json_agg(json_build_object(
+          'status', status, 'skills', skills,
+          'quiz_total_questions', quiz_total_questions, 'quiz_correct_first_try', quiz_correct_first_try
+        )) as courses
       from eligible
       group by account_id
     )
@@ -76,7 +95,8 @@ export async function getTeamOverview() {
       coalesce(p.in_progress_count, 0) as in_progress_count,
       p.last_activity,
       coalesce(p.stalled, false) as stalled,
-      p.stalled_course
+      p.stalled_course,
+      coalesce(p.courses, '[]') as courses
     from (select distinct account_id from account_tracks) e
     join accounts a on a.id = e.account_id
     left join user_role ur on ur.account_id = a.id

@@ -316,3 +316,19 @@ export function skillConfidence(courses) {
     })
     .sort((a, b) => b.pct - a.pct || a.skill.localeCompare(b.skill));
 }
+
+// First-try quiz accuracy (0-100), averaged across whichever of the given
+// courses are complete AND have a quiz snapshot — the same per-course ratio
+// courseStrength above uses, just flattened across a set of courses instead
+// of grouped by skill. Used for the Learner Dashboard's own "Avg exam score"
+// row and, unchanged, for Team view's per-member "Avg exam" column and its
+// team-wide KPI tile (features/learning/TeamPage.jsx) — one formula, three
+// call sites, rather than three copies that could quietly drift apart. Null
+// (not 0) when nothing in the set has a quiz snapshot yet, so a caller can
+// show "—" instead of a fabricated score.
+export function avgExamScore(courses) {
+  const scored = courses.filter((c) => c.status === "complete" && c.quiz_total_questions);
+  if (!scored.length) return null;
+  const avg = scored.reduce((sum, c) => sum + c.quiz_correct_first_try / c.quiz_total_questions, 0) / scored.length;
+  return Math.round(avg * 100);
+}

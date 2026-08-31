@@ -51,7 +51,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, effectivePosition, fmtDate,
   PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel, weeklyStreak,
-  skillConfidence, SKILL_CONFIDENCE_SCALE,
+  skillConfidence, SKILL_CONFIDENCE_SCALE, avgExamScore,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
@@ -254,16 +254,12 @@ export default function LearnerDashboardPage() {
   const streak = weeklyStreak(journey);
 
   // Retention card — "Confidence by skill" (skillConfidence, shared.js) plus
-  // its own "Avg exam score" footer row: the same first-try-accuracy ratio
-  // skillConfidence uses per course, just averaged across every completed,
-  // quiz-graded course instead of grouped by skill — the card's own overall
-  // number, same all-time scope as Consistency next to it (see that card's
-  // own comment for why "this month" isn't derivable).
+  // its own "Avg exam score" footer row (avgExamScore, shared.js — same
+  // formula Team view's roster column and KPI tile use), same all-time scope
+  // as Consistency next to it (see that card's own comment for why "this
+  // month" isn't derivable).
   const skillRows = skillConfidence(journey);
-  const examScored = completeCourses.filter((c) => c.quiz_total_questions);
-  const avgExamScore = examScored.length
-    ? Math.round((examScored.reduce((sum, c) => sum + c.quiz_correct_first_try / c.quiz_total_questions, 0) / examScored.length) * 100)
-    : null;
+  const myAvgExamScore = avgExamScore(journey);
 
   // What's next — same "upcoming" pick as Your Journey's Up next card (dated
   // soonest-first, then undated filling the roadmap's own order), just the
@@ -385,7 +381,7 @@ export default function LearnerDashboardPage() {
                       ) : (
                         <div>
                           {skillRows.map((s) => <SkillRow key={s.skill} skill={s.skill} dots={s.dots} />)}
-                          {avgExamScore != null && <MiniRow k="Avg exam score" v={`${avgExamScore}%`} />}
+                          {myAvgExamScore != null && <MiniRow k="Avg exam score" v={`${myAvgExamScore}%`} />}
                         </div>
                       )}
                     </div>
