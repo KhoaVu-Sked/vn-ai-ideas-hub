@@ -7,11 +7,15 @@
 // Pace/Avg exam columns), a skills heatmap, and a level-distribution chart
 // are all real, derived from data that already exists — no new schema.
 //
-// Two mockup pieces stay out, for the same honest-data reason the Learner
-// Dashboard's own Application card does: "Ideas shipped" (KPI) and the
-// "Application · Ideas Hub" funnel both need an idea<->course link that
-// lives in the Ideas Hub's own schema, not this feature's — nothing here
-// can compute them yet.
+// "Ideas shipped" (KPI) and the "Application · Ideas Hub" funnel read the
+// Ideas Hub's `ideas` table by OWNER and STATUS only
+// (ideas.initiator_account_id, ideas.status — see getTeamIdeas(),
+// features/learning/queries.js), scoped to currently-enrolled learners
+// (account_tracks). That's a real cross-feature read, but not the
+// idea<->course link that's still genuinely missing: nothing here can say
+// which course or skill a given idea came from, so the funnel below shows
+// the Ideas Hub's own real lifecycle (STATUS_ORDER, features/ideas/
+// constants.js) rather than per-idea skill attribution.
 //
 // The mockup's "Needs support" card flags three categories (Stalled,
 // Struggling, Stuck) with fabricated-sounding thresholds ("two exam scores
@@ -51,6 +55,7 @@ import {
 } from "@/features/learning/shared";
 import { JourneyTable } from "@/features/learning/JourneyPage";
 import ProgressBar from "@/features/learning/ProgressBar";
+import { STATUS_META, STATUS_ORDER } from "@/features/ideas/constants";
 
 const cardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" };
 const cardCaption = { fontSize: 12, color: "var(--muted)", margin: "0 0 14px" };
@@ -350,6 +355,56 @@ function LevelDistribution({ members }) {
   );
 }
 
+// One stage of the Application card's funnel — bar length relative to the
+// largest stage, colored by that status's own STATUS_META (features/ideas/
+// constants.js), same colors the Ideas Hub's own board uses.
+function StatusFunnelRow({ status, count, max }) {
+  const fg = (STATUS_META[status] || {}).fg || "var(--blue)";
+  const pct = max ? Math.round((count / max) * 100) : 0;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+      <span style={{ flex: "0 0 100px", fontSize: 12, color: "var(--muted)" }}>{status}</span>
+      <div style={{ flex: 1, height: 10, borderRadius: 999, background: "var(--line)", overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: fg, borderRadius: 999 }} />
+      </div>
+      <span style={{ flex: "0 0 24px", textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{count}</span>
+    </div>
+  );
+}
+
+// "From learning to impact" — real now: every idea initiated by a
+// currently-enrolled learner (getTeamIdeas, features/learning/queries.js),
+// bucketed into the Ideas Hub's own real lifecycle (STATUS_ORDER) rather
+// than the mockup's Submitted/In progress/Shipped/Adopted labels (this app
+// has no "Adopted" status). The mockup's own "62% of members who finished
+// Applied have shipped..." conversion rate needed level+skill attribution
+// this can't do; "% of learners who've submitted at least one idea" is the
+// honest substitute — owner + status only, same as everything else here.
+function LearningImpactCard({ members, ideas }) {
+  const counts = STATUS_ORDER.map((status) => ({ status, count: ideas.filter((i) => i.status === status).length }));
+  const max = Math.max(1, ...counts.map((c) => c.count));
+  const contributors = new Set(ideas.map((i) => i.initiator_account_id)).size;
+  const contributorPct = members.length ? Math.round((contributors / members.length) * 100) : 0;
+
+  return (
+    <div style={{ ...card, marginTop: 16 }}>
+      <p style={eyebrow}>Application · AI Ideas Hub</p>
+      <h2 style={cardTitle}>From learning to impact</h2>
+      {ideas.length === 0 ? (
+        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>No enrolled learner has submitted an idea yet.</p>
+      ) : (
+        <>
+          <p style={cardCaption}>Where enrolled learners' own Ideas Hub submissions stand today.</p>
+          <div>{counts.map((c) => <StatusFunnelRow key={c.status} status={c.status} count={c.count} max={max} />)}</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+            <b style={{ color: "var(--ink)" }}>{contributors} of {members.length} learners</b> ({contributorPct}%) have submitted at least one idea.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function MemberDrilldown({ member, onClose }) {
   const [courses, setCourses] = useState(null);
   const [err, setErr] = useState("");
@@ -389,6 +444,7 @@ export default function TeamPage() {
   const { user } = useSession();
   const me = user === undefined ? undefined : (user?.role === "admin" ? user : null);
   const [members, setMembers] = useState([]);
+  const [ideas, setIdeas] = useState([]);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
   const [trackFilter, setTrackFilter] = useState("all");
@@ -398,7 +454,11 @@ export default function TeamPage() {
 
   const load = useCallback(async () => {
     setErr("");
-    try { const { members: m } = await api("/api/team"); setMembers(m); } catch (e) { setErr(e.message); } finally { setReady(true); }
+    try {
+      const { members: m, ideas: i } = await api("/api/team");
+      setMembers(m);
+      setIdeas(i || []);
+    } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
 
   useEffect(() => { if (me) load(); }, [me, load]);
@@ -463,6 +523,11 @@ export default function TeamPage() {
   // big list of completions to begin with rather than one list per person).
   const teamAvgExamScore = avgExamScore(members.flatMap((m) => m.courses || []));
 
+  // KPI: "Ideas shipped" — count of enrolled-learner ideas that reached
+  // Launched (getTeamIdeas, features/learning/queries.js — owner + status
+  // only, see the file header comment).
+  const shippedCount = ideas.filter((i) => i.status === "Launched").length;
+
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <AppHeader crumb="Team view" />
@@ -481,15 +546,12 @@ export default function TeamPage() {
               </div>
             ) : (
               <>
-                {/* ── KPI row — Team completion/Active this week/Avg exam
-                    score wired to real data; Ideas shipped needs an
-                    idea↔course link (Ideas Hub), so it stays a placeholder —
-                    see the file header comment. ── */}
+                {/* ── KPI row — all four wired to real data. ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
                   <KpiTile label="Team completion" value={`${avgPct}%`} hint={`avg across ${members.length} learner${members.length === 1 ? "" : "s"}`} />
                   <KpiTile label="Active this week" value={`${activeCount} / ${members.length}`} hint={inactiveCount === 0 ? "Everyone's active" : `${inactiveCount} inactive 7+ days`} />
                   <KpiTile label="Avg exam score" value={teamAvgExamScore != null ? `${teamAvgExamScore}%` : "—"} hint="First-try accuracy, quiz-graded completions" />
-                  <KpiTile label="Ideas shipped" hint="Coming soon · Phase 2" accent />
+                  <KpiTile label="Ideas shipped" value={shippedCount} hint={`${ideas.length} submitted by learners`} accent />
                 </div>
 
                 <NeedsSupportCard members={members} onOpen={setSelected} />
@@ -559,12 +621,8 @@ export default function TeamPage() {
                   </div>
                 </div>
 
-                {/* ── Application · AI Ideas Hub (mockup card holder) ── */}
-                <div style={{ ...card, marginTop: 16 }}>
-                  <p style={eyebrow}>Application · AI Ideas Hub</p>
-                  <h2 style={cardTitle}>From learning to impact</h2>
-                  <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>Coming soon · Phase 2 — needs an idea↔course link on the Ideas Hub side.</p>
-                </div>
+                {/* ── Application · AI Ideas Hub ── */}
+                <LearningImpactCard members={members} ideas={ideas} />
 
                 {selected && <MemberDrilldown member={selected} onClose={() => setSelected(null)} />}
               </>

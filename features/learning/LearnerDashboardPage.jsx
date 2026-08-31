@@ -16,10 +16,20 @@
 // credit for in_progress, and not-started/skipped courses excluded rather
 // than dragging the average toward 0.
 //
-// Skills applied (KPI) and the full-width Application card stay placeholders
-// for a different reason: both need an idea<->course link, which lives in
-// the Ideas Hub's schema (the `ideas` table), not this feature's — left
-// alone on purpose, see the chat for why.
+// "Ideas shipped" (KPI, renamed from the mockup's "Skills applied") and the
+// full-width Application card read the Ideas Hub's `ideas` table by OWNER
+// and STATUS only (ideas.initiator_account_id, ideas.status) — both already
+// point at the same shared accounts table course_assignments does, so this
+// needed no new column, no new table, and no idea<->course link. That link
+// (which idea came from which course/skill) still doesn't exist — the
+// mockup's own "From Prompting + Summarizing" per-idea attribution isn't
+// shown here for that reason, and the KPI is named for what's actually
+// counted (ideas launched) rather than "skills applied," which this can't
+// measure. STATUS_META/STATUS_ORDER (features/ideas/constants.js) are
+// imported for this the same way POSITIONS is already imported from
+// features/accounts/constants (features/learning/queries.js) — reusing the
+// Ideas Hub's own status vocabulary/colors rather than a second, driftable
+// copy of it.
 //
 // Weekly streak (weeklyStreak, shared.js) is scoped to courses actually
 // booked through Auto Schedule (calendar_event_id set) — Auto Schedule is
@@ -43,6 +53,7 @@
 // back).
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
@@ -56,6 +67,7 @@ import {
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
 import { JourneyTable } from "@/features/learning/JourneyPage";
+import { STATUS_META } from "@/features/ideas/constants";
 
 const cardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" };
 const cardCaption = { fontSize: 12, color: "var(--muted)", margin: "0 0 14px" };
@@ -63,9 +75,9 @@ const cardCaption = { fontSize: 12, color: "var(--muted)", margin: "0 0 14px" };
 // ── New (mockup-driven) pieces below ────────────────────────────────────
 
 // Top KPI row — same 4 tiles the mockup shows. `accent` gives the last tile
-// the mockup's dark navy treatment. Wired tiles pass `value`/`hint`; the
-// ones with no honest data behind them yet (Weekly streak, Skills applied —
-// see the file header comment) omit both and fall back to a dash +
+// the mockup's dark navy treatment. All four are wired to real data now
+// (`value`/`hint`); a tile with nothing to show yet (e.g. Ideas shipped
+// before the learner's ever submitted one) falls back to a dash +
 // "Coming soon" rather than a fabricated number.
 function KpiHolder({ label, value, hint, accent }) {
   return (
@@ -76,24 +88,6 @@ function KpiHolder({ label, value, hint, accent }) {
       <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 11.5, letterSpacing: 0.6, textTransform: "uppercase", color: accent ? "#8fa6c2" : "var(--muted)" }}>{label}</div>
       <div style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 30, letterSpacing: -0.3, margin: "6px 0 2px", color: accent ? "#fff" : "var(--ink)" }}>{value ?? "—"}</div>
       <div style={{ fontSize: 12, color: accent ? "#b9c6d8" : "var(--muted)" }}>{hint || "Coming soon"}</div>
-    </div>
-  );
-}
-
-// A card whose chrome (kicker/title/caption) matches the mockup but whose
-// body isn't wired up to real data yet — Retention and the Ideas Hub
-// application card use this (see the file header comment for why). `note`
-// defaults to a plain "Coming soon." (Retention — no skill taxonomy exists
-// yet); the Application card passes its own "Phase 2" wording since that one
-// needs a cross-feature change (an idea<->course link in the Ideas Hub's own
-// schema), not just more time on this feature.
-function PlaceholderCard({ kicker, title, caption, note = "Coming soon.", style }) {
-  return (
-    <div style={{ ...card, ...style }}>
-      <p style={eyebrow}>{kicker}</p>
-      <h2 style={cardTitle}>{title}</h2>
-      {caption && <p style={cardCaption}>{caption}</p>}
-      <div style={{ fontSize: 12.5, color: "var(--muted)", padding: caption ? "2px 0 0" : "0" }}>{note}</div>
     </div>
   );
 }
@@ -151,6 +145,26 @@ function NextRow({ icon, title, detail }) {
   );
 }
 
+// One of the learner's own Ideas Hub submissions — Application card. Links
+// to the real idea page; status pill reuses STATUS_META (features/ideas/
+// constants.js) so it matches the Ideas Hub's own board colors exactly,
+// rather than a second palette invented for this one card.
+function IdeaRow({ idea }) {
+  const meta = STATUS_META[idea.status] || { bg: "#eef0f4", fg: "#5e687a" };
+  return (
+    <Link
+      href={`/idea/${idea.id}`}
+      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--line)", textDecoration: "none" }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{idea.name}</div>
+        <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{idea.number}</div>
+      </div>
+      <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap", background: meta.bg, color: meta.fg }}>{idea.status}</span>
+    </Link>
+  );
+}
+
 // One row of the "Progress by level" breakdown — completion for a whole
 // progress level (Foundations/Applied/Intermediate/Advanced) across every
 // enrolled track (not scoped to isExpectedByNow, unlike the stat
@@ -180,6 +194,7 @@ export default function LearnerDashboardPage() {
   const [journey, setJourney] = useState([]);
   const [position, setPosition] = useState(null);
   const [recentCompletions, setRecentCompletions] = useState([]);
+  const [ideas, setIdeas] = useState([]);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState("all");
@@ -199,6 +214,14 @@ export default function LearnerDashboardPage() {
 
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
+
+  // The Application card's own data — a separate, small fetch rather than
+  // folded into /api/journey above: Your Journey (JourneyPage.jsx) calls
+  // that same endpoint and has no use for ideas, so this stays out of it.
+  useEffect(() => {
+    if (!me) return;
+    api("/api/journey/ideas").then(({ ideas: i }) => setIdeas(i || [])).catch(() => {});
+  }, [me]);
 
   // Derived straight from the journey data already on hand — no extra fetch,
   // same pattern JourneyPage uses for its own track filter.
@@ -289,6 +312,12 @@ export default function LearnerDashboardPage() {
       ? `Target: ${POSITION_LABEL[nextPosition] || nextPosition} · ${POSITION_ORDER.length - 1 - posIdx} stage${POSITION_ORDER.length - 1 - posIdx === 1 ? "" : "s"} left`
       : "Top of the ladder";
 
+  // KPI: "Ideas shipped" — count of the learner's own Ideas Hub submissions
+  // (ideas.initiator_account_id) that reached Launched (ideas.status). See
+  // the file header comment for why this is owner+status only, not a
+  // fabricated skill-level "applied" count.
+  const shippedIdeas = ideas.filter((i) => i.status === "Launched").length;
+
   // JourneyTable already reorders itself locally for instant feedback (same
   // component Your Journey uses); this just persists it. No reload — see
   // JourneyPage's own reorderStage for why.
@@ -328,15 +357,12 @@ export default function LearnerDashboardPage() {
               </div>
             ) : (
               <>
-                {/* ── KPI row — Roadmap complete/Level/Weekly streak wired to
-                    real data; Skills applied needs an idea↔course link
-                    (Ideas Hub), so it stays a placeholder — see the file
-                    header comment. ── */}
+                {/* ── KPI row — all four wired to real data. ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
                   <KpiHolder label="Roadmap complete" value={`${roadmapPct}%`} hint={`${roadmapComplete} of ${visibleJourney.length}${visiblePosition ? ` · through ${POSITION_LABEL[visiblePosition] || visiblePosition}` : ""}`} />
                   <KpiHolder label="Level" value={POSITION_LABEL[position] || "—"} hint={levelHint} />
                   <KpiHolder label="Weekly streak" value={`${streak} wk${streak === 1 ? "" : "s"}`} hint="From Auto Schedule sessions" />
-                  <KpiHolder label="Skills applied" hint="Coming soon · Phase 2" accent />
+                  <KpiHolder label="Ideas shipped" value={shippedIdeas} hint={`${ideas.length} submitted total`} accent />
                 </div>
 
                 {/* ── Learning + side column ── */}
@@ -408,14 +434,17 @@ export default function LearnerDashboardPage() {
                   </div>
                 </div>
 
-                {/* ── Application · AI Ideas Hub (mockup card holder) ── */}
-                <PlaceholderCard
-                  kicker="Application · AI Ideas Hub"
-                  title="What I've built from what I learned"
-                  caption="Each idea will link back to the course or skill it came from."
-                  note="Coming soon · Phase 2 — needs an idea↔course link on the Ideas Hub side."
-                  style={{ marginBottom: 16 }}
-                />
+                {/* ── Application · AI Ideas Hub ── */}
+                <div style={{ ...card, marginBottom: 16 }}>
+                  <p style={eyebrow}>Application · AI Ideas Hub</p>
+                  <h2 style={cardTitle}>What I've built from what I learned</h2>
+                  <p style={cardCaption}>Ideas you've submitted to the Ideas Hub — not yet linked back to the specific course or skill each one came from.</p>
+                  {ideas.length === 0 ? (
+                    <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Nothing submitted yet.</div>
+                  ) : (
+                    <div>{ideas.map((idea) => <IdeaRow key={idea.id} idea={idea} />)}</div>
+                  )}
+                </div>
 
                 <section style={card}>
                   <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>

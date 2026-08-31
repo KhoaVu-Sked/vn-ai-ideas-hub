@@ -106,6 +106,47 @@ export async function getTeamOverview() {
   `;
 }
 
+// ── Ideas Hub cross-reference ("Application" cards) ────────────────
+//
+// Not the idea<->course/skill link that's still genuinely missing (an idea
+// doesn't say which course or skill it came from — see
+// ai-learning-requirements/04-learner-dashboard.md and 09-out-of-scope.md).
+// This only needs an idea's OWNER (ideas.initiator_account_id) and its
+// STATUS, both already on the ideas table and both already pointing at the
+// same shared accounts table course_assignments does — no new column, no
+// new table, just a query that reads across two features' tables in the one
+// database they both already live in. STATUS_META/STATUS_ORDER
+// (features/ideas/constants.js) is imported the same way this file already
+// imports POSITIONS from features/accounts/constants above, so the funnel
+// this feeds uses the Ideas Hub's own real lifecycle instead of a
+// hand-copied (and driftable) second list of statuses.
+
+// The caller's own Ideas Hub submissions — Learner Dashboard's Application
+// card ("What I've built from what I learned"). Ordered newest-first, same
+// as the Ideas Hub's own board default.
+export async function getMyIdeas(accountId) {
+  return sql`
+    select id, name, status, 'IDEA-' || lpad(coalesce(seq, 0)::text, 3, '0') as number
+    from ideas
+    where initiator_account_id = ${accountId}
+    order by created_at desc
+  `;
+}
+
+// Every idea initiated by a currently-enrolled learner (account_tracks) —
+// lean (status + owner only), for Team view's "Ideas shipped" KPI and its
+// Application card. Aggregated client-side (status funnel, shipped count,
+// % of learners with at least one idea) the same way skillConfidence()/
+// avgExamScore() are, off the roster TeamPage.jsx already has — not a
+// second copy of "what counts as shipped" logic in SQL.
+export async function getTeamIdeas() {
+  return sql`
+    select status, initiator_account_id
+    from ideas
+    where initiator_account_id in (select distinct account_id from account_tracks)
+  `;
+}
+
 // Suggested-tracks cards on the Learning Hub — name, course count, whether
 // this account is already assigned to it, and how many of its courses this
 // account has completed (so the card can say "Completed" instead of

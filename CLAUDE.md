@@ -16,6 +16,8 @@ I'm Khoa Vu, a Technical Support Engineer at Skedulo. I lead an internal initiat
 
 This repo also hosts a second, largely independent feature — **AI Learning** (`/learning-hub/*`): course tracks, a learner's roadmap, wrap-up quizzes, a Learner Dashboard, a Team view, and Auto Schedule (real Google Calendar booking). It has its own requirements doc, split by feature so a session only has to read what's relevant to the change at hand — **start at [`ai-learning-requirements/00-overview.md`](ai-learning-requirements/00-overview.md)**. It's short, and its routing table sends you to the one or two files that actually matter; don't read the whole directory for a small, single-feature change.
 
+One deliberate exception to "independent": both dashboards' Application cards read the Ideas Hub's own `ideas` table (owner + status only — `initiator_account_id`/`status`, and `features/ideas/constants.js`'s status vocabulary/colors) for "ideas shipped by learners." Renaming an idea status reaches AI Learning too now — see `docs/change-map.md`.
+
 ## Before changing anything — read this first
 
 **Read [`docs/change-map.md`](docs/change-map.md) before editing code.** It lists
