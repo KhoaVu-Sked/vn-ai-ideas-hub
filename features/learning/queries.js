@@ -9,11 +9,12 @@ import { POSITIONS } from "@/features/accounts/constants";
 const POSITION_ORDER = POSITIONS;
 
 // Team view (admin only): one row per account enrolled in at least one
-// track, with enough to render the roster table and the three stat cards
-// without a second query. "Stalled" = an in_progress course whose status
-// hasn't moved in 21+ days (course_assignments.updated_at); stalled_course
-// names the oldest such course, for the "In progress over 3 weeks" card's
-// example line. Drill-down reuses getJourney(accountId) below — it was
+// track, with enough to render the roster table and the KPI row/Needs
+// support card without a second query. "Stalled" = an in_progress course
+// whose status hasn't moved in 28+ days (course_assignments.updated_at);
+// stalled_course names the oldest such course, for the Needs support
+// card's per-person line and the roster's Pace column. Drill-down reuses
+// getJourney(accountId) below — it was
 // already generic on accountId, not hardcoded to the caller.
 //
 // core_total/core_complete are scoped to what's actually expected of each
@@ -73,9 +74,9 @@ export async function getTeamOverview() {
         count(*) filter (where priority = 'core' and in_range and status = 'complete')::int as core_complete,
         count(*) filter (where status = 'in_progress')::int as in_progress_count,
         max(updated_at) as last_activity,
-        bool_or(status = 'in_progress' and updated_at < now() - interval '21 days') as stalled,
+        bool_or(status = 'in_progress' and updated_at < now() - interval '28 days') as stalled,
         (array_agg(title order by updated_at asc)
-          filter (where status = 'in_progress' and updated_at < now() - interval '21 days'))[1] as stalled_course,
+          filter (where status = 'in_progress' and updated_at < now() - interval '28 days'))[1] as stalled_course,
         -- Lean per-course fields only (status/skills/quiz snapshot) — enough
         -- for skillConfidence()/avgExamScore() (shared.js) to run client-side
         -- on this same shape getJourney() already produces for the learner's

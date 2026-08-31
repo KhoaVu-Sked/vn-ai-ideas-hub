@@ -22,7 +22,7 @@
 // below 70%"). This app has no notion of a passing quiz score anywhere — the
 // wrap-up quiz is deliberately un-scored/un-gated (03-your-journey.md) — so
 // "Struggling"/"Stuck" would mean inventing a threshold with no basis in the
-// product. Only "Stalled" (in_progress, untouched 21+ days — already
+// product. Only "Stalled" (in_progress, untouched 28+ days — already
 // computed server-side) is real here; that's the one category this card
 // shows, one row per person instead of the two-examples-squeezed-into-a-
 // stat-card-hint it used to be.
@@ -166,21 +166,34 @@ function KpiTile({ label, value, hint, accent }) {
   );
 }
 
-// Roster's Pace column — "Stalled" is the one real signal (server-computed,
-// getTeamOverview). No fabricated middle "Behind" state — see file header
-// comment for why: there's no tracked pacing target to compare against.
-function PacePill({ stalled }) {
+// Roster's Pace column — three real states, no fabricated ones:
+//   - "Stalled" — server-computed (getTeamOverview): an in_progress course
+//     untouched 28+ days. Takes priority over Behind below — going quiet
+//     entirely is the more urgent signal than trailing the team average.
+//   - "Behind" — this person's own % Complete (pctOf) is below the team's
+//     average (the same average the "Team completion" KPI shows) — a real,
+//     already-computed benchmark, not an invented fixed target.
+//   - "On track" — neither of the above.
+function paceFor(member, teamAvgPct) {
+  if (member.stalled) return "stalled";
+  return pctOf(member) < teamAvgPct ? "behind" : "on_track";
+}
+
+const PACE_META = {
+  stalled: { label: "Stalled", bg: "#fff4e0", fg: "#a15c00" },
+  behind: { label: "Behind", bg: "#fdeaea", fg: "#c92a2a" },
+  on_track: { label: "On track", bg: "#e6f4ea", fg: "#1f7a3c" },
+};
+function PacePill({ pace }) {
+  const meta = PACE_META[pace];
   return (
-    <span style={{
-      fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap",
-      background: stalled ? "#fff4e0" : "#e6f4ea", color: stalled ? "#a15c00" : "#1f7a3c",
-    }}>
-      {stalled ? "Stalled" : "On track"}
+    <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap", background: meta.bg, color: meta.fg }}>
+      {meta.label}
     </span>
   );
 }
 
-function MemberRow({ member, onOpen }) {
+function MemberRow({ member, teamAvgPct, onOpen }) {
   const pct = pctOf(member);
   const exam = avgExamScore(member.courses || []);
   return (
@@ -200,7 +213,7 @@ function MemberRow({ member, onOpen }) {
         </div>
       </td>
       <td style={td}>{member.in_progress_count}</td>
-      <td style={td}><PacePill stalled={member.stalled} /></td>
+      <td style={td}><PacePill pace={paceFor(member, teamAvgPct)} /></td>
       <td style={{ ...td, textAlign: "right" }}>{exam != null ? `${exam}%` : "—"}</td>
       <td style={td}>{relTime(member.last_activity)}</td>
       <td style={{ ...td, textAlign: "right", color: "var(--muted)" }}>›</td>
@@ -209,7 +222,7 @@ function MemberRow({ member, onOpen }) {
 }
 
 // "Needs support" — one row per stalled person (real signal: an in_progress
-// course untouched 21+ days, computed server-side). A real "View roadmap"
+// course untouched 28+ days, computed server-side). A real "View roadmap"
 // action (opens the same drill-down a roster row does), not the mockup's
 // decorative "Book a 1:1 · pair with buddy" button — nothing in this app
 // could actually do that.
@@ -596,14 +609,14 @@ export default function TeamPage() {
                             <th style={th}>Track</th>
                             <th style={th} title="Core courses complete, scoped to what's expected through this person's own level — not the whole roadmap">% Complete</th>
                             <th style={th}>In Progress</th>
-                            <th style={th}>Pace</th>
+                            <th style={th} title="Stalled: an in-progress course untouched 28+ days. Behind: % Complete below the team's own average.">Pace</th>
                             <th style={{ ...th, textAlign: "right" }} title="First-try accuracy across this person's completed, quiz-graded courses">Avg Exam</th>
                             <th style={th}>Last Activity</th>
                             <th />
                           </tr>
                         </thead>
                         <tbody>
-                          {rows.map((m) => <MemberRow key={m.id} member={m} onOpen={setSelected} />)}
+                          {rows.map((m) => <MemberRow key={m.id} member={m} teamAvgPct={avgPct} onOpen={setSelected} />)}
                         </tbody>
                       </table>
                     </div>
