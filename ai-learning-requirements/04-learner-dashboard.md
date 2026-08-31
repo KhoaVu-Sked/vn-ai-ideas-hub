@@ -24,8 +24,9 @@ Lives at `/learning-hub/dashboard` (`features/learning/LearnerDashboardPage.jsx`
 **Application · AI Ideas Hub card — placeholder** ("Coming soon · Phase 2 — needs an idea↔course link on the Ideas Hub side."): same blocker as Skills applied above — this repo has no `ideas`-to-`courses` relationship anywhere yet.
 
 **Kept from the previous layout, moved below the sections above** (unaffected by any of the progress-level or KPI work):
-- **Roadmap progress**: one completion bar per enrolled track (complete / total courses for that track, scoped by raw `isExpectedByNow`), always covering every enrolled track regardless of the Mind map's own filter below it.
 - **Mind map**: the same tier-gated view described in Your Journey ([03-your-journey.md](03-your-journey.md), 4.4/4.5) — same columns-by-position-tier layout (still position-grouped, not level-grouped), same Locked/Skip-prerequisite behavior and confirm wording, same `features/learning/MindMap.jsx` component Your Journey's "See the Mind map →" link also points to. Has its own track-filter dropdown, separate from anything above it.
+
+The per-track "Roadmap progress" section (one completion bar per enrolled track) that used to sit above the Mind map was removed — "Progress by level" (above, in the Learning card) already covers roadmap completion, just grouped by level instead of by track.
 
 A nav link ("My Dashboard," in the app header, next to "Learning Hub") points here.
 

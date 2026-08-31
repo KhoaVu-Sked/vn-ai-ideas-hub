@@ -1,6 +1,6 @@
 // A small blue progress bar, reused by ProfileStrip, Team view's roster,
-// and the Learner Dashboard's Roadmap progress — the same track+fill
-// markup was being hand-copied at each call site.
+// and the Learner Dashboard's "Progress by level" bars — the same
+// track+fill markup was being hand-copied at each call site.
 //
 // Track uses --line (not --bg): --bg (#f3f5f9) sits almost flush against
 // --card's white, so the "remaining" portion of the bar was nearly

@@ -35,9 +35,12 @@
 // app already separates those as two nav links in AppHeader ("My Dashboard"
 // vs "Team"), so an in-page tab would just duplicate that.
 //
-// The pre-existing Roadmap-by-track section and Mind map (with its
-// skip-a-tier action) aren't part of the mockup, but stay below the new
-// layout rather than being dropped — kept at the user's request.
+// The pre-existing Mind map (with its skip-a-tier action) isn't part of the
+// mockup either, but stays below the new layout rather than being dropped —
+// kept at the user's request. The per-track "Roadmap progress" section that
+// used to sit above it was dropped later (removed, not part of the mockup
+// to begin with — see TrackProgressRow's git history if it's ever wanted
+// back).
 
 import { useCallback, useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
@@ -56,40 +59,6 @@ import { JourneyTable } from "@/features/learning/JourneyPage";
 
 const cardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" };
 const cardCaption = { fontSize: 12, color: "var(--muted)", margin: "0 0 14px" };
-
-// `total` here is the track's course count SCOPED to what's expected of
-// this account's own position (isExpectedByNow, shared.js) — not every
-// course the track has. Easy to misread as "the whole track" otherwise, so
-// the row spells it out right under the track name rather than relying on
-// the section's own caption above it.
-function TrackProgressRow({ name, complete, total, position }) {
-  const pct = total ? Math.round((complete / total) * 100) : 0;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid var(--line)" }}>
-      <div style={{ flex: "0 0 180px" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{name}</div>
-        {position && (
-          <div style={{ fontSize: 10.5, color: "var(--muted)" }} title="Courses expected for your current level, not the whole track">
-            Through {POSITION_LABEL[position] || position}
-          </div>
-        )}
-      </div>
-      {/* ProgressBar defaults to width: "100%", which — with no flex-basis
-          of its own — resolves against the WHOLE row, not the space left
-          after the label, blowing past the % and count columns entirely
-          (they were still in the DOM, just squeezed out of view). Wrapping
-          it in a flex: 1 / min-width: 0 container gives it just the
-          remaining space instead — min-width: 0 overrides a flex item's
-          default min-width: auto, which is what let width: 100% win out
-          over its siblings in the first place. */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <ProgressBar pct={pct} />
-      </div>
-      <div style={{ flex: "0 0 44px", textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{pct}%</div>
-      <div style={{ flex: "0 0 60px", textAlign: "right", fontSize: 12, color: "var(--muted)" }}>{complete}/{total}</div>
-    </div>
-  );
-}
 
 // ── New (mockup-driven) pieces below ────────────────────────────────────
 
@@ -241,17 +210,6 @@ export default function LearnerDashboardPage() {
 
   const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
 
-  // Roadmap progress-by-track always covers every enrolled track, independent
-  // of the Mind map's own track filter below — switching that filter
-  // shouldn't collapse this list down to one row. Scoped the same way as
-  // the stat tiles above (isExpectedByNow on the raw position) — a Senior's
-  // "AI Track" bar reads against Intern-through-Senior, not the whole
-  // roadmap up to Principal.
-  const perTrack = trackOptions.map((t) => {
-    const courses = journey.filter((c) => c.track_id === t.id && isExpectedByNow(c, position));
-    return { name: t.name, total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
-  });
-
   // "Progress by level" — completion per progress level (not raw role;
   // see PROGRESS_LEVEL_ORDER, shared.js) across every enrolled track,
   // unscoped by isExpectedByNow on purpose (see LevelRow). A course's level
@@ -268,7 +226,7 @@ export default function LearnerDashboardPage() {
   // behaves and scopes identically: what's expected by now (own tier, or one
   // stage of early access once that tier's fully done — effectivePosition/
   // isExpectedByNow, shared.js), across every enrolled track. Not the Mind
-  // map's own track filter below — same as Roadmap progress above it.
+  // map's own track filter below.
   const visiblePosition = effectivePosition(journey, position);
   const visibleJourney = journey.filter((c) => isExpectedByNow(c, visiblePosition));
 
@@ -462,17 +420,6 @@ export default function LearnerDashboardPage() {
                   note="Coming soon · Phase 2 — needs an idea↔course link on the Ideas Hub side."
                   style={{ marginBottom: 16 }}
                 />
-
-                {/* ── Kept from the previous dashboard, per request ── */}
-                <section style={{ ...card, marginBottom: 18 }}>
-                  <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", margin: "0 0 4px" }}>Roadmap progress</h1>
-                  <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>
-                    Course completion by track{position ? `, through ${POSITION_LABEL[position] || position}` : ""}.
-                  </p>
-                  <div>
-                    {perTrack.map((t) => <TrackProgressRow key={t.name} {...t} position={position} />)}
-                  </div>
-                </section>
 
                 <section style={card}>
                   <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
