@@ -55,6 +55,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, th, td, relTime,
   formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, skillConfidence, avgExamAccuracy,
+  isExpectedByNow, effectivePosition,
 } from "@/features/learning/shared";
 import { JourneyTable } from "@/features/learning/JourneyPage";
 import ProgressBar from "@/features/learning/ProgressBar";
@@ -563,20 +564,33 @@ function LearningImpactCard({ members, ideas }) {
   );
 }
 
+// Drill-down roadmap — scoped the same way "My courses" scopes the
+// learner's own Dashboard/Journey view: isExpectedByNow/effectivePosition
+// (shared.js), courses at or below this person's own tier, plus one stage
+// of early access once that tier's fully done. NOT the whole track (every
+// tier, Intern through Principal) — an admin checking on a Junior shouldn't
+// be shown Principal-tier courses that aren't expected of them yet.
 function MemberDrilldown({ member, onClose }) {
-  const [courses, setCourses] = useState(null);
+  const [journey, setJourney] = useState(null);
+  const [position, setPosition] = useState(null);
   const [err, setErr] = useState("");
 
   useEffect(() => {
     let live = true;
-    setCourses(null);
+    setJourney(null);
+    setPosition(null);
     setErr("");
-    api(`/api/team/${member.id}/journey`).then(({ courses: c }) => { if (live) setCourses(c); })
-      .catch((e) => { if (live) setErr(e.message); });
+    api(`/api/team/${member.id}/journey`).then(({ courses, position: pos }) => {
+      if (!live) return;
+      setJourney(courses);
+      setPosition(pos);
+    }).catch((e) => { if (live) setErr(e.message); });
     return () => { live = false; };
   }, [member.id]);
 
   const pct = pctOf(member);
+  const visiblePosition = journey ? effectivePosition(journey, position) : position;
+  const visibleJourney = journey ? journey.filter((c) => isExpectedByNow(c, visiblePosition)) : null;
 
   return (
     <section style={{ ...card, marginTop: 18 }}>
@@ -587,13 +601,20 @@ function MemberDrilldown({ member, onClose }) {
             <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)" }}>{member.name || member.username} — roadmap</div>
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>
               {POSITION_LABEL[member.position] || member.position || "—"} · {trackLabel(member.tracks)} · {pct}% complete · read-only
+              {visiblePosition && ` · through ${POSITION_LABEL[visiblePosition] || visiblePosition}`}
             </div>
           </div>
         </div>
         <button onClick={onClose} style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12.5, fontWeight: 700, color: "var(--body)", cursor: "pointer" }}>Close</button>
       </div>
       {err && <div style={errBanner}>{err}</div>}
-      {!err && (courses === null ? <Loading label="Loading roadmap" /> : <JourneyTable courses={courses} readOnly ownRoadmap={false} />)}
+      {!err && (visibleJourney === null ? (
+        <Loading label="Loading roadmap" />
+      ) : visibleJourney.length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing expected yet for this person's stage.</div>
+      ) : (
+        <JourneyTable courses={visibleJourney} readOnly ownRoadmap={false} />
+      ))}
     </section>
   );
 }
