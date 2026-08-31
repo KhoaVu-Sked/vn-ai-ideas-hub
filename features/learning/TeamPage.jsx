@@ -18,14 +18,16 @@
 // constants.js) rather than per-idea skill attribution.
 //
 // The mockup's "Needs support" card flags three categories (Stalled,
-// Struggling, Stuck) with fabricated-sounding thresholds ("two exam scores
-// below 70%"). This app has no notion of a passing quiz score anywhere — the
-// wrap-up quiz is deliberately un-scored/un-gated (03-your-journey.md) — so
-// "Struggling"/"Stuck" would mean inventing a threshold with no basis in the
-// product. Real categories here instead: everyone the roster's own Pace
-// column would flag (paceFor — Stalled or Behind, see its own comment),
-// tagged the same way the Pace column tags them, one row per person instead
-// of the two-examples-squeezed-into-a-stat-card-hint this card used to be.
+// Struggling, Stuck). Stuck stays out — it's just Stalled again under a
+// different name, using the same "hasn't touched it in weeks" signal with
+// no separate data behind it. Struggling IS built (needsSupportReason,
+// below): this app otherwise has no notion of a passing quiz score
+// anywhere — the wrap-up quiz stays deliberately un-scored/un-gated
+// everywhere else (03-your-journey.md) — but the 70% threshold here was
+// set by the product owner directly, not guessed at in this file, so it's
+// not the same kind of invention the mockup's own unexplained "two exam
+// scores below 70%" is. One row per flagged person instead of the
+// two-examples-squeezed-into-a-stat-card-hint this card used to be.
 //
 // Skills heatmap and the roster's "Avg exam" column reuse skillConfidence()/
 // avgExamScore() (shared.js) — the exact same formulas the learner's own
@@ -222,21 +224,53 @@ function MemberRow({ member, teamAvgPct, ideasCount, onOpen }) {
   );
 }
 
-// "Needs support" — one row per person the roster's own Pace column would
-// flag (paceFor — Stalled or Behind, see its comment for exactly what each
-// means and why there's no fabricated third category), tagged with the
-// same PACE_META pill the Pace column itself uses so the color matches.
-// Stalled's "why" line names the stale course; Behind's compares this
-// person's own % Complete against the team's real average — the same
-// benchmark the Pace column compares against, not an invented target. A
-// real "View roadmap" action (opens the same drill-down a roster row
-// does), not the mockup's decorative "Book a 1:1 · pair with buddy"
-// button — nothing in this app could actually do that.
-function NeedsSupportRow({ member, pace, teamAvgPct, onOpen }) {
-  const meta = PACE_META[pace];
-  const why = pace === "stalled"
+// A member's own average exam score (avgExamScore, shared.js — the exact
+// number the roster's own "Avg Exam" column shows) falling below this is
+// "Struggling". Unlike everything else on this page, this IS a fixed,
+// invented-sounding number — but unlike the mockup's own "two exam scores
+// below 70%" (which we deliberately didn't build), this one was set by
+// the product owner directly, not guessed at here. Nothing else in this
+// app treats 70% (or any score) as a "pass" — the wrap-up quiz itself
+// stays deliberately un-scored/un-gated everywhere else in this feature.
+const STRUGGLING_EXAM_THRESHOLD = 70;
+
+// "Needs support" reasons — a superset of the roster's own Pace column
+// (paceFor, above): Stalled and Behind mean the same thing here they do
+// there, plus Struggling (below), which Pace itself doesn't carry (exam
+// performance is a different axis than completion pace, so it doesn't
+// belong in that column). Checked in severity order — a person matching
+// more than one reason is shown once, under the most urgent: going quiet
+// entirely (Stalled) outranks a comprehension signal (Struggling), which
+// outranks simply trailing the team's pace (Behind).
+function needsSupportReason(member, teamAvgPct) {
+  if (member.stalled) return "stalled";
+  const exam = avgExamScore(member.courses || []);
+  if (exam != null && exam < STRUGGLING_EXAM_THRESHOLD) return "struggling";
+  if (pctOf(member) < teamAvgPct) return "behind";
+  return null;
+}
+
+const NEEDS_SUPPORT_META = {
+  ...PACE_META,
+  // A third distinct hue — the same purple the Ideas Hub's own "Pilot"
+  // status uses (STATUS_META, features/ideas/constants.js) — reused
+  // rather than invented, same as everywhere else this page picks a color.
+  struggling: { label: "Struggling", bg: "#f1ecfd", fg: "#7048e8" },
+};
+
+// One flagged person — tagged with NEEDS_SUPPORT_META so Stalled/Behind
+// match the exact pill the roster's own Pace column shows. A real "View
+// roadmap" action (opens the same drill-down a roster row does), not the
+// mockup's decorative "Book a 1:1 · pair with buddy" button — nothing in
+// this app could actually do that.
+function NeedsSupportRow({ member, reason, teamAvgPct, onOpen }) {
+  const meta = NEEDS_SUPPORT_META[reason];
+  const exam = avgExamScore(member.courses || []);
+  const why = reason === "stalled"
     ? `Last active ${relTime(member.last_activity)} · ${member.stalled_course ? `stuck on "${member.stalled_course}"` : "an in-progress course"}`
-    : `${pctOf(member)}% complete · team average is ${teamAvgPct}%`;
+    : reason === "struggling"
+      ? `${exam}% avg exam score · below the ${STRUGGLING_EXAM_THRESHOLD}% mark`
+      : `${pctOf(member)}% complete · team average is ${teamAvgPct}%`;
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--line)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -259,19 +293,20 @@ function NeedsSupportRow({ member, pace, teamAvgPct, onOpen }) {
   );
 }
 
+const NEEDS_SUPPORT_PRIORITY = { stalled: 0, struggling: 1, behind: 2 };
 function NeedsSupportCard({ members, teamAvgPct, onOpen }) {
   const flagged = members
-    .map((m) => ({ member: m, pace: paceFor(m, teamAvgPct) }))
-    .filter((f) => f.pace !== "on_track")
-    .sort((a, b) => (a.pace === b.pace ? 0 : a.pace === "stalled" ? -1 : 1)); // Stalled first — the more urgent signal
+    .map((m) => ({ member: m, reason: needsSupportReason(m, teamAvgPct) }))
+    .filter((f) => f.reason)
+    .sort((a, b) => NEEDS_SUPPORT_PRIORITY[a.reason] - NEEDS_SUPPORT_PRIORITY[b.reason]);
   return (
     <div style={{ ...card, marginBottom: 14 }}>
       <p style={eyebrow}>Needs support</p>
       <h2 style={cardTitle}>Where you can help this week</h2>
       {flagged.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Nothing stalled or behind — everyone's on track.</div>
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Nothing stalled, struggling, or behind — everyone's on track.</div>
       ) : (
-        <div>{flagged.map((f) => <NeedsSupportRow key={f.member.id} member={f.member} pace={f.pace} teamAvgPct={teamAvgPct} onOpen={onOpen} />)}</div>
+        <div>{flagged.map((f) => <NeedsSupportRow key={f.member.id} member={f.member} reason={f.reason} teamAvgPct={teamAvgPct} onOpen={onOpen} />)}</div>
       )}
     </div>
   );
