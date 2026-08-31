@@ -337,8 +337,15 @@ function SkillHeatmap({ members }) {
                 {members.map((m) => {
                   const pct = pctFor(m.id, skill);
                   return (
-                    <td key={m.id} style={{ padding: 0 }} title={`${m.name || m.username} · ${skill}: ${pct != null ? `${pct}%` : "no data yet"}`}>
-                      <div style={{ width: "100%", height: 30, borderRadius: 6, background: HEAT_COLORS[heatBucket(pct)] }} />
+                    <td key={m.id} style={{ padding: 0, textAlign: "center" }} title={`${m.name || m.username} · ${skill}: ${pct != null ? `${pct}%` : "no data yet"}`}>
+                      {/* Columns still divide the card's full width evenly
+                          (table-layout: fixed above) so the table itself
+                          spans edge to edge with a small roster — but the
+                          swatch itself stays capped at the mockup's own
+                          cell size and centered in its column, instead of
+                          stretching to fill however wide that column ends
+                          up being with only a few members. */}
+                      <div style={{ width: 30, maxWidth: "70%", height: 26, margin: "0 auto", borderRadius: 6, background: HEAT_COLORS[heatBucket(pct)] }} />
                     </td>
                   );
                 })}
