@@ -1,6 +1,6 @@
 # AI Learning Platform — Requirements
 
-**Status:** In progress — Learning Hub, Your Journey (including the wrap-up quiz and Auto Schedule), a Learner Dashboard, and Team view are built and live in this repo. The Planner and Knowledge Builder agents are not built; Scheduler is split — Auto Schedule itself is real (deterministic, not Claude-driven), reminders and preference-aware sequencing are not.
+**Status:** In progress — Learning Hub, Your Journey (including the wrap-up quiz and Auto Schedule), a Learner Dashboard (rebuilt to follow a design mockup — KPI row, Learning/Consistency/What's next cards, a Weekly streak tied to Auto Schedule), and Team view are built and live in this repo. The Planner and Knowledge Builder agents are not built; Scheduler is split — Auto Schedule itself is real (deterministic, not Claude-driven), reminders and preference-aware sequencing are not. Two Learner Dashboard cards are explicit Phase 2 placeholders pending an idea↔course link on the Ideas Hub side (Section 4.10).
 **Owner:** The Kiet
 **Purpose:** One place for a learner to see the tracks available to them, enroll, and work through a roadmap of courses by seniority level (Intern → Principal) — mostly self-serve and manual, with one real exception: Auto Schedule books actual study time on the learner's Google Calendar. The rest of the original plan to automate planning, note-generation, and Claude-driven scheduling with agents is still ahead, not behind, this build.
 
@@ -43,7 +43,7 @@ This file describes what the AI Learning feature actually is today, section by s
 | `cost` | Free-text, e.g. `"Free"`, `"Udemy Business"`, `"Free (DevRev)"` |
 | `outcome` | "What you can do after" — shown in the List view's expanded row, and as the headline text on Mind map nodes |
 | `priority` | `core` or `optional` — feeds the profile strip's "N of M core courses complete" |
-| `expected_by_position` | `intern` / `junior` / `middle` / `senior` / `principal` — the seniority ladder a course belongs to; this is what tier-gating and the Mind map's columns are built on |
+| `expected_by_position` | `intern` / `junior` / `middle` / `senior` / `principal` — the seniority ladder a course belongs to; this is what tier-gating, the Mind map's columns, and the List view's drag-drop tier boundary are built on. The Learner Dashboard's "Progress by level" chart (Section 4.10) re-buckets this same column into 4 display-only levels (Foundations/Applied/Intermediate/Advanced) at read time — no separate column, this one stays the single source of truth |
 | `link` | Direct URL to the course |
 
 No `course_id`-style stable business key exists — the primary key is a plain `uuid`, and seeding is idempotent on `(track_id, title)` instead.
@@ -134,13 +134,32 @@ Lives at `/learning-hub/journey/[courseId]/quiz`. The **Wrap-up** link in a List
 - A course with no quiz seeded (5 of the 20 — see Section 2.1) shows "No quiz for this course yet" instead of a dead end.
 - Already-completed courses can be retaken freely; retaking just re-writes the same snapshot.
 
-### 4.10 Learner Dashboard — ✅ Built
-Lives at `/learning-hub/dashboard` (`features/learning/LearnerDashboardPage.jsx`). New this pass, built alongside pulling the Mind map out of Your Journey (4.4) — this is where it moved to. Reuses the same `GET /api/journey` fetch Your Journey already made; no new endpoint or table behind it.
+### 4.10 Learner Dashboard — ✅ Built (rebuilt this pass to follow a design mockup)
+Lives at `/learning-hub/dashboard` (`features/learning/LearnerDashboardPage.jsx`). Originally built alongside pulling the Mind map out of Your Journey (4.4); since rebuilt again to follow a design mockup (`AI Learning dashboards.html`, repo root) rather than the plain stat-tiles layout described in earlier drafts of this doc. Still reuses the same `GET /api/journey` fetch Your Journey already makes — no new endpoint, no new table.
 
-- **Stat tiles**: seniority level, tracks enrolled, core courses complete (%), courses in progress, all courses complete (%) — all scoped to this page's own track-filter dropdown, independent of whatever's selected on Your Journey.
-- **Roadmap progress**: one completion bar per enrolled track (complete / total courses for that track), always covering every enrolled track regardless of the Mind map's own filter below it — switching that filter doesn't collapse this list down to one row.
-- **Mind map**: the same tier-gated view described in 4.4/4.5 — same columns-by-position-tier layout, same Locked/Skip-prerequisite behavior and confirm wording, same components (now `features/learning/MindMap.jsx`, extracted out of `JourneyPage.jsx` so this page and Your Journey can both use it). Has its own track-filter dropdown, separate from the stat tiles' one above it.
-- A nav link ("My Dashboard," in the app header, next to "Learning Hub") and a "See the Mind map →" link from Your Journey both point here.
+**KPI row** — four tiles:
+- **Roadmap complete** — % of what's expected by now (the same `isExpectedByNow`/`effectivePosition` scoping Your Journey uses: courses at or below the learner's own tier, plus one stage of early access once that tier's done) that's actually `complete`.
+- **Level** — current position, plus the next rung up (e.g. "Target: Middle · 2 stages left"), or "Top of the ladder" once at Principal.
+- **Weekly streak** — see below.
+- **Skills applied** — placeholder, "Coming soon · Phase 2": needs an idea↔course link that lives in the Ideas Hub's own schema, not this feature's.
+
+**Learning card — "Progress by level"**: a **display-only** regrouping of the same 5-tier position ladder into 4 named levels — **Foundations** (Intern), **Applied** (Junior), **Intermediate** (Middle), **Advanced** (Senior *and* Principal, collapsed onto one shared bar). Computed client-side (`progressLevelForPosition`/`rolesForProgressLevel`/`PROGRESS_LEVEL_ORDER`/`PROGRESS_LEVEL_LABEL`, all in `features/learning/shared.js`) by re-bucketing `courses.expected_by_position` at read time — **no schema change**, no `progress_level` column or table anywhere in the database. Every gating/locking/ordering rule everywhere else in this feature — the Mind map's columns, the List view's tier-gated drag-drop, Team view's roster, every SQL query in `queries.js` — still reads the raw 5-value ladder exactly as before; this chart is the only place the 4-level regrouping exists. Below the level bars, **"My courses"** reuses `JourneyTable` — the *exact same* List-view component from Your Journey (4.4), same columns, same drag-reorder, same Wrap-up link — not a second implementation of the same list.
+
+**Weekly streak** (the KPI tile, and repeated as "Current streak" on the Consistency card below): `weeklyStreak()` (`shared.js`) counts consecutive Mon–Sun weeks — ending at the current week, or last week if this week hasn't landed one yet — with at least one course completed **through Auto Schedule**, scoped to `course_assignments.calendar_event_id` being set (Auto Schedule is the only thing in this app resembling a "session," so that's the signal, not every completion regardless of how it was scheduled). A learner who's never used Auto Schedule reads a plain 0, not a broken number. No live Google Calendar read: completion only ever lives in `course_assignments.status`, never on the calendar event itself, so `calendar_event_id` already carries the one bit a live fetch would add, without the token-refresh/revoked-access failure modes a live call brings.
+
+**Consistency card — "Learning activity"**: Courses completed, Hours logged (sum of `est_hours` on complete courses, all-time — not "this month": `course_assignments` keeps one `updated_at` per row, not a change history, so a monthly window isn't derivable), In progress, Current streak (same number as the Weekly streak KPI).
+
+**Retention card — placeholder** ("Coming soon."): `courses.focus_area` turned out to be a per-course description, effectively 1:1 with the title, not a shared skill taxonomy multiple courses group under — nothing real to bucket a "confidence by skill" view by without inventing a new taxonomy.
+
+**What's next card**: reuses Your Journey's own "upcoming" pick — dated soonest-first, then undated in roadmap order — for a "Finish course X" row (shown as its target date, not "from your calendar": a live calendar read is a separate lift not covered here, and `target_date` is real data either way), plus a second row surfacing the most recently completed course's own `outcome` copy as a "try this" nudge — no fabricated suggestions.
+
+**Application · AI Ideas Hub card — placeholder** ("Coming soon · Phase 2 — needs an idea↔course link on the Ideas Hub side."): same blocker as Skills applied above — this repo has no `ideas`-to-`courses` relationship anywhere yet.
+
+**Kept from the previous layout, moved below the sections above** (unaffected by any of the progress-level or KPI work):
+- **Roadmap progress**: one completion bar per enrolled track (complete / total courses for that track, scoped by raw `isExpectedByNow`), always covering every enrolled track regardless of the Mind map's own filter below it.
+- **Mind map**: the same tier-gated view described in 4.4/4.5 — same columns-by-position-tier layout (still position-grouped, not level-grouped), same Locked/Skip-prerequisite behavior and confirm wording, same `features/learning/MindMap.jsx` component Your Journey's "See the Mind map →" link also points to. Has its own track-filter dropdown, separate from anything above it.
+
+A nav link ("My Dashboard," in the app header, next to "Learning Hub") points here.
 
 **Acceptance criteria:**
 - [x] A learner with zero enrolled tracks sees the empty state, never a broken roadmap
@@ -151,6 +170,9 @@ Lives at `/learning-hub/dashboard` (`features/learning/LearnerDashboardPage.jsx`
 - [x] Wrap-up is a real quiz that marks a course complete, not a placeholder button
 - [x] Up next reflects a real scheduled plan *(Auto Schedule writes real `target_date`s from real Google Calendar events — Section 8)*
 - [x] The Mind map and its Skip-prerequisite flow work identically on the Learner Dashboard as they did on Your Journey before the move
+- [x] Roadmap complete / Level / Weekly streak (KPIs) and the Learning / Consistency / What's next cards show real, derived data — no fabricated numbers standing in for data that doesn't exist
+- [ ] Skills applied (KPI) and the Application card — blocked on an idea↔course link (Ideas Hub side), Phase 2
+- [ ] Retention "Confidence by skill" — blocked on a shared skill taxonomy that doesn't exist on `courses` yet
 
 ---
 
@@ -238,12 +260,12 @@ All of these live in the same database as the rest of `vn-ai-ideas-hub`. Table d
 | `tracks` | Reference list of tracks (`AI Track`, `Core Competency`) |
 | `account_tracks` | Many-to-many: which accounts are enrolled in which tracks |
 | `courses` | The catalog — see Section 2.1 for columns |
-| `course_assignments` | One row per (account, course): `status` (`not_started`/`in_progress`/`complete`/`skipped`), `target_date` (the learner's own suggested date, set from Up next's pencil-edit **or** by Auto Schedule — a suggestion, not an enforced deadline), `position` (the learner's own drag-reorder within a tier), `quiz_total_questions` / `quiz_correct_first_try` (a one-time snapshot written when the course is marked complete — see Section 4.9), `calendar_event_id` (the Google Calendar event Auto Schedule created for this course, if any — migration 027, Section 8) |
+| `course_assignments` | One row per (account, course): `status` (`not_started`/`in_progress`/`complete`/`skipped`), `target_date` (the learner's own suggested date, set from Up next's pencil-edit **or** by Auto Schedule — a suggestion, not an enforced deadline), `position` (the learner's own drag-reorder within a tier), `quiz_total_questions` / `quiz_correct_first_try` (a one-time snapshot written when the course is marked complete — see Section 4.9), `calendar_event_id` (the Google Calendar event Auto Schedule created for this course, if any — migration 027, Section 8). `getJourney()` now returns all four of these on *every* course in the list, not just the 3 most recent completions — `calendar_event_id` + `updated_at` feed the Learner Dashboard's Weekly streak (4.10); the quiz-snapshot pair is present on every course too, but nothing currently renders a per-course score on the Dashboard's own "My courses" list (it reuses Your Journey's plain List columns, no score column) — today it's still only ever *displayed* via the separate, 3-row Knowledge artifacts path (4.8) |
 | `course_quiz_questions` | The wrap-up quiz's actual content — see Section 2.1 |
 | `calendar_connections` | One row per account that's connected Google Calendar: an AES-256-GCM-encrypted refresh token (`lib/crypto.js`, `CALENDAR_TOKEN_KEY`) plus the scope actually granted — Section 8 |
 | `app_settings` | Existing app-wide key/value settings table (not learning-specific) — `key`/`value`/`updated_by`. This feature reads/writes one key, `annual_review_date` (Section 8.6); `email_notifications` in the same table is the Ideas Hub's own, unrelated to learning |
 
-**Not built, and not currently planned:** `courses_ref`, `assignments`, `progress`, `knowledge_artifacts` (the Knowledge artifacts *card* is real — Section 4.8 — but it reads `course_assignments`' own snapshot columns, not a dedicated table), `reminders_log` (Auto Schedule books events but sends no reminders — Section 8), `competency_uploads`, `skill_course_map`, `unmatched_skills`, `course_quiz_attempts`/`course_quiz_answers` (deliberately not built — no per-click or per-attempt history, just the one snapshot pair above), any `roadmap_status` column. If the upload/matching flow (old Section 3) gets built later, expect new tables — don't assume these old names are what they'll be called.
+**Not built, and not currently planned:** `courses_ref`, `assignments`, `progress`, `knowledge_artifacts` (the Knowledge artifacts *card* is real — Section 4.8 — but it reads `course_assignments`' own snapshot columns, not a dedicated table), `reminders_log` (Auto Schedule books events but sends no reminders — Section 8), `competency_uploads`, `skill_course_map`, `unmatched_skills`, `course_quiz_attempts`/`course_quiz_answers` (deliberately not built — no per-click or per-attempt history, just the one snapshot pair above), any `roadmap_status` column, and — despite the Learner Dashboard's "Progress by level" chart (Section 4.10) — no `progress_level` column or table either: that chart's 4 levels are a pure client-side re-bucketing of `courses.expected_by_position`, computed in `features/learning/shared.js` and consumed only by `LearnerDashboardPage.jsx`; nothing in the schema, `queries.js`'s SQL, `MindMap.jsx`, `JourneyPage.jsx`, or `TeamPage.jsx` knows this grouping exists. If the upload/matching flow (old Section 3) gets built later, expect new tables — don't assume these old names are what they'll be called.
 
 ---
 
@@ -258,3 +280,5 @@ All of these live in the same database as the rest of `vn-ai-ideas-hub`. Table d
 - NotebookLM-generated mind maps, summaries, or exams (Section 7) — the Wrap-up quiz and Knowledge artifacts card are both real now, but neither is this; see Section 7 for the distinction
 - A per-click or per-attempt history for the wrap-up quiz — one snapshot (question count + first-try accuracy) is written once, at completion; nothing records individual answers or retries
 - Reminders ahead of an Auto Schedule study block, and Claude-driven preference-aware sequencing (Section 8) — Auto Schedule itself is real; these two parts of the original Scheduler idea are not
+- An idea↔course link on the Ideas Hub side (Section 4.10) — blocks two Learner Dashboard pieces (the "Skills applied" KPI and the Application · AI Ideas Hub card), both explicit "Coming soon · Phase 2" placeholders, not silently dropped
+- A shared skill taxonomy on courses (Section 4.10's Retention card) — `courses.focus_area` is a per-course description, not a groupable skill; "Confidence by skill" has no real data to bucket by until one exists
