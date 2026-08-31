@@ -22,10 +22,10 @@
 // below 70%"). This app has no notion of a passing quiz score anywhere — the
 // wrap-up quiz is deliberately un-scored/un-gated (03-your-journey.md) — so
 // "Struggling"/"Stuck" would mean inventing a threshold with no basis in the
-// product. Only "Stalled" (in_progress, untouched 28+ days — already
-// computed server-side) is real here; that's the one category this card
-// shows, one row per person instead of the two-examples-squeezed-into-a-
-// stat-card-hint it used to be.
+// product. Real categories here instead: everyone the roster's own Pace
+// column would flag (paceFor — Stalled or Behind, see its own comment),
+// tagged the same way the Pace column tags them, one row per person instead
+// of the two-examples-squeezed-into-a-stat-card-hint this card used to be.
 //
 // Skills heatmap and the roster's "Avg exam" column reuse skillConfidence()/
 // avgExamScore() (shared.js) — the exact same formulas the learner's own
@@ -222,21 +222,31 @@ function MemberRow({ member, teamAvgPct, ideasCount, onOpen }) {
   );
 }
 
-// "Needs support" — one row per stalled person (real signal: an in_progress
-// course untouched 28+ days, computed server-side). A real "View roadmap"
-// action (opens the same drill-down a roster row does), not the mockup's
-// decorative "Book a 1:1 · pair with buddy" button — nothing in this app
-// could actually do that.
-function NeedsSupportRow({ member, onOpen }) {
+// "Needs support" — one row per person the roster's own Pace column would
+// flag (paceFor — Stalled or Behind, see its comment for exactly what each
+// means and why there's no fabricated third category), tagged with the
+// same PACE_META pill the Pace column itself uses so the color matches.
+// Stalled's "why" line names the stale course; Behind's compares this
+// person's own % Complete against the team's real average — the same
+// benchmark the Pace column compares against, not an invented target. A
+// real "View roadmap" action (opens the same drill-down a roster row
+// does), not the mockup's decorative "Book a 1:1 · pair with buddy"
+// button — nothing in this app could actually do that.
+function NeedsSupportRow({ member, pace, teamAvgPct, onOpen }) {
+  const meta = PACE_META[pace];
+  const why = pace === "stalled"
+    ? `Last active ${relTime(member.last_activity)} · ${member.stalled_course ? `stuck on "${member.stalled_course}"` : "an in-progress course"}`
+    : `${pctOf(member)}% complete · team average is ${teamAvgPct}%`;
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--line)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
         <Avatar person={member} size={28} />
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{member.name || member.username}</div>
-          <div style={{ fontSize: 12, color: "var(--muted)" }}>
-            Last active {relTime(member.last_activity)} · {member.stalled_course ? `stuck on "${member.stalled_course}"` : "an in-progress course"}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", background: meta.bg, color: meta.fg }}>{meta.label}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{member.name || member.username}</span>
           </div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{why}</div>
         </div>
       </div>
       <button
@@ -249,16 +259,19 @@ function NeedsSupportRow({ member, onOpen }) {
   );
 }
 
-function NeedsSupportCard({ members, onOpen }) {
-  const stalled = members.filter((m) => m.stalled);
+function NeedsSupportCard({ members, teamAvgPct, onOpen }) {
+  const flagged = members
+    .map((m) => ({ member: m, pace: paceFor(m, teamAvgPct) }))
+    .filter((f) => f.pace !== "on_track")
+    .sort((a, b) => (a.pace === b.pace ? 0 : a.pace === "stalled" ? -1 : 1)); // Stalled first — the more urgent signal
   return (
     <div style={{ ...card, marginBottom: 14 }}>
       <p style={eyebrow}>Needs support</p>
       <h2 style={cardTitle}>Where you can help this week</h2>
-      {stalled.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Nothing stalled — everyone's active.</div>
+      {flagged.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Nothing stalled or behind — everyone's on track.</div>
       ) : (
-        <div>{stalled.map((m) => <NeedsSupportRow key={m.id} member={m} onOpen={onOpen} />)}</div>
+        <div>{flagged.map((f) => <NeedsSupportRow key={f.member.id} member={f.member} pace={f.pace} teamAvgPct={teamAvgPct} onOpen={onOpen} />)}</div>
       )}
     </div>
   );
@@ -674,7 +687,7 @@ export default function TeamPage() {
                   <KpiTile label="Ideas shipped" value={shippedCount} hint={`${ideas.length} submitted by learners`} accent />
                 </div>
 
-                <NeedsSupportCard members={members} onOpen={setSelected} />
+                <NeedsSupportCard members={members} teamAvgPct={avgPct} onOpen={setSelected} />
 
                 <section style={card}>
                   <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
