@@ -499,16 +499,21 @@ export default function TeamPage() {
   });
   const comboSummary = [...comboCounts.entries()].map(([label, count]) => `${count} on ${label}`).join(" · ");
 
-  // KPI: "Team completion" — pooled core-course completion across everyone,
-  // unfiltered by the roster's own track filter (same as every KPI/card on
-  // this page — that filter only ever scoped the table itself, same
-  // precedent as the Mind map's own independent filter on the Learner
-  // Dashboard). No "+X% MoM" trend, on purpose — same reasoning as the
-  // Learner Dashboard's "Roadmap complete" KPI: no snapshot history exists,
-  // and a fabricated delta would be worse than none.
-  const totalCoreTotal = members.reduce((s, m) => s + m.core_total, 0);
-  const totalCoreComplete = members.reduce((s, m) => s + m.core_complete, 0);
-  const avgPct = totalCoreTotal ? Math.round((totalCoreComplete / totalCoreTotal) * 100) : 0;
+  // KPI: "Team completion" — a simple average of each member's own %
+  // (pctOf, same function the roster rows and sort already use), so this
+  // number is literally "add up the % column, divide by headcount" — every
+  // learner counts equally regardless of how many core courses their own
+  // level expects. (An earlier version pooled raw counts first — sum of
+  // everyone's core_complete over sum of everyone's core_total — which
+  // let whoever had the biggest course load dominate the result; that's
+  // more representative of total work done, but didn't match what the
+  // roster's own % column visibly adds up to, which is what people actually
+  // compared it against.) Unfiltered by the roster's own track filter, same
+  // as every KPI/card on this page. No "+X% MoM" trend, on purpose — same
+  // reasoning as the Learner Dashboard's "Roadmap complete" KPI: no
+  // snapshot history exists, and a fabricated delta would be worse than
+  // none.
+  const avgPct = members.length ? Math.round(members.reduce((s, m) => s + pctOf(m), 0) / members.length) : 0;
 
   // KPI: "Active this week" — plain 7-day activity window (withinDays,
   // above). A member who's never touched a course (last_activity null)
