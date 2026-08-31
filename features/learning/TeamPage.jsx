@@ -252,7 +252,7 @@ function NeedsSupportRow({ member, onOpen }) {
 function NeedsSupportCard({ members, onOpen }) {
   const stalled = members.filter((m) => m.stalled);
   return (
-    <div style={{ ...card, marginBottom: 18 }}>
+    <div style={{ ...card, marginBottom: 14 }}>
       <p style={eyebrow}>Needs support</p>
       <h2 style={cardTitle}>Where you can help this week</h2>
       {stalled.length === 0 ? (
@@ -658,7 +658,7 @@ export default function TeamPage() {
             ) : (
               <>
                 {/* ── KPI row — all four wired to real data. ── */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
                   <KpiTile label="Team completion" value={`${avgPct}%`} hint={`avg across ${members.length} learner${members.length === 1 ? "" : "s"}`} />
                   <KpiTile label="Active this week" value={`${activeCount} / ${members.length}`} hint={inactiveCount === 0 ? "Everyone's active" : `${inactiveCount} inactive 7+ days`} />
                   <KpiTile label="Avg exam score" value={teamAvgExamScore != null ? `${teamAvgExamScore}%` : "—"} hint="First-try accuracy, quiz-graded completions" />
@@ -668,7 +668,7 @@ export default function TeamPage() {
                 <NeedsSupportCard members={members} onOpen={setSelected} />
 
                 <section style={card}>
-                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
                     <div>
                       <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", margin: "0 0 4px" }}>Team progress</h1>
                       <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>
@@ -718,12 +718,18 @@ export default function TeamPage() {
                 </section>
 
                 {/* ── Coverage (left) + Application/Distribution stacked
-                    (right) — the mockup's own two-column row: Skills
-                    heatmap runs the full height of the row, and "From
-                    learning to impact" sits above "Where the team sits" in
-                    the narrower column, not as a separate full-width
-                    section below both. ── */}
-                <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 14, marginTop: 16 }}>
+                    (right) — the mockup's own two-column row: an EVEN
+                    1fr/1fr split (its own ".g-1-1" class — a different
+                    ratio than the Learner Dashboard's Learning+side-column
+                    row, which really is 1.6fr/1fr, ".g-2-1"). This row had
+                    drifted to 1.3fr/1fr, quietly handing the heatmap ~57%
+                    of the width instead of an even half and squeezing the
+                    stacked cards on the right more than the mockup does.
+                    Skills heatmap runs the full height of the row, and
+                    "From learning to impact" sits above "Where the team
+                    sits" in the narrower column, not as a separate
+                    full-width section below both. ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
                   <div style={card}>
                     <p style={eyebrow}>Coverage</p>
                     <h2 style={cardTitle}>Skills across the team</h2>
