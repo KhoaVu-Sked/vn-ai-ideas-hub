@@ -109,6 +109,7 @@ create table if not exists courses (
   link                  text,
   expected_by_position  text
                           check (expected_by_position in ('intern', 'junior', 'middle', 'senior', 'principal')),
+  skills                text[] not null default '{}',  -- shared skill tags (migration 028)
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
   unique (track_id, title)

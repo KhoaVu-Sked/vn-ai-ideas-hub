@@ -250,3 +250,69 @@ export function weeklyStreak(courses, today = new Date()) {
   }
   return streak;
 }
+
+// Learner Dashboard's Retention card, "Confidence by skill" — how many of
+// SKILL_CONFIDENCE_SCALE segments to fill in the dot meter next to each
+// skill name. Exported so the UI (LearnerDashboardPage's ConfidenceMeter)
+// and the math here agree on the same scale rather than one of them
+// hand-copying the number 5.
+export const SKILL_CONFIDENCE_SCALE = 5;
+
+// One course's contribution to whichever skill(s) it's tagged with
+// (courses.skills, migration 028) — null for a course that hasn't been
+// started yet, so it's excluded from the average entirely rather than
+// dragging a skill toward 0 just because the learner hasn't gotten there.
+// A skipped course carries the same "no signal" treatment as not_started —
+// skipping says nothing about how well the material was learned.
+//   - complete + has a quiz snapshot: first-try accuracy (quiz_correct_first_try
+//     / quiz_total_questions) — the same ratio the Knowledge artifacts card
+//     already shows per course (03-your-journey.md), reused here as the
+//     "how well" signal instead of inventing a second one.
+//   - complete + no quiz (5 of the 20 catalog courses have none —
+//     01-course-catalog.md): full credit. There's nothing to grade, and
+//     finishing the course is still real progress toward the skill.
+//   - in_progress: half credit — started, not yet proven.
+function courseStrength(course) {
+  if (course.status === "complete") {
+    return course.quiz_total_questions ? course.quiz_correct_first_try / course.quiz_total_questions : 1;
+  }
+  if (course.status === "in_progress") return 0.5;
+  return null; // not_started / skipped
+}
+
+// Groups a journey's courses by skill tag (a course can carry more than
+// one — see ai-track-seed.sql) and averages courseStrength across whichever
+// of that skill's courses the learner has actually engaged with. A skill
+// with zero engaged courses doesn't appear at all — same "empty state, not
+// a fabricated number" rule this feature uses everywhere else (weeklyStreak
+// above is the one exception, because it's a fixed KPI tile that's always
+// on screen; this is a list, so the honest move is to just not list it yet).
+// Unscoped by isExpectedByNow/track filters on purpose, same as the
+// Consistency card next to it on the Dashboard — a course finished early
+// (or outside what's strictly expected by now) still earned its confidence.
+//
+// Returned array is sorted most-confident first (ties broken alphabetically,
+// for a stable order rather than one that shuffles on every reload) — the
+// call site decides how many rows it has room to show.
+export function skillConfidence(courses) {
+  const bySkill = new Map();
+  for (const course of courses) {
+    const strength = courseStrength(course);
+    if (strength === null) continue;
+    for (const skill of course.skills || []) {
+      if (!bySkill.has(skill)) bySkill.set(skill, []);
+      bySkill.get(skill).push(strength);
+    }
+  }
+  return [...bySkill.entries()]
+    .map(([skill, strengths]) => {
+      const avg = strengths.reduce((sum, s) => sum + s, 0) / strengths.length;
+      return {
+        skill,
+        pct: Math.round(avg * 100),
+        dots: Math.round(avg * SKILL_CONFIDENCE_SCALE),
+        courseCount: strengths.length,
+      };
+    })
+    .sort((a, b) => b.pct - a.pct || a.skill.localeCompare(b.skill));
+}

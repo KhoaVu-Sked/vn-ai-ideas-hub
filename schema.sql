@@ -108,11 +108,15 @@ create table if not exists courses (
   link                  text,
   expected_by_position  text
                           check (expected_by_position in ('intern', 'junior', 'middle', 'senior', 'principal')),
+  skills                text[] not null default '{}',  -- shared skill tags (migration 028) — see ai-learning-requirements/01-course-catalog.md
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
   unique (track_id, title)
 );
 create index if not exists courses_track_id_idx on courses (track_id);
+-- Existing databases predate this column (migration 028). Kept right here,
+-- same pattern as course_assignments' own predate-columns block below.
+alter table courses add column if not exists skills text[] not null default '{}';
 
 -- One row per (account, course): a learner's target date and progress.
 create table if not exists course_assignments (

@@ -2,16 +2,20 @@
 --
 -- The AI Learning feature's actual content: the AI Track + Core Competency
 -- tracks, the AI Track's 23 real courses (imported from the roadmap
--- spreadsheet), and the wrap-up quiz questions for 15 of them (imported
--- from "AI Learning Course Framework.xlsx" — see migrations 022, 023, and
--- 025 for how this data was originally introduced, one delta at a time).
+-- spreadsheet), the wrap-up quiz questions for 15 of them (imported from
+-- "AI Learning Course Framework.xlsx" — see migrations 022, 023, and 025 for
+-- how this data was originally introduced, one delta at a time), and the
+-- skill tags each course carries (courses.skills, migration 028).
 --
 -- Separate from schema.sql on purpose: schema.sql is table design only
 -- (every create table / alter table this app needs); this file is content,
 -- run once schema.sql has already created tracks/courses/course_assignments/
 -- course_quiz_questions. Not destructive — every insert here is
 -- ON CONFLICT DO NOTHING, safe to re-run on a database that already has
--- some or all of this content.
+-- some or all of this content. The skills UPDATE near the bottom is
+-- re-runnable for a different reason (plain UPDATE, not an insert) — see the
+-- comment there. That's also the block to edit and re-run on its own if the
+-- skill taxonomy itself needs to change later.
 --
 -- Run schema.sql first.
 
@@ -43,6 +47,52 @@ from (values
   ('L3 — Advanced (Technical)', 'Multi-agent / subagent design (hands-on)', 'Introduction to subagents (applied)', 'Anthropic Academy', 'core', 3.0, 'Free', 'Design multi-agent systems that delegate and coordinate work.', 'principal', 'https://anthropic.skilljar.com/introduction-to-subagents')
 ) as v(stage, focus_area, title, platform, priority, est_hours, cost, outcome, expected_by_position, link)
 on conflict (track_id, title) do nothing;
+
+-- Skill tags (courses.skills, migration 028) — a shared taxonomy so several
+-- courses can group under one skill, which is what the Learner Dashboard's
+-- "Confidence by skill" card (ai-learning-requirements/04-learner-dashboard.md)
+-- averages over. courses.focus_area above stays untouched — it's a per-course
+-- description, effectively 1:1 with the title; skills is the deliberately
+-- coarser, shared grouping focus_area never was.
+--
+-- A plain UPDATE, not folded into the insert above: the insert's
+-- ON CONFLICT DO NOTHING only ever fires once, at creation, so it would never
+-- reach a course that already exists. This UPDATE has no such guard — same
+-- input always produces the same output, so it's naturally safe to re-run —
+-- and that's the point: if the taxonomy itself needs to change later (a
+-- skill renamed, split, or a course re-tagged), edit the VALUES list below
+-- and re-run just this block against the live database, the same way you'd
+-- re-run any other idempotent step in this file.
+--
+-- Seven skills span the 20 courses; most courses carry one, a few carry two
+-- where the content genuinely crosses skills (e.g. the Fluency course covers
+-- both responsible-use judgment and prompting technique). Scoped to the AI
+-- Track by title, same key the insert above uses.
+update courses set skills = v.skills
+from (values
+  ('AI Capabilities and Limitations', array['AI Fundamentals']::text[]),
+  ('GenAI for Beginners', array['AI Fundamentals']::text[]),
+  ('AI Foundations & Industry Applications', array['AI Fundamentals', 'AI for Customer Support']::text[]),
+  ('AI Fluency: Framework & Foundations', array['AI Fluency & Responsible Use', 'Prompt Engineering']::text[]),
+  ('Skedulo AI Usage Policy', array['AI Fluency & Responsible Use']::text[]),
+  ('Prompt Engineering: ChatGPT, Claude & AI Masterclass', array['Prompt Engineering']::text[]),
+  ('Claude 101', array['Everyday AI Tools']::text[]),
+  ('Gemini for Google Workspace (learning path)', array['Everyday AI Tools']::text[]),
+  ('Generative AI with Gemini and Google AI Studio for Beginners', array['Everyday AI Tools']::text[]),
+  ('Claude for Work', array['Everyday AI Tools', 'AI for Customer Support']::text[]),
+  ('Custom assistants: Claude Projects / Gemini Gems', array['Everyday AI Tools', 'Agentic AI & Automation']::text[]),
+  ('Customer Experience with Generative AI', array['AI for Customer Support']::text[]),
+  ('DevRev Product Mastery', array['AI for Customer Support']::text[]),
+  ('Introduction to Claude Cowork', array['Agentic AI & Automation']::text[]),
+  ('Introduction to subagents', array['Agentic AI & Automation']::text[]),
+  ('Introduction to Model Context Protocol (MCP)', array['Agentic AI & Automation']::text[]),
+  ('Introduction to subagents (applied)', array['Applied AI Development', 'Agentic AI & Automation']::text[]),
+  ('Build with Claude (API)', array['Applied AI Development']::text[]),
+  ('Claude Code 101', array['Applied AI Development']::text[]),
+  ('Claude Code in Action', array['Applied AI Development']::text[])
+) as v(title, skills)
+where courses.title = v.title
+  and courses.track_id = (select id from tracks where name = 'AI Track');
 
 -- migration 025: quiz questions for 15 of the catalog's courses (see
 -- migrations/025_course_quiz_questions.sql for which courses are skipped and why)

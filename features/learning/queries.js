@@ -155,7 +155,7 @@ export async function getJourney(accountId) {
           'id', c.id, 'title', c.title, 'stage', c.stage, 'platform', c.platform,
           'est_hours', c.est_hours, 'link', c.link, 'outcome', c.outcome,
           'expected_by_position', c.expected_by_position, 'priority', c.priority,
-          'track_id', t.id, 'track_name', t.name,
+          'skills', c.skills, 'track_id', t.id, 'track_name', t.name,
           'status', coalesce(ca.status, 'not_started'), 'target_date', ca.target_date,
           'quiz_total_questions', ca.quiz_total_questions, 'quiz_correct_first_try', ca.quiz_correct_first_try,
           'calendar_event_id', ca.calendar_event_id, 'updated_at', ca.updated_at

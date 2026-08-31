@@ -33,3 +33,4 @@ These never delete data (no `DELETE` / `TRUNCATE` / `DROP` of your rows) and are
 - `025_course_quiz_questions.sql` — add `course_quiz_questions` for the wrap-up quiz.
 - `026_quiz_completion_stats.sql` — add `course_assignments.quiz_total_questions/quiz_correct_first_try`, a snapshot written when a course is marked complete.
 - `027_calendar_connections.sql` — add `calendar_connections` (encrypted Google refresh token per account) and `course_assignments.calendar_event_id`, for Auto Schedule.
+- `028_course_skills.sql` — add `courses.skills` (text[]), a shared skill taxonomy so the Learner Dashboard's "Confidence by skill" card has something real to group by. Content is seeded by `ai-track-seed.sql`.

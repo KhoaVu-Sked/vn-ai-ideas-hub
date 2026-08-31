@@ -3,12 +3,19 @@
 // Learner Dashboard — rebuilt to follow the "AI Learning dashboards" mockup
 // (repo root, member/"My Progress" view). Wired to real data: the KPI row's
 // Roadmap complete/Level/Weekly streak, the Learning card (progress-by-level
-// bars + My courses), and the Consistency + What's next side cards. One
-// thing stays a placeholder because there's genuinely no honest data behind
-// it yet, not because it was skipped:
-//   - Retention "Confidence by skill" — courses.focus_area is a per-course
-//     description (1:1 with title), not a shared skill taxonomy multiple
-//     courses group under, so there's nothing real to bucket by yet.
+// bars + My courses), and the Consistency + Retention + What's next side
+// cards.
+//
+// Retention "Confidence by skill" (skillConfidence, shared.js) reads
+// courses.skills — a shared tag array (migration 028, seeded by
+// ai-track-seed.sql) that's deliberately coarser than courses.focus_area
+// (a per-course description, ~1:1 with the title, and not what this reads).
+// Each skill's meter averages courseStrength (shared.js) across whichever of
+// that skill's courses the learner has actually started — quiz accuracy
+// where one exists, full credit for a complete course with no quiz, half
+// credit for in_progress, and not-started/skipped courses excluded rather
+// than dragging the average toward 0.
+//
 // Skills applied (KPI) and the full-width Application card stay placeholders
 // for a different reason: both need an idea<->course link, which lives in
 // the Ideas Hub's schema (the `ideas` table), not this feature's — left
@@ -41,6 +48,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, effectivePosition, fmtDate,
   PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel, weeklyStreak,
+  skillConfidence, SKILL_CONFIDENCE_SCALE,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
@@ -127,6 +135,36 @@ function MiniRow({ k, v }) {
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: "1px solid var(--line)" }}>
       <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{k}</span>
       <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{v}</span>
+    </div>
+  );
+}
+
+// The mockup's ".conf" dot meter (Retention card) — SKILL_CONFIDENCE_SCALE
+// small segments, filled left-to-right up to `dots`. Deliberately its own
+// shape rather than ProgressBar: ProgressBar's continuous fill already means
+// "% of a checklist done" everywhere else on this page (Roadmap, Progress by
+// level); a discrete meter reads as the different thing confidence actually
+// is — a graded signal, not a completion count. --blue/--line are the same
+// two tokens ProgressBar itself uses, so it stays visually part of the same
+// page rather than introducing a new color for "filled."
+function ConfidenceMeter({ dots }) {
+  return (
+    <div style={{ display: "flex", gap: 4 }}>
+      {Array.from({ length: SKILL_CONFIDENCE_SCALE }, (_, i) => (
+        <span key={i} style={{ width: 14, height: 8, borderRadius: 2, background: i < dots ? "var(--blue)" : "var(--line)" }} />
+      ))}
+    </div>
+  );
+}
+
+// A skill name + its confidence meter — Retention card's own row shape
+// (label left, meter right), distinct from MiniRow (label + text value)
+// even though both share the same border-top/padding rhythm.
+function SkillRow({ skill, dots }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--line)" }}>
+      <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{skill}</span>
+      <ConfidenceMeter dots={dots} />
     </div>
   );
 }
@@ -257,6 +295,18 @@ export default function LearnerDashboardPage() {
   // file header comment for what this does and doesn't count.
   const streak = weeklyStreak(journey);
 
+  // Retention card — "Confidence by skill" (skillConfidence, shared.js) plus
+  // its own "Avg exam score" footer row: the same first-try-accuracy ratio
+  // skillConfidence uses per course, just averaged across every completed,
+  // quiz-graded course instead of grouped by skill — the card's own overall
+  // number, same all-time scope as Consistency next to it (see that card's
+  // own comment for why "this month" isn't derivable).
+  const skillRows = skillConfidence(journey);
+  const examScored = completeCourses.filter((c) => c.quiz_total_questions);
+  const avgExamScore = examScored.length
+    ? Math.round((examScored.reduce((sum, c) => sum + c.quiz_correct_first_try / c.quiz_total_questions, 0) / examScored.length) * 100)
+    : null;
+
   // What's next — same "upcoming" pick as Your Journey's Up next card (dated
   // soonest-first, then undated filling the roadmap's own order), just the
   // top one rather than 2. Its target_date is shown plainly as "Target", not
@@ -368,7 +418,19 @@ export default function LearnerDashboardPage() {
                         <MiniRow k="Current streak" v={`${streak} wk${streak === 1 ? "" : "s"}`} />
                       </div>
                     </div>
-                    <PlaceholderCard kicker="Retention" title="Confidence by skill" />
+                    <div style={card}>
+                      <p style={eyebrow}>Retention</p>
+                      <h2 style={cardTitle}>Confidence by skill</h2>
+                      <p style={cardCaption}>From courses you've started — quiz accuracy where one exists, completion otherwise.</p>
+                      {skillRows.length === 0 ? (
+                        <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Start a course to see your confidence by skill.</div>
+                      ) : (
+                        <div>
+                          {skillRows.map((s) => <SkillRow key={s.skill} skill={s.skill} dots={s.dots} />)}
+                          {avgExamScore != null && <MiniRow k="Avg exam score" v={`${avgExamScore}%`} />}
+                        </div>
+                      )}
+                    </div>
                     <div style={card}>
                       <p style={eyebrow}>What's next</p>
                       <h2 style={cardTitle}>Keep the momentum</h2>

@@ -1,0 +1,11 @@
+-- Add a shared skill taxonomy to the course catalog. Plain text[] tag array,
+-- same pattern as ideas.tags — courses.skills lets several courses group
+-- under one skill name, which is what the Learner Dashboard's "Confidence by
+-- skill" card (ai-learning-requirements/04-learner-dashboard.md) needs to
+-- aggregate by. courses.focus_area stays as-is (a per-course description,
+-- ~1:1 with the title) — this is a separate, deliberately coarser column.
+--
+-- Content — which skill tags land on which courses — is seeded separately by
+-- ai-track-seed.sql (an UPDATE block, re-runnable), same split as the rest of
+-- the catalog: this file is structure, that one is content.
+alter table courses add column if not exists skills text[] not null default '{}';
