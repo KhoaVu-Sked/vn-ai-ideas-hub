@@ -308,13 +308,23 @@ function SkillHeatmap({ members }) {
 
   return (
     <>
+      {/* table-layout: fixed + an explicit width only on the skill-name
+          column lets the browser split whatever's left EQUALLY across the
+          member columns, so cells stretch to fill the card instead of
+          hugging the left edge at a fixed 30px regardless of how few
+          members there are. overflowX still guards a roster large enough
+          to squeeze columns uncomfortably narrow. */}
       <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "separate", borderSpacing: 4 }}>
+        <table style={{ width: "100%", minWidth: 320 + members.length * 60, tableLayout: "fixed", borderCollapse: "separate", borderSpacing: 4 }}>
+          <colgroup>
+            <col style={{ width: 170 }} />
+            {members.map((m) => <col key={m.id} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th style={{ width: 120 }} />
+              <th />
               {members.map((m) => (
-                <th key={m.id} style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", padding: "0 2px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
+                <th key={m.id} style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", padding: "0 0 6px", textAlign: "center" }}>
                   {(m.name || m.username).split(" ")[0]}
                 </th>
               ))}
@@ -323,12 +333,12 @@ function SkillHeatmap({ members }) {
           <tbody>
             {skills.map((skill) => (
               <tr key={skill}>
-                <td style={{ fontSize: 12, fontWeight: 600, color: "var(--navy)", padding: "0 8px 0 0", whiteSpace: "nowrap" }}>{skill}</td>
+                <td style={{ fontSize: 12, fontWeight: 600, color: "var(--navy)", padding: "0 10px 0 0", lineHeight: 1.3 }}>{skill}</td>
                 {members.map((m) => {
                   const pct = pctFor(m.id, skill);
                   return (
                     <td key={m.id} style={{ padding: 0 }} title={`${m.name || m.username} · ${skill}: ${pct != null ? `${pct}%` : "no data yet"}`}>
-                      <div style={{ width: 30, height: 26, borderRadius: 6, background: HEAT_COLORS[heatBucket(pct)] }} />
+                      <div style={{ width: "100%", height: 30, borderRadius: 6, background: HEAT_COLORS[heatBucket(pct)] }} />
                     </td>
                   );
                 })}
@@ -353,16 +363,28 @@ function SkillHeatmap({ members }) {
 // over the same POSITION_ORDER ladder every other gating rule in this
 // feature uses, not a new taxonomy. Bar height is relative to the largest
 // bucket, not a fixed scale, so this reads sensibly at any team size.
+//
+// Each column gets a full-width, full-height track (--line, same "empty"
+// track ProgressBar itself uses) with the actual navy fill bottom-anchored
+// inside it — not just a bare bar floating in a mostly-empty column — so
+// every level shows a same-size shape across the card's full width, a
+// 0-count level included, rather than a number with nothing under it. The
+// track sits in a flex:1 slot (not a percentage height) so its own height
+// is resolved by the flex layout first; the fill's percentage height then
+// resolves safely against that, instead of the number/label/gap arithmetic
+// the old fixed-percentage-of-120px version relied on.
 function LevelDistribution({ members }) {
   const counts = POSITION_ORDER.map((p) => ({ position: p, count: members.filter((m) => m.position === p).length }));
   const max = Math.max(1, ...counts.map((c) => c.count));
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 120, marginTop: 8, paddingTop: 6 }}>
+    <div style={{ display: "flex", alignItems: "stretch", gap: 14, height: 120, marginTop: 8, paddingTop: 6 }}>
       {counts.map((c) => (
-        <div key={c.position} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
-          <div style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 13, color: "var(--ink)" }}>{c.count}</div>
-          <div style={{ width: "70%", height: `${Math.max(4, (c.count / max) * 100)}%`, background: "var(--navy)", borderRadius: "8px 8px 0 0" }} />
-          <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>{POSITION_LABEL[c.position] || c.position}</div>
+        <div key={c.position} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 13, color: "var(--ink)", marginBottom: 6 }}>{c.count}</div>
+          <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end", background: "var(--line)", borderRadius: "8px 8px 0 0", overflow: "hidden" }}>
+            <div style={{ width: "100%", height: `${Math.max(4, (c.count / max) * 100)}%`, background: "var(--navy)" }} />
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600, marginTop: 6 }}>{POSITION_LABEL[c.position] || c.position}</div>
         </div>
       ))}
     </div>
