@@ -324,7 +324,7 @@ function SkillHeatmap({ members }) {
             <tr>
               <th />
               {members.map((m) => (
-                <th key={m.id} style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", padding: "0 0 6px", textAlign: "center" }}>
+                <th key={m.id} style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", padding: "0 0 6px", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.4 }}>
                   {(m.name || m.username).split(" ")[0]}
                 </th>
               ))}
@@ -391,19 +391,21 @@ function LevelDistribution({ members }) {
   );
 }
 
-// One stage of the Application card's funnel — bar length relative to the
-// largest stage, colored by that status's own STATUS_META (features/ideas/
-// constants.js), same colors the Ideas Hub's own board uses.
+// One stage of the Application card's funnel — a solid bar (no background
+// track behind it, unlike a progress bar: an empty stage should show
+// nothing, not a gray placeholder pill) sized relative to the largest
+// stage, colored by that status's own STATUS_META (features/ideas/
+// constants.js), same colors the Ideas Hub's own board uses. Same
+// label/bar/count 3-column proportions as the design mockup's own funnel
+// row.
 function StatusFunnelRow({ status, count, max }) {
   const fg = (STATUS_META[status] || {}).fg || "var(--blue)";
   const pct = max ? Math.round((count / max) * 100) : 0;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
-      <span style={{ flex: "0 0 100px", fontSize: 12, color: "var(--muted)" }}>{status}</span>
-      <div style={{ flex: 1, height: 10, borderRadius: 999, background: "var(--line)", overflow: "hidden" }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: fg, borderRadius: 999 }} />
-      </div>
-      <span style={{ flex: "0 0 24px", textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{count}</span>
+    <div style={{ display: "grid", gridTemplateColumns: "96px 1fr 30px", alignItems: "center", gap: 10, margin: "9px 0" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--navy)" }}>{status}</span>
+      <div style={{ height: 26, borderRadius: 8, width: `${pct}%`, background: fg }} />
+      <span style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 14, textAlign: "right", color: "var(--ink)" }}>{count}</span>
     </div>
   );
 }
@@ -461,7 +463,7 @@ function LearningImpactCard({ members, ideas }) {
   const contributorPct = members.length ? Math.round((contributors.length / members.length) * 100) : 0;
 
   return (
-    <div style={{ ...card, marginTop: 16 }}>
+    <div style={card}>
       <p style={eyebrow}>Application · AI Ideas Hub</p>
       <h2 style={cardTitle}>From learning to impact</h2>
       {ideas.length === 0 ? (
@@ -470,19 +472,28 @@ function LearningImpactCard({ members, ideas }) {
         <>
           <p style={cardCaption}>Where enrolled learners' own Ideas Hub submissions stand today.</p>
           <div>{counts.map((c) => <StatusFunnelRow key={c.status} status={c.status} count={c.count} max={max} />)}</div>
+          {/* Boxed info panel (var(--bg), the same canvas gray other small
+              icon chips on this page already use) instead of a plain
+              bordered text line — matches the mockup's own ".conv" callout
+              treatment for this exact summary. Doubles as the expand
+              toggle for the "who's doing it" breakdown below. */}
           <button
             onClick={() => setExpanded((v) => !v)}
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", border: "none", background: "none", padding: 0, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%",
+              border: "none", background: "var(--bg)", borderRadius: 10, padding: "11px 13px", marginTop: 12,
+              cursor: "pointer", textAlign: "left",
+            }}
           >
-            <span style={{ fontSize: 12, color: "var(--muted)" }}>
-              <b style={{ color: "var(--ink)" }}>{contributors.length} of {members.length} learners</b> ({contributorPct}%) have submitted at least one idea.
+            <span style={{ fontSize: 12.5, color: "var(--navy)" }}>
+              <b>{contributors.length} of {members.length} learners</b> ({contributorPct}%) have submitted at least one idea.
             </span>
-            <span style={{ fontSize: 11, color: "var(--blue)", fontWeight: 700, flexShrink: 0, marginLeft: 10 }}>
+            <span style={{ fontSize: 11, color: "var(--blue)", fontWeight: 700, flexShrink: 0 }}>
               {expanded ? "Hide ︿" : "Who's doing it ﹀"}
             </span>
           </button>
           {expanded && (
-            <div style={{ marginTop: 4 }}>
+            <div style={{ marginTop: 2 }}>
               {contributors.map((c) => <ContributorRow key={c.member.id} member={c.member} total={c.total} shipped={c.shipped} />)}
             </div>
           )}
@@ -706,7 +717,12 @@ export default function TeamPage() {
                   )}
                 </section>
 
-                {/* ── Coverage + Distribution — mockup's two-column row ── */}
+                {/* ── Coverage (left) + Application/Distribution stacked
+                    (right) — the mockup's own two-column row: Skills
+                    heatmap runs the full height of the row, and "From
+                    learning to impact" sits above "Where the team sits" in
+                    the narrower column, not as a separate full-width
+                    section below both. ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 14, marginTop: 16 }}>
                   <div style={card}>
                     <p style={eyebrow}>Coverage</p>
@@ -714,16 +730,16 @@ export default function TeamPage() {
                     <p style={cardCaption}>Spot gaps at a glance — darker means stronger.</p>
                     <SkillHeatmap members={members} />
                   </div>
-                  <div style={card}>
-                    <p style={eyebrow}>Distribution</p>
-                    <h2 style={cardTitle}>Where the team sits</h2>
-                    <p style={cardCaption}>Learners per seniority level.</p>
-                    <LevelDistribution members={members} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <LearningImpactCard members={members} ideas={ideas} />
+                    <div style={card}>
+                      <p style={eyebrow}>Distribution</p>
+                      <h2 style={cardTitle}>Where the team sits</h2>
+                      <p style={cardCaption}>Learners per seniority level.</p>
+                      <LevelDistribution members={members} />
+                    </div>
                   </div>
                 </div>
-
-                {/* ── Application · AI Ideas Hub ── */}
-                <LearningImpactCard members={members} ideas={ideas} />
 
                 {selected && <MemberDrilldown member={selected} onClose={() => setSelected(null)} />}
               </>
