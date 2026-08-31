@@ -339,13 +339,15 @@ function SkillHeatmap({ members }) {
                   return (
                     <td key={m.id} style={{ padding: 0, textAlign: "center" }} title={`${m.name || m.username} · ${skill}: ${pct != null ? `${pct}%` : "no data yet"}`}>
                       {/* Columns still divide the card's full width evenly
-                          (table-layout: fixed above) so the table itself
-                          spans edge to edge with a small roster — but the
-                          swatch itself stays capped at the mockup's own
-                          cell size and centered in its column, instead of
-                          stretching to fill however wide that column ends
-                          up being with only a few members. */}
-                      <div style={{ width: 30, maxWidth: "70%", height: 26, margin: "0 auto", borderRadius: 6, background: HEAT_COLORS[heatBucket(pct)] }} />
+                          (table-layout: fixed above) so the table spans
+                          edge to edge — the swatch itself fills most of its
+                          column (80%) rather than the mockup's own small
+                          fixed 30px, which left too much bare gap around
+                          each box once a small roster gives every column
+                          more room than 7-member mockup ever assumed.
+                          max-width keeps it from ballooning again if the
+                          roster is smaller still (fewer, wider columns). */}
+                      <div style={{ width: "80%", maxWidth: 52, height: 30, margin: "0 auto", borderRadius: 6, background: HEAT_COLORS[heatBucket(pct)] }} />
                     </td>
                   );
                 })}
