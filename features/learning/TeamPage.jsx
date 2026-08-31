@@ -215,8 +215,8 @@ function MemberRow({ member, teamAvgPct, ideasCount, onOpen }) {
       <td style={td}>{member.in_progress_count}</td>
       <td style={td}><PacePill pace={paceFor(member, teamAvgPct)} /></td>
       <td style={{ ...td, textAlign: "right" }}>{exam != null ? `${exam}%` : "—"}</td>
-      <td style={{ ...td, textAlign: "right" }}>{ideasCount}</td>
       <td style={td}>{relTime(member.last_activity)}</td>
+      <td style={{ ...td, textAlign: "right" }}>{ideasCount}</td>
       <td style={{ ...td, textAlign: "right", color: "var(--muted)" }}>›</td>
     </tr>
   );
