@@ -41,9 +41,9 @@ const POSITION_ORDER = POSITIONS;
 //
 // courses (added for the Team view rebuild) is UNSCOPED by in_range too, and
 // deliberately lean — status/skills/quiz snapshot only, not the full course
-// row getJourney() returns. It exists so skillConfidence()/avgExamScore()
+// row getJourney() returns. It exists so skillConfidence()/avgExamAccuracy()
 // (shared.js) can run client-side per member for the "Skills across the
-// team" heatmap and the roster's "Avg exam" column, off the exact same
+// team" heatmap and the roster's "Avg Accuracy" column, off the exact same
 // formula the learner's own Dashboard uses — not a second, SQL-side copy of
 // that math that could quietly drift from it.
 export async function getTeamOverview() {
@@ -78,9 +78,9 @@ export async function getTeamOverview() {
         (array_agg(title order by updated_at asc)
           filter (where status = 'in_progress' and updated_at < now() - interval '28 days'))[1] as stalled_course,
         -- Lean per-course fields only (status/skills/quiz snapshot) — enough
-        -- for skillConfidence()/avgExamScore() (shared.js) to run client-side
+        -- for skillConfidence()/avgExamAccuracy() (shared.js) to run client-side
         -- on this same shape getJourney() already produces for the learner's
-        -- own Dashboard, so Team view's heatmap and "Avg exam" column reuse
+        -- own Dashboard, so Team view's heatmap and "Avg Accuracy" column reuse
         -- that exact formula instead of a second copy of it in SQL.
         json_agg(json_build_object(
           'status', status, 'skills', skills,
@@ -138,7 +138,7 @@ export async function getMyIdeas(accountId) {
 // lean (status + owner only), for Team view's "Ideas shipped" KPI and its
 // Application card. Aggregated client-side (status funnel, shipped count,
 // % of learners with at least one idea) the same way skillConfidence()/
-// avgExamScore() are, off the roster TeamPage.jsx already has — not a
+// avgExamAccuracy() are, off the roster TeamPage.jsx already has — not a
 // second copy of "what counts as shipped" logic in SQL.
 export async function getTeamIdeas() {
   return sql`

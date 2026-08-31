@@ -29,9 +29,10 @@
 // scores below 70%" is. One row per flagged person instead of the
 // two-examples-squeezed-into-a-stat-card-hint this card used to be.
 //
-// Skills heatmap and the roster's "Avg exam" column reuse skillConfidence()/
-// avgExamScore() (shared.js) — the exact same formulas the learner's own
-// Dashboard uses for "Confidence by skill"/"Avg exam score" — computed
+// Skills heatmap and the roster's "Avg Accuracy" column reuse
+// skillConfidence()/avgExamAccuracy() (shared.js) — the exact same
+// formulas the learner's own Dashboard uses for "Confidence by
+// skill"/"Avg exam accuracy" — computed
 // client-side per member off the lean `courses` array getTeamOverview() now
 // returns per row (features/learning/queries.js), not a second copy of that
 // math in SQL.
@@ -53,7 +54,7 @@ import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, th, td, relTime,
-  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, skillConfidence, avgExamScore,
+  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, skillConfidence, avgExamAccuracy,
 } from "@/features/learning/shared";
 import { JourneyTable } from "@/features/learning/JourneyPage";
 import ProgressBar from "@/features/learning/ProgressBar";
@@ -197,7 +198,7 @@ function PacePill({ pace }) {
 
 function MemberRow({ member, teamAvgPct, ideasCount, onOpen }) {
   const pct = pctOf(member);
-  const exam = avgExamScore(member.courses || []);
+  const exam = avgExamAccuracy(member.courses || []);
   return (
     <tr style={{ borderTop: "1px solid var(--line)", cursor: "pointer" }} onClick={() => onOpen(member)}>
       <td style={td}>
@@ -224,15 +225,17 @@ function MemberRow({ member, teamAvgPct, ideasCount, onOpen }) {
   );
 }
 
-// A member's own average exam score (avgExamScore, shared.js — the exact
-// number the roster's own "Avg Exam" column shows) falling below this is
+// A member's own average quiz accuracy (avgExamAccuracy, shared.js — the
+// correct-answers-over-total-questions ratio, first try, the exact number
+// the roster's own "Avg Accuracy" column shows) falling below this is
 // "Struggling". Unlike everything else on this page, this IS a fixed,
 // invented-sounding number — but unlike the mockup's own "two exam scores
 // below 70%" (which we deliberately didn't build), this one was set by
 // the product owner directly, not guessed at here. Nothing else in this
-// app treats 70% (or any score) as a "pass" — the wrap-up quiz itself
-// stays deliberately un-scored/un-gated everywhere else in this feature.
-const STRUGGLING_EXAM_THRESHOLD = 70;
+// app treats 70% (or any accuracy figure) as a "pass" — the wrap-up quiz
+// itself stays deliberately un-scored/un-gated everywhere else in this
+// feature.
+const STRUGGLING_ACCURACY_THRESHOLD = 70;
 
 // "Needs support" reasons — a superset of the roster's own Pace column
 // (paceFor, above): Stalled and Behind mean the same thing here they do
@@ -244,8 +247,8 @@ const STRUGGLING_EXAM_THRESHOLD = 70;
 // outranks simply trailing the team's pace (Behind).
 function needsSupportReason(member, teamAvgPct) {
   if (member.stalled) return "stalled";
-  const exam = avgExamScore(member.courses || []);
-  if (exam != null && exam < STRUGGLING_EXAM_THRESHOLD) return "struggling";
+  const exam = avgExamAccuracy(member.courses || []);
+  if (exam != null && exam < STRUGGLING_ACCURACY_THRESHOLD) return "struggling";
   if (pctOf(member) < teamAvgPct) return "behind";
   return null;
 }
@@ -265,11 +268,11 @@ const NEEDS_SUPPORT_META = {
 // this app could actually do that.
 function NeedsSupportRow({ member, reason, teamAvgPct, onOpen }) {
   const meta = NEEDS_SUPPORT_META[reason];
-  const exam = avgExamScore(member.courses || []);
+  const exam = avgExamAccuracy(member.courses || []);
   const why = reason === "stalled"
     ? `Last active ${relTime(member.last_activity)} · ${member.stalled_course ? `stuck on "${member.stalled_course}"` : "an in-progress course"}`
     : reason === "struggling"
-      ? `${exam}% avg exam score · below the ${STRUGGLING_EXAM_THRESHOLD}% mark`
+      ? `${exam}% avg exam accuracy · below the ${STRUGGLING_ACCURACY_THRESHOLD}% mark`
       : `${pctOf(member)}% complete · team average is ${teamAvgPct}%`;
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--line)" }}>
@@ -646,7 +649,7 @@ export default function TeamPage() {
   // Track-combination breakdown ("3 on AI Track · 2 on AI Track + Core
   // Competency") — folded into the Team progress caption below rather than
   // its own KPI tile, so the KPI row can match the mockup's 4-tile set
-  // exactly (Team completion/Active this week/Avg exam score/Ideas shipped).
+  // exactly (Team completion/Active this week/Avg exam accuracy/Ideas shipped).
   const comboCounts = new Map();
   members.forEach((m) => {
     const key = trackLabel((m.tracks || []).slice().sort());
@@ -676,12 +679,13 @@ export default function TeamPage() {
   const activeCount = members.filter((m) => withinDays(m.last_activity, 7)).length;
   const inactiveCount = members.length - activeCount;
 
-  // KPI: "Avg exam score" — avgExamScore (shared.js) over every member's
-  // courses flattened into one list, so this is one team-wide average
-  // rather than an average-of-per-member-averages (a member with more
-  // quiz-graded completions naturally weighs more, same as if this were one
-  // big list of completions to begin with rather than one list per person).
-  const teamAvgExamScore = avgExamScore(members.flatMap((m) => m.courses || []));
+  // KPI: "Avg exam accuracy" — avgExamAccuracy (shared.js) over every
+  // member's courses flattened into one list, so this is one team-wide
+  // average rather than an average-of-per-member-averages (a member with
+  // more quiz-graded completions naturally weighs more, same as if this
+  // were one big list of completions to begin with rather than one list
+  // per person).
+  const teamAvgExamAccuracy = avgExamAccuracy(members.flatMap((m) => m.courses || []));
 
   // KPI: "Ideas shipped" — count of enrolled-learner ideas that reached
   // Launched (getTeamIdeas, features/learning/queries.js — owner + status
@@ -718,7 +722,7 @@ export default function TeamPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
                   <KpiTile label="Team completion" value={`${avgPct}%`} hint={`avg across ${members.length} learner${members.length === 1 ? "" : "s"}`} />
                   <KpiTile label="Active this week" value={`${activeCount} / ${members.length}`} hint={inactiveCount === 0 ? "Everyone's active" : `${inactiveCount} inactive 7+ days`} />
-                  <KpiTile label="Avg exam score" value={teamAvgExamScore != null ? `${teamAvgExamScore}%` : "—"} hint="First-try accuracy, quiz-graded completions" />
+                  <KpiTile label="Avg exam accuracy" value={teamAvgExamAccuracy != null ? `${teamAvgExamAccuracy}%` : "—"} hint="First-try accuracy, quiz-graded completions" />
                   <KpiTile label="Ideas shipped" value={shippedCount} hint={`${ideas.length} submitted by learners`} accent />
                 </div>
 
@@ -760,7 +764,7 @@ export default function TeamPage() {
                             <th style={th} title="Core courses complete, scoped to what's expected through this person's own level — not the whole roadmap">% Complete</th>
                             <th style={th}>In Progress</th>
                             <th style={th} title="Stalled: an in-progress course untouched 28+ days. Behind: % Complete below the team's own average.">Pace</th>
-                            <th style={{ ...th, textAlign: "right" }} title="First-try accuracy across this person's completed, quiz-graded courses">Avg Exam</th>
+                            <th style={{ ...th, textAlign: "right" }} title="First-try accuracy across this person's completed, quiz-graded courses">Avg Accuracy</th>
                             <th style={th}>Last Activity</th>
                             <th style={{ ...th, textAlign: "right" }} title="Ideas Hub submissions this person has initiated, any status">Ideas</th>
                             <th />

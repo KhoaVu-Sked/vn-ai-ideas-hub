@@ -62,7 +62,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, effectivePosition, fmtDate,
   PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel, weeklyStreak,
-  skillConfidence, SKILL_CONFIDENCE_SCALE, avgExamScore,
+  skillConfidence, SKILL_CONFIDENCE_SCALE, avgExamAccuracy,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
@@ -277,12 +277,12 @@ export default function LearnerDashboardPage() {
   const streak = weeklyStreak(journey);
 
   // Retention card — "Confidence by skill" (skillConfidence, shared.js) plus
-  // its own "Avg exam score" footer row (avgExamScore, shared.js — same
-  // formula Team view's roster column and KPI tile use), same all-time scope
-  // as Consistency next to it (see that card's own comment for why "this
-  // month" isn't derivable).
+  // its own "Avg exam accuracy" footer row (avgExamAccuracy, shared.js —
+  // same formula Team view's roster column and KPI tile use), same all-time
+  // scope as Consistency next to it (see that card's own comment for why
+  // "this month" isn't derivable).
   const skillRows = skillConfidence(journey);
-  const myAvgExamScore = avgExamScore(journey);
+  const myAvgExamAccuracy = avgExamAccuracy(journey);
 
   // What's next — same "upcoming" pick as Your Journey's Up next card (dated
   // soonest-first, then undated filling the roadmap's own order), just the
@@ -407,7 +407,7 @@ export default function LearnerDashboardPage() {
                       ) : (
                         <div>
                           {skillRows.map((s) => <SkillRow key={s.skill} skill={s.skill} dots={s.dots} />)}
-                          {myAvgExamScore != null && <MiniRow k="Avg exam score" v={`${myAvgExamScore}%`} />}
+                          {myAvgExamAccuracy != null && <MiniRow k="Avg exam accuracy" v={`${myAvgExamAccuracy}%`} />}
                         </div>
                       )}
                     </div>
