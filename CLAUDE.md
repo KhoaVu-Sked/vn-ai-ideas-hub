@@ -12,6 +12,10 @@ I'm Khoa Vu, a Technical Support Engineer at Skedulo. I lead an internal initiat
 - **Data lives in Neon Postgres**, reached only from server-side API routes. Raw parameterised SQL via `@neondatabase/serverless` — no ORM.
 - Built and in use: the board, the full `/idea/[id]` page with engagement, auth with email verification, profiles, the leader dashboard, admin tooling (tags, form fields, accounts, feedback, delete requests, tasks, activity log), and email notifications.
 
+## AI Learning feature
+
+This repo also hosts a second, largely independent feature — **AI Learning** (`/learning-hub/*`): course tracks, a learner's roadmap, wrap-up quizzes, a Learner Dashboard, a Team view, and Auto Schedule (real Google Calendar booking). It has its own requirements doc, split by feature so a session only has to read what's relevant to the change at hand — **start at [`ai-learning-requirements/00-overview.md`](ai-learning-requirements/00-overview.md)**. It's short, and its routing table sends you to the one or two files that actually matter; don't read the whole directory for a small, single-feature change.
+
 ## Before changing anything — read this first
 
 **Read [`docs/change-map.md`](docs/change-map.md) before editing code.** It lists

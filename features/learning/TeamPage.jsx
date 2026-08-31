@@ -14,7 +14,7 @@
 //
 // Deliberately does NOT include a "Sync courses" control — that's the
 // Google Sheets catalog-sync pipeline from the original spec, which was
-// never built and isn't planned (see ai-learning-requirements.md, section 2.2).
+// never built and isn't planned (see ai-learning-requirements/01-course-catalog.md, section 2.2).
 
 import { useCallback, useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";

@@ -5,8 +5,8 @@
 -- Learner Dashboard (/learning-hub/dashboard) have something real to show
 -- instead of empty states — plus two live-demoable moments for the "+1
 -- stage" early-access feature (Section 4.4/8 style rule in
--- ai-learning-requirements.md; effectivePosition/isTierDone in
--- features/learning/shared.js). Run schema.sql and ai-track-seed.sql first
+-- ai-learning-requirements/03-your-journey.md; effectivePosition/isTierDone
+-- in features/learning/shared.js). Run schema.sql and ai-track-seed.sql first
 -- (this reads courses/course_quiz_questions they create). Run in the Neon
 -- SQL editor, same as those two.
 --
@@ -60,7 +60,7 @@
 --
 -- Target dates on in-progress courses fall between today and the next
 -- annual review (13 Oct 2026 — the same default Auto Schedule itself would
--- propose; Section 8.6 of ai-learning-requirements.md).
+-- propose; Section 8.6 of ai-learning-requirements/07-scheduler-auto-schedule.md).
 --
 -- Re-running: fully safe and fully deterministic. Step 4 below DELETEs
 -- every course_assignments row for these 3 accounts before rebuilding them
@@ -93,8 +93,9 @@ join accounts a on a.username = v.username
 on conflict (account_id) do update set position = excluded.position, updated_at = now();
 
 -- 3) Enroll all three in the AI Track — the only track with real courses
--- today (Core Competency exists but is empty — see ai-learning-requirements.md
--- Section 2.1's acceptance criteria).
+-- today (Core Competency exists but is empty — see
+-- ai-learning-requirements/01-course-catalog.md's Section 2.1 acceptance
+-- criteria).
 insert into account_tracks (account_id, track_id)
 select a.id, (select id from tracks where name = 'AI Track')
 from accounts a

@@ -437,8 +437,9 @@ export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosit
 }
 
 // Writes what Auto Schedule decided for one course: the target_date Up next
-// already reads (Section 4.7) plus the Google event id, so a re-run knows to
-// update that event rather than create a second one.
+// already reads (ai-learning-requirements/03-your-journey.md, 4.7) plus the
+// Google event id, so a re-run knows to update that event rather than create
+// a second one.
 export async function saveScheduledEvent(accountId, courseId, { targetDate, eventId }) {
   const rows = await sql`
     insert into course_assignments (account_id, course_id, target_date, calendar_event_id)

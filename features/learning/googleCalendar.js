@@ -8,7 +8,7 @@
 // SECRET if those aren't set (the default once someone with access adds the
 // redirect URI there instead). Keeps its own refresh token per account
 // (calendar_connections) either way — sign-in itself never stores a token.
-// See ai-learning-requirements.md Section 8 for why.
+// See ai-learning-requirements/07-scheduler-auto-schedule.md for why.
 //
 // Needs, on WHICHEVER client ends up in use here:
 //   - the Calendar API enabled on its Cloud project
