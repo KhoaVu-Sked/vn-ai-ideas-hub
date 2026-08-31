@@ -114,8 +114,12 @@ create table if not exists courses (
   unique (track_id, title)
 );
 create index if not exists courses_track_id_idx on courses (track_id);
--- Existing databases predate this column (migration 028). Kept right here,
--- same pattern as course_assignments' own predate-columns block below.
+-- Existing databases predate these columns — stage/cost/outcome (migration
+-- 023) and skills (migration 028). Kept right here, same pattern as
+-- course_assignments' own predate-columns block below.
+alter table courses add column if not exists stage text;
+alter table courses add column if not exists cost text;
+alter table courses add column if not exists outcome text;
 alter table courses add column if not exists skills text[] not null default '{}';
 
 -- One row per (account, course): a learner's target date and progress.
