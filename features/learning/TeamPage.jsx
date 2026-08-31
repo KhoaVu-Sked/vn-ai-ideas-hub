@@ -193,7 +193,7 @@ function PacePill({ pace }) {
   );
 }
 
-function MemberRow({ member, teamAvgPct, onOpen }) {
+function MemberRow({ member, teamAvgPct, ideasCount, onOpen }) {
   const pct = pctOf(member);
   const exam = avgExamScore(member.courses || []);
   return (
@@ -215,6 +215,7 @@ function MemberRow({ member, teamAvgPct, onOpen }) {
       <td style={td}>{member.in_progress_count}</td>
       <td style={td}><PacePill pace={paceFor(member, teamAvgPct)} /></td>
       <td style={{ ...td, textAlign: "right" }}>{exam != null ? `${exam}%` : "—"}</td>
+      <td style={{ ...td, textAlign: "right" }}>{ideasCount}</td>
       <td style={td}>{relTime(member.last_activity)}</td>
       <td style={{ ...td, textAlign: "right", color: "var(--muted)" }}>›</td>
     </tr>
@@ -385,6 +386,24 @@ function StatusFunnelRow({ status, count, max }) {
   );
 }
 
+// One contributor's line in the expanded "who's doing it" breakdown —
+// submitted/shipped counts only (no link to their roadmap drill-down: that
+// shows course progress, not their ideas, and there's no "this account's
+// ideas" view to send it to instead).
+function ContributorRow({ member, total, shipped }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 0", borderTop: "1px solid var(--line)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <Avatar person={member} size={24} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{member.name || member.username}</span>
+      </div>
+      <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
+        {total} submitted{shipped > 0 ? ` · ${shipped} shipped` : ""}
+      </span>
+    </div>
+  );
+}
+
 // "From learning to impact" — real now: every idea initiated by a
 // currently-enrolled learner (getTeamIdeas, features/learning/queries.js),
 // bucketed into the Ideas Hub's own real lifecycle (STATUS_ORDER) rather
@@ -393,11 +412,31 @@ function StatusFunnelRow({ status, count, max }) {
 // Applied have shipped..." conversion rate needed level+skill attribution
 // this can't do; "% of learners who've submitted at least one idea" is the
 // honest substitute — owner + status only, same as everything else here.
+//
+// Expandable: the funnel/contributor-% summary is the always-visible
+// headline; toggling reveals the per-contributor breakdown ("who's doing
+// it") — same collapsed-by-default chevron pattern JourneyTable's own row
+// expansion uses (JourneyPage.jsx), rather than showing every contributor
+// unconditionally, which would make this card grow without bound as the
+// team submits more ideas.
 function LearningImpactCard({ members, ideas }) {
+  const [expanded, setExpanded] = useState(false);
   const counts = STATUS_ORDER.map((status) => ({ status, count: ideas.filter((i) => i.status === status).length }));
   const max = Math.max(1, ...counts.map((c) => c.count));
-  const contributors = new Set(ideas.map((i) => i.initiator_account_id)).size;
-  const contributorPct = members.length ? Math.round((contributors / members.length) * 100) : 0;
+
+  const membersById = new Map(members.map((m) => [m.id, m]));
+  const byContributor = new Map(); // account_id -> { total, shipped }
+  for (const idea of ideas) {
+    const row = byContributor.get(idea.initiator_account_id) || { total: 0, shipped: 0 };
+    row.total += 1;
+    if (idea.status === "Launched") row.shipped += 1;
+    byContributor.set(idea.initiator_account_id, row);
+  }
+  const contributors = [...byContributor.entries()]
+    .map(([accountId, stats]) => ({ member: membersById.get(accountId), ...stats }))
+    .filter((c) => c.member) // an initiator who's since left every track wouldn't be on the roster
+    .sort((a, b) => b.total - a.total || (a.member.name || a.member.username).localeCompare(b.member.name || b.member.username));
+  const contributorPct = members.length ? Math.round((contributors.length / members.length) * 100) : 0;
 
   return (
     <div style={{ ...card, marginTop: 16 }}>
@@ -409,9 +448,22 @@ function LearningImpactCard({ members, ideas }) {
         <>
           <p style={cardCaption}>Where enrolled learners' own Ideas Hub submissions stand today.</p>
           <div>{counts.map((c) => <StatusFunnelRow key={c.status} status={c.status} count={c.count} max={max} />)}</div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)" }}>
-            <b style={{ color: "var(--ink)" }}>{contributors} of {members.length} learners</b> ({contributorPct}%) have submitted at least one idea.
-          </div>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", border: "none", background: "none", padding: 0, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}
+          >
+            <span style={{ fontSize: 12, color: "var(--muted)" }}>
+              <b style={{ color: "var(--ink)" }}>{contributors.length} of {members.length} learners</b> ({contributorPct}%) have submitted at least one idea.
+            </span>
+            <span style={{ fontSize: 11, color: "var(--blue)", fontWeight: 700, flexShrink: 0, marginLeft: 10 }}>
+              {expanded ? "Hide ︿" : "Who's doing it ﹀"}
+            </span>
+          </button>
+          {expanded && (
+            <div style={{ marginTop: 4 }}>
+              {contributors.map((c) => <ContributorRow key={c.member.id} member={c.member} total={c.total} shipped={c.shipped} />)}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -546,6 +598,14 @@ export default function TeamPage() {
   // only, see the file header comment).
   const shippedCount = ideas.filter((i) => i.status === "Launched").length;
 
+  // Roster's "Ideas" column — how many Ideas Hub submissions each member
+  // has initiated, any status. Built once here (not filtered per-row in
+  // MemberRow) so it's one pass over `ideas` regardless of roster size.
+  const ideasByAccount = new Map();
+  for (const idea of ideas) {
+    ideasByAccount.set(idea.initiator_account_id, (ideasByAccount.get(idea.initiator_account_id) || 0) + 1);
+  }
+
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <AppHeader crumb="Team view" />
@@ -612,11 +672,12 @@ export default function TeamPage() {
                             <th style={th} title="Stalled: an in-progress course untouched 28+ days. Behind: % Complete below the team's own average.">Pace</th>
                             <th style={{ ...th, textAlign: "right" }} title="First-try accuracy across this person's completed, quiz-graded courses">Avg Exam</th>
                             <th style={th}>Last Activity</th>
+                            <th style={{ ...th, textAlign: "right" }} title="Ideas Hub submissions this person has initiated, any status">Ideas</th>
                             <th />
                           </tr>
                         </thead>
                         <tbody>
-                          {rows.map((m) => <MemberRow key={m.id} member={m} teamAvgPct={avgPct} onOpen={setSelected} />)}
+                          {rows.map((m) => <MemberRow key={m.id} member={m} teamAvgPct={avgPct} ideasCount={ideasByAccount.get(m.id) || 0} onOpen={setSelected} />)}
                         </tbody>
                       </table>
                     </div>
