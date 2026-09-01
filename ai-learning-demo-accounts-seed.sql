@@ -1,10 +1,10 @@
 -- AI Learning Platform — demo learner accounts with variant roadmap progress
 --
--- Sets up 3 learners on the AI Track with deliberately different seniority
--- and completion, so Team view (/learning-hub/team) and each learner's own
--- Learner Dashboard (/learning-hub/dashboard) have something real to show
--- instead of empty states — plus two live-demoable moments for the "+1
--- stage" early-access feature (Section 4.4/8 style rule in
+-- Sets up 3 fictional learners on the AI Track with deliberately different
+-- seniority and completion, so Team view (/learning-hub/team) and each
+-- learner's own Learner Dashboard (/learning-hub/dashboard) have something
+-- real to show instead of empty states — plus two live-demoable moments for
+-- the "+1 stage" early-access feature (Section 4.4/8 style rule in
 -- ai-learning-requirements/03-your-journey.md; effectivePosition/isTierDone
 -- in features/learning/shared.js). Run schema.sql and ai-track-seed.sql first
 -- (this reads courses/course_quiz_questions they create). Run in the Neon
@@ -16,6 +16,18 @@
 -- inventing new people, and safe whether or not seed.sql has been run: the
 -- account insert below is ON CONFLICT (username) DO NOTHING, so it never
 -- touches an existing row's name/password/role.
+--
+-- ⚠️ Section 9 (kiet.ly@skedulo.com) is DIFFERENT from the three above: it's
+-- not a fictional persona, it's a real Skedulo account (Kiet's own), reset
+-- here to mirror thu's exact scenario ON PURPOSE — the product owner's own
+-- explicit request, for live demos under their own login rather than a
+-- fictional name. Unlike thao/thu/haanh, there is no accounts insert for it
+-- (the row already exists — email is looked up, not created), but
+-- user_role.position and course_assignments ARE overwritten on every
+-- re-run, same as the other three. Re-running this file after that account
+-- has accumulated real, non-demo progress will erase it back to this
+-- scripted scenario — that's the deliberately-requested behavior, not an
+-- accident, but worth knowing before pasting this into Neon a second time.
 --
 -- The rule this file encodes: an account with position P has COMPLETED
 -- every course in every tier BELOW P, then shows realistic, DELIBERATE
@@ -257,4 +269,136 @@ on conflict (account_id, course_id) do update set
   status = excluded.status,
   quiz_total_questions = excluded.quiz_total_questions,
   quiz_correct_first_try = excluded.quiz_correct_first_try,
+  updated_at = excluded.updated_at;
+
+-- 9) kiet.ly@skedulo.com — Kiet's own REAL account, not a fictional persona
+-- (see the ⚠️ warning at the top of this file). Looked up by email, not
+-- username, since this row already exists and this file never creates it.
+-- Mirrors thu's exact scenario (steps 5+7 above) so the same "one quiz
+-- away from unlocking Middle" demo is available under Kiet's own login,
+-- not just thu's: every Intern course complete, 5 of 6 Junior (own-tier)
+-- courses complete, "Prompt Engineering: ChatGPT, Claude & AI Masterclass"
+-- deliberately left not-started.
+insert into user_role (account_id, position)
+select a.id, 'junior'
+from accounts a
+where lower(a.email) = lower('kiet.ly@skedulo.com')
+on conflict (account_id) do update set position = excluded.position, updated_at = now();
+
+insert into account_tracks (account_id, track_id)
+select a.id, (select id from tracks where name = 'AI Track')
+from accounts a
+where lower(a.email) = lower('kiet.ly@skedulo.com')
+on conflict do nothing;
+
+delete from course_assignments
+where account_id in (select id from accounts where lower(email) = lower('kiet.ly@skedulo.com'));
+
+-- Every Intern-tier course — complete (same backfill approach as step 5,
+-- scoped to this one account by email instead of the username values-list).
+insert into course_assignments (account_id, course_id, status, quiz_total_questions, quiz_correct_first_try, updated_at)
+select
+  x.account_id, x.course_id, 'complete',
+  nullif(x.qtotal, 0),
+  case when x.qtotal > 0 then greatest(1, round(x.qtotal * 0.85)::int) else null end,
+  now() - (35 + (random() * 5)::int) * interval '1 day'
+from (
+  select a.id as account_id, c.id as course_id,
+    (select count(*)::int from course_quiz_questions q where q.course_id = c.id) as qtotal
+  from accounts a
+  join courses c on c.track_id = (select id from tracks where name = 'AI Track')
+  where lower(a.email) = lower('kiet.ly@skedulo.com')
+    and c.expected_by_position = 'intern'
+) x
+on conflict (account_id, course_id) do update set
+  status = excluded.status,
+  quiz_total_questions = excluded.quiz_total_questions,
+  quiz_correct_first_try = excluded.quiz_correct_first_try,
+  updated_at = excluded.updated_at;
+
+-- 5 of 6 Junior (own-tier) courses complete — same "one course away" demo
+-- as thu (step 7 above), same excluded course.
+insert into course_assignments (account_id, course_id, status, quiz_total_questions, quiz_correct_first_try, updated_at)
+select
+  x.account_id, x.course_id, 'complete',
+  nullif(x.qtotal, 0),
+  case when x.qtotal > 0 then greatest(1, round(x.qtotal * 0.82)::int) else null end,
+  now() - (5 + x.rn) * interval '1 day'
+from (
+  select a.id as account_id, c.id as course_id,
+    (select count(*)::int from course_quiz_questions q where q.course_id = c.id) as qtotal,
+    row_number() over (order by c.title) as rn
+  from accounts a
+  join courses c on c.track_id = (select id from tracks where name = 'AI Track')
+  where lower(a.email) = lower('kiet.ly@skedulo.com')
+    and c.expected_by_position = 'junior'
+    and c.title <> 'Prompt Engineering: ChatGPT, Claude & AI Masterclass'
+) x
+on conflict (account_id, course_id) do update set
+  status = excluded.status,
+  quiz_total_questions = excluded.quiz_total_questions,
+  quiz_correct_first_try = excluded.quiz_correct_first_try,
+  updated_at = excluded.updated_at;
+
+-- 10) quang (Quang Duc) — intern, 25% complete, "Behind" pace: a small,
+-- clearly-lagging account for Team view's own demonstration (the Pace
+-- column, Needs support's "Behind" tag, % Complete, Avg Accuracy) —
+-- recreated here as its own fictional persona so that demo doesn't
+-- disappear now that kiet.ly@skedulo.com (step 9) mirrors thu's
+-- further-along scenario instead. Reuses seed.sql's existing "Quang Duc"
+-- sample teammate (Ideas Hub demo), same as thao/thu/haanh above — not a
+-- new invented person. Same ON CONFLICT (username) DO NOTHING as those
+-- three: never touches an existing row's name/password/role.
+insert into accounts (username, email, password_hash, name, role) values
+  ('quang', 'quang@example.com', '$2b$10$.KADIlZ9jydxGHKm3RUtwObHYevre41mNeyaUcJzF7OX3zsvbBNUm', 'Quang Duc', 'member')
+on conflict (username) do nothing;
+
+insert into user_role (account_id, position)
+select a.id, 'intern'
+from accounts a where a.username = 'quang'
+on conflict (account_id) do update set position = excluded.position, updated_at = now();
+
+insert into account_tracks (account_id, track_id)
+select a.id, (select id from tracks where name = 'AI Track')
+from accounts a where a.username = 'quang'
+on conflict do nothing;
+
+delete from course_assignments
+where account_id in (select id from accounts where username = 'quang');
+
+-- 1 of 4 core Intern courses complete (25%) — the one % Complete/Pace/
+-- Needs-support read against the team average. Quiz accuracy landed at
+-- 78% on purpose (7 of 9 first-try) to match "Avg Accuracy" in the demo
+-- this is recreating.
+insert into course_assignments (account_id, course_id, status, quiz_total_questions, quiz_correct_first_try, updated_at)
+select
+  x.account_id, x.course_id, 'complete',
+  nullif(x.qtotal, 0),
+  case when x.qtotal > 0 then greatest(1, round(x.qtotal * 0.78)::int) else null end,
+  now() - interval '10 days'
+from (
+  select a.id as account_id, c.id as course_id,
+    (select count(*)::int from course_quiz_questions q where q.course_id = c.id) as qtotal
+  from accounts a
+  join courses c on c.track_id = (select id from tracks where name = 'AI Track')
+  where a.username = 'quang'
+    and c.title = 'AI Capabilities and Limitations'
+) x
+on conflict (account_id, course_id) do update set
+  status = excluded.status,
+  quiz_total_questions = excluded.quiz_total_questions,
+  quiz_correct_first_try = excluded.quiz_correct_first_try,
+  updated_at = excluded.updated_at;
+
+-- 1 course in progress (drives the roster's "In Progress" count and, being
+-- the most recent update, "Last Activity" too).
+insert into course_assignments (account_id, course_id, status, target_date, updated_at)
+select a.id, c.id, 'in_progress', '2026-10-01', now() - interval '4 days'
+from accounts a, courses c
+where a.username = 'quang'
+  and c.track_id = (select id from tracks where name = 'AI Track')
+  and c.title = 'Claude 101'
+on conflict (account_id, course_id) do update set
+  status = excluded.status,
+  target_date = excluded.target_date,
   updated_at = excluded.updated_at;
