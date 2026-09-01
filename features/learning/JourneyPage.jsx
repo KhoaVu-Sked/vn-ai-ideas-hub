@@ -720,6 +720,23 @@ export default function JourneyPage() {
   // also fully done) so the empty-handed moment gets an explicit message
   // instead of just... nothing happening.
   const atCeiling = visiblePosition !== position && isTierDone(journey, visiblePosition);
+  // Whether the account has an early-access tier at all to unlock (false
+  // once you're already at the top of the ladder — effectivePosition caps
+  // at the last position rather than going past it, so finishing Principal
+  // never makes visiblePosition diverge from position). Shared by the
+  // congrats banner below and, identically, by ProfileStrip's own selector.
+  const earlyAccess = position && visiblePosition !== position;
+  // The congrats banner below fires the moment the account's OWN official
+  // tier alone is done — real courses required, not vacuously true for an
+  // empty tier (isTierDone alone would say "done" for a tier with zero
+  // courses in it, which isn't an achievement). Deliberately checked
+  // BEFORE atCeiling, and suppressed once atCeiling is also true (below) —
+  // atCeiling is a strictly later state (it requires this tier done AND
+  // the +1 tier done too), so once reached, its own "you've completed
+  // everything visible" message supersedes this one rather than stacking
+  // two congrats banners.
+  const ownTierCourses = journey.filter((c) => c.expected_by_position === position);
+  const tierJustFinished = position && ownTierCourses.length > 0 && isTierDone(journey, position);
   // Knowledge artifacts' "waiting on the quiz" row — the account's current
   // in_progress pick, across every enrolled track (not scoped to the track
   // dropdown, same as recentCompletions isn't). Already on hand from the
@@ -848,6 +865,19 @@ export default function JourneyPage() {
               )}
             </div>
             {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
+            {tierJustFinished && !atCeiling && (
+              // Fires once, the moment the account's own official tier is
+              // fully done — the real annual-review milestone. Suppressed
+              // once atCeiling (below) is also true, so this doesn't stack
+              // with that later, more-complete message.
+              <div style={{ background: "#e6f4ea", border: "1px solid #bfe3c9", color: "#1f7a3c", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
+                {earlyAccess ? (
+                  <>🎉 You've completed every course in {POSITION_LABEL[position] || position} — you're all set for your annual review on {formatMonthDay(annualReviewDate)}. Early access to {POSITION_LABEL[visiblePosition] || visiblePosition} is open now — your {POSITION_LABEL[position] || position} completion rate for this review stays exactly as it is, whatever you do next.</>
+                ) : (
+                  <>🎉 You've completed every course in {POSITION_LABEL[position] || position} — you've reached the top of the ladder, and you're all set for your annual review on {formatMonthDay(annualReviewDate)}.</>
+                )}
+              </div>
+            )}
             {atCeiling && (
               // The +1 cap is flat (effectivePosition, shared.js) — finishing
               // that stage too doesn't push it to +2, so without this the
