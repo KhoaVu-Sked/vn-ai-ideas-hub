@@ -333,12 +333,26 @@ function AutoScheduleModal({ currentPosition, annualReviewDate, onClose, onSched
 }
 
 // Name, position badge, track tag(s) (one per enrolled track shown when the
-// dropdown is on "All tracks", just the one otherwise), and core-course
-// progress scoped to whatever the dropdown currently shows. "N/A" instead
-// of a progress bar when the account isn't enrolled in any track yet —
-// not just when the current filter happens to have zero core courses.
-function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTotal }) {
-  const pct = coreTotal ? Math.round((coreComplete / coreTotal) * 100) : 0;
+// TRACK filter dropdown is on "All tracks", just the one otherwise), and
+// core-course progress. "N/A" instead of a progress bar when the account
+// isn't enrolled in any track yet — not just when the current filter
+// happens to have zero core courses.
+//
+// A SEPARATE small selector (own local state, not the track filter above)
+// appears only once early access is earned (visiblePosition !== position —
+// effectivePosition, shared.js): "my level" shows the same cumulative
+// "through X" number as always; "early access" swaps to the next tier's
+// OWN core courses (nextTierCoreComplete/Total, computed by the parent) so
+// the learner can monitor the bonus material on its own terms, not folded
+// into a number that's already sitting near 100% because the tier below it
+// is what earned the early access in the first place.
+function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, coreComplete, coreTotal, nextTierCoreComplete, nextTierCoreTotal }) {
+  const [scope, setScope] = useState("mine");
+  const earlyAccess = Boolean(visiblePosition) && visiblePosition !== position;
+  const showingNext = earlyAccess && scope === "next";
+  const complete = showingNext ? nextTierCoreComplete : coreComplete;
+  const total = showingNext ? nextTierCoreTotal : coreTotal;
+  const pct = total ? Math.round((complete / total) * 100) : 0;
   return (
     <section style={{ ...card, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -362,9 +376,24 @@ function ProfileStrip({ me, position, trackTags, hasTracks, coreComplete, coreTo
       <div style={{ minWidth: 220, textAlign: "right" }}>
         {hasTracks ? (
           <>
+            {earlyAccess && (
+              <select
+                value={scope}
+                onChange={(e) => setScope(e.target.value)}
+                title="You've unlocked early access to the next stage — pick which one to monitor here"
+                style={{ marginBottom: 6, border: "1px solid var(--line)", background: "var(--bg)", borderRadius: 8, padding: "3px 8px", fontSize: 11.5, fontWeight: 700, color: "var(--ink)" }}
+              >
+                <option value="mine">{POSITION_LABEL[position] || position}</option>
+                <option value="next">{POSITION_LABEL[visiblePosition] || visiblePosition} · early access</option>
+              </select>
+            )}
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>
-              <strong style={{ color: "var(--ink)" }}>{coreComplete} of {coreTotal}</strong> core courses complete
-              {position && <span style={{ color: "var(--faint)" }}> · through {POSITION_LABEL[position] || position}</span>}
+              <strong style={{ color: "var(--ink)" }}>{complete} of {total}</strong> core courses complete
+              {showingNext ? (
+                <span style={{ color: "var(--faint)" }}> · {POSITION_LABEL[visiblePosition] || visiblePosition} only</span>
+              ) : (
+                position && <span style={{ color: "var(--faint)" }}> · through {POSITION_LABEL[position] || position}</span>
+              )}
             </div>
             <ProgressBar pct={pct} />
           </>
@@ -702,6 +731,15 @@ export default function JourneyPage() {
   // own definition for why the % stays uncoupled from early access).
   const coreCourses = filteredJourney.filter((c) => c.priority === "core" && isExpectedByNow(c, position));
   const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
+  // The early-access tier's OWN core courses only (expected_by_position ===
+  // visiblePosition), not accumulated with the tier(s) below it the way
+  // coreCourses above is ("through X"). That lower tier is already fully
+  // done — early access only unlocks once it is — so folding it back in
+  // would just show ~100% again and tell the learner nothing about the
+  // bonus material they just unlocked. ProfileStrip only surfaces this
+  // (as a second, selectable view) once visiblePosition !== position.
+  const nextTierCoreCourses = filteredJourney.filter((c) => c.priority === "core" && c.expected_by_position === visiblePosition);
+  const nextTierCoreComplete = nextTierCoreCourses.filter((c) => c.status === "complete").length;
   // "All tracks" shows a tag per enrolled track; one specific track shows just that one.
   const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
@@ -762,10 +800,13 @@ export default function JourneyPage() {
             <ProfileStrip
               me={me}
               position={position}
+              visiblePosition={visiblePosition}
               trackTags={trackTags}
               hasTracks={journey.length > 0}
               coreComplete={coreComplete}
               coreTotal={coreCourses.length}
+              nextTierCoreComplete={nextTierCoreComplete}
+              nextTierCoreTotal={nextTierCoreCourses.length}
             />
             <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
             <section style={{ ...card, flex: "2 1 480px", minWidth: 0 }}>
