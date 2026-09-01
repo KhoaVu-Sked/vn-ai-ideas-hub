@@ -412,6 +412,12 @@ function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, cor
 // the "⋯" menu (UpNextMenu below) instead of competing for header space.
 const pillBtnAccent = { display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "var(--blue)", cursor: "pointer", whiteSpace: "nowrap" };
 const pillBtnDone = { display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #bfe3c9", background: "#e6f4ea", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "#1f7a3c", cursor: "pointer", whiteSpace: "nowrap" };
+// Milestone banners (tierJustFinished/atCeiling, below) — same light-blue
+// accent combo as pillBtnAccent above, not the generic green a progress-app
+// reflex reaches for by default. Skedulo's own brand palette (CLAUDE.md)
+// is navy/blue; it has no green in it, so a green "success" banner would
+// be the one thing on this page that isn't actually on-brand.
+const milestoneBanner = { background: "#e8f0ff", border: "1px solid #cddcff", color: "var(--navy)", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 };
 const ellipsisBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, width: 28, height: 28, fontSize: 15, lineHeight: 1, color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 const menuPopover = { position: "absolute", top: "calc(100% + 6px)", right: 0, background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 8px 24px rgba(10,22,44,0.16)", padding: 6, display: "flex", flexDirection: "column", gap: 2, minWidth: 170, zIndex: 30 };
 const menuItem = { display: "flex", alignItems: "center", gap: 8, border: "none", background: "none", borderRadius: 6, padding: "8px 10px", fontSize: 12.5, fontWeight: 600, color: "var(--body)", cursor: "pointer", textAlign: "left", width: "100%" };
@@ -870,7 +876,7 @@ export default function JourneyPage() {
               // fully done — the real annual-review milestone. Suppressed
               // once atCeiling (below) is also true, so this doesn't stack
               // with that later, more-complete message.
-              <div style={{ background: "#e6f4ea", border: "1px solid #bfe3c9", color: "#1f7a3c", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
+              <div style={milestoneBanner}>
                 {earlyAccess ? (
                   <>🎉 You've completed every course in {POSITION_LABEL[position] || position} — you're all set for your annual review on {formatMonthDay(annualReviewDate)}. Early access to {POSITION_LABEL[visiblePosition] || visiblePosition} is open now — your {POSITION_LABEL[position] || position} completion rate for this review stays exactly as it is, whatever you do next.</>
                 ) : (
@@ -883,7 +889,7 @@ export default function JourneyPage() {
               // that stage too doesn't push it to +2, so without this the
               // learner would just see the same fully-complete list with no
               // explanation of why nothing new ever shows up.
-              <div style={{ background: "#e6f4ea", border: "1px solid #bfe3c9", color: "#1f7a3c", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
+              <div style={milestoneBanner}>
                 🎉 You've completed everything visible through {POSITION_LABEL[visiblePosition] || visiblePosition} — the next stage unlocks once your manager updates your level.
               </div>
             )}
