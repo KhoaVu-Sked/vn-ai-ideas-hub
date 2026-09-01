@@ -3,12 +3,14 @@
 -- Sets up 3 fictional learners on the AI Track with deliberately different
 -- seniority and completion, so Team view (/learning-hub/team) and each
 -- learner's own Learner Dashboard (/learning-hub/dashboard) have something
--- real to show instead of empty states — plus two live-demoable moments for
--- the "+1 stage" early-access feature (Section 4.4/8 style rule in
+-- real to show instead of empty states — plus a live-demoable moment for the
+-- "+1 stage" early-access feature (Section 4.4/8 style rule in
 -- ai-learning-requirements/03-your-journey.md; effectivePosition/isTierDone
--- in features/learning/shared.js). Run schema.sql and ai-track-seed.sql first
--- (this reads courses/course_quiz_questions they create). Run in the Neon
--- SQL editor, same as those two.
+-- in features/learning/shared.js): thu AND haanh both sit one quiz away from
+-- unlocking Middle, so either login demos the same live unlock. Run
+-- schema.sql and ai-track-seed.sql first (this reads courses/
+-- course_quiz_questions they create). Run in the Neon SQL editor, same as
+-- those two.
 --
 -- Accounts: thao@example.com / thu@example.com / haanh@example.com are the
 -- same three sample teammates seed.sql already creates for the Ideas Hub
@@ -17,7 +19,7 @@
 -- account insert below is ON CONFLICT (username) DO NOTHING, so it never
 -- touches an existing row's name/password/role.
 --
--- ⚠️ Section 9 (kiet.ly@skedulo.com) is DIFFERENT from the three above: it's
+-- ⚠️ Section 8 (kiet.ly@skedulo.com) is DIFFERENT from the three above: it's
 -- not a fictional persona, it's a real Skedulo account (Kiet's own), reset
 -- here to mirror thu's exact scenario ON PURPOSE — the product owner's own
 -- explicit request, for live demos under their own login rather than a
@@ -42,29 +44,19 @@
 --                                         "mid-flight" early-access state
 --
 --   thu   (Thu Nguyen Duong) → junior  → done through intern, and 5 of her
---                                         6 own-tier (junior) courses —
+--   haanh (Ha Anh)           → junior     6 own-tier (junior) courses each —
 --                                         ONE course away from finishing
---                                         Junior and unlocking Middle.
---                                         Demo: complete "Prompt
+--                                         Junior and unlocking Middle. Both
+--                                         accounts share this exact scenario
+--                                         on purpose — two independent
+--                                         logins for the same "junior → mid"
+--                                         demo. Demo: complete "Prompt
 --                                         Engineering: ChatGPT, Claude & AI
---                                         Masterclass" and watch the List /
---                                         Learner Dashboard expand to show
---                                         through Middle, with the "you've
---                                         unlocked early access" message
---
---   haanh (Ha Anh)           → junior  → done through intern, her own
---                                         (junior) tier FULLY complete —
---                                         already earned early access into
---                                         Middle — and 3 of those 4 Middle
---                                         courses too. ONE course away from
---                                         the +1 CEILING. Demo: complete
---                                         "Introduction to Model Context
---                                         Protocol (MCP)" and watch the
---                                         "you've completed everything
---                                         visible... unlocks once your
---                                         manager updates your level"
---                                         banner appear (JourneyPage.jsx's
---                                         atCeiling)
+--                                         Masterclass" on either account and
+--                                         watch its List / Learner Dashboard
+--                                         expand to show through Middle,
+--                                         with the "you've unlocked early
+--                                         access" message
 --
 -- "Not started" is never an explicit row here: the app already treats a
 -- missing course_assignments row as not_started (see getJourney() in
@@ -85,7 +77,8 @@
 -- written. Running this WILL overwrite any manual poking-around you've
 -- done on these 3 specific demo accounts back to the scenario above —
 -- that's the point, so you can always get back to a clean, demoable state
--- with one paste, including the two "one course away" moments.
+-- with one paste, including the shared "one course away" moment thu and
+-- haanh both sit on.
 
 -- 1) Accounts — untouched if they already exist (see header).
 insert into accounts (username, email, password_hash, name, role) values
@@ -183,8 +176,9 @@ on conflict (account_id, course_id) do update set
   updated_at = excluded.updated_at;
 
 -- thao's early access, put to use: the first Principal-tier course, in
--- progress but NOT complete — she's mid-flight through her +1 stage, not
--- at the ceiling (that's haanh's demo, below).
+-- progress but NOT complete — she's mid-flight through her +1 stage. No
+-- account currently demos the +1 CEILING (atCeiling, JourneyPage.jsx) —
+-- haanh used to, before she was reshaped to mirror thu's scenario below.
 insert into course_assignments (account_id, course_id, status, target_date, updated_at)
 select a.id, c.id, 'in_progress', '2026-10-01', now() - interval '1 day'
 from accounts a, courses c
@@ -196,10 +190,12 @@ on conflict (account_id, course_id) do update set
   target_date = excluded.target_date,
   updated_at = excluded.updated_at;
 
--- 7) thu (junior, 6 courses in her own tier): 5 complete, ONE deliberately
--- left not-started ("Prompt Engineering...") so completing it live is the
--- demo — watch her List/Dashboard expand to show through Middle the
--- moment that quiz finishes.
+-- 7) thu AND haanh (junior, 6 courses in their own tier): 5 complete each,
+-- ONE deliberately left not-started ("Prompt Engineering...") so completing
+-- it live is the demo — watch either account's List/Dashboard expand to
+-- show through Middle the moment that quiz finishes. Both share this exact
+-- scenario on purpose (rn is partitioned per-account so each gets its own
+-- 1..5 staggered completion dates, not one 1..10 run across both).
 insert into course_assignments (account_id, course_id, status, quiz_total_questions, quiz_correct_first_try, updated_at)
 select
   x.account_id, x.course_id, 'complete',
@@ -209,10 +205,10 @@ select
 from (
   select a.id as account_id, c.id as course_id,
     (select count(*)::int from course_quiz_questions q where q.course_id = c.id) as qtotal,
-    row_number() over (order by c.title) as rn
+    row_number() over (partition by a.id order by c.title) as rn
   from accounts a
   join courses c on c.track_id = (select id from tracks where name = 'AI Track')
-  where a.username = 'thu'
+  where a.username in ('thu', 'haanh')
     and c.expected_by_position = 'junior'
     and c.title <> 'Prompt Engineering: ChatGPT, Claude & AI Masterclass'
 ) x
@@ -222,56 +218,7 @@ on conflict (account_id, course_id) do update set
   quiz_correct_first_try = excluded.quiz_correct_first_try,
   updated_at = excluded.updated_at;
 
--- 8) haanh (junior): her ENTIRE own tier (all 6 junior courses) complete —
--- she's already earned early access into Middle. Of Middle's 4 courses, 3
--- are complete and ONE ("Introduction to Model Context Protocol (MCP)") is
--- deliberately left not-started — the ceiling demo: completing it should
--- make every course visible to her complete, triggering the "you've
--- completed everything visible... unlocks once your manager updates your
--- level" banner (JourneyPage.jsx's atCeiling).
-insert into course_assignments (account_id, course_id, status, quiz_total_questions, quiz_correct_first_try, updated_at)
-select
-  x.account_id, x.course_id, 'complete',
-  nullif(x.qtotal, 0),
-  case when x.qtotal > 0 then greatest(1, round(x.qtotal * 0.8)::int) else null end,
-  now() - (3 + x.rn) * interval '1 day'
-from (
-  select a.id as account_id, c.id as course_id,
-    (select count(*)::int from course_quiz_questions q where q.course_id = c.id) as qtotal,
-    row_number() over (order by c.title) as rn
-  from accounts a
-  join courses c on c.track_id = (select id from tracks where name = 'AI Track')
-  where a.username = 'haanh' and c.expected_by_position = 'junior'
-) x
-on conflict (account_id, course_id) do update set
-  status = excluded.status,
-  quiz_total_questions = excluded.quiz_total_questions,
-  quiz_correct_first_try = excluded.quiz_correct_first_try,
-  updated_at = excluded.updated_at;
-
-insert into course_assignments (account_id, course_id, status, quiz_total_questions, quiz_correct_first_try, updated_at)
-select
-  x.account_id, x.course_id, 'complete',
-  nullif(x.qtotal, 0),
-  case when x.qtotal > 0 then greatest(1, round(x.qtotal * 0.85)::int) else null end,
-  now() - x.rn * interval '1 day'
-from (
-  select a.id as account_id, c.id as course_id,
-    (select count(*)::int from course_quiz_questions q where q.course_id = c.id) as qtotal,
-    row_number() over (order by c.title) as rn
-  from accounts a
-  join courses c on c.track_id = (select id from tracks where name = 'AI Track')
-  where a.username = 'haanh'
-    and c.expected_by_position = 'middle'
-    and c.title <> 'Introduction to Model Context Protocol (MCP)'
-) x
-on conflict (account_id, course_id) do update set
-  status = excluded.status,
-  quiz_total_questions = excluded.quiz_total_questions,
-  quiz_correct_first_try = excluded.quiz_correct_first_try,
-  updated_at = excluded.updated_at;
-
--- 9) kiet.ly@skedulo.com — Kiet's own REAL account, not a fictional persona
+-- 8) kiet.ly@skedulo.com — Kiet's own REAL account, not a fictional persona
 -- (see the ⚠️ warning at the top of this file). Looked up by email, not
 -- username, since this row already exists and this file never creates it.
 -- One rung below thu's scenario (steps 5+7 above), same shape: intern, not
@@ -326,7 +273,7 @@ on conflict (account_id, course_id) do update set
   quiz_correct_first_try = excluded.quiz_correct_first_try,
   updated_at = excluded.updated_at;
 
--- 10) quang (Quang Duc) — intern, 25% complete, "Behind" pace: a small,
+-- 9) quang (Quang Duc) — intern, 25% complete, "Behind" pace: a small,
 -- clearly-lagging account for Team view's own demonstration (the Pace
 -- column, Needs support's "Behind" tag, % Complete, Avg Accuracy) —
 -- recreated here as its own fictional persona so that demo doesn't
