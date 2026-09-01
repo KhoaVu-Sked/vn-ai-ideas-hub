@@ -274,13 +274,21 @@ on conflict (account_id, course_id) do update set
 -- 9) kiet.ly@skedulo.com — Kiet's own REAL account, not a fictional persona
 -- (see the ⚠️ warning at the top of this file). Looked up by email, not
 -- username, since this row already exists and this file never creates it.
--- Mirrors thu's exact scenario (steps 5+7 above) so the same "one quiz
--- away from unlocking Middle" demo is available under Kiet's own login,
--- not just thu's: every Intern course complete, 5 of 6 Junior (own-tier)
--- courses complete, "Prompt Engineering: ChatGPT, Claude & AI Masterclass"
--- deliberately left not-started.
+-- One rung below thu's scenario (steps 5+7 above), same shape: intern, not
+-- junior — there's no tier below Intern to bulk-complete, so instead it's
+-- 4 of Intern's 5 own-tier courses done (3 core + the 1 optional course,
+-- "GenAI for Beginners" — isTierDone/effectivePosition, shared.js, count
+-- ALL courses in a tier, optional included, not just core), with "AI
+-- Fluency: Framework & Foundations" deliberately left not-started. That's
+-- the one course a real Wrap-up quiz can still finish live (it has one —
+-- unlike "Skedulo AI Usage Policy", one of the 5 catalog courses with no
+-- quiz at all, so it can't be the live-demoed course, only pre-completed
+-- by this seed same as everything else). Finishing it completes BOTH the
+-- last core course (4 of 4 → 100%) AND the tier itself at the same
+-- moment, unlocking Junior — "1 off to complete the Intern roadmap and
+-- then able to start on Junior," watchable from Kiet's own login.
 insert into user_role (account_id, position)
-select a.id, 'junior'
+select a.id, 'intern'
 from accounts a
 where lower(a.email) = lower('kiet.ly@skedulo.com')
 on conflict (account_id) do update set position = excluded.position, updated_at = now();
@@ -294,35 +302,13 @@ on conflict do nothing;
 delete from course_assignments
 where account_id in (select id from accounts where lower(email) = lower('kiet.ly@skedulo.com'));
 
--- Every Intern-tier course — complete (same backfill approach as step 5,
--- scoped to this one account by email instead of the username values-list).
+-- 4 of Intern's 5 courses complete — every course in the tier EXCEPT "AI
+-- Fluency: Framework & Foundations", the one held back for the live demo.
 insert into course_assignments (account_id, course_id, status, quiz_total_questions, quiz_correct_first_try, updated_at)
 select
   x.account_id, x.course_id, 'complete',
   nullif(x.qtotal, 0),
   case when x.qtotal > 0 then greatest(1, round(x.qtotal * 0.85)::int) else null end,
-  now() - (35 + (random() * 5)::int) * interval '1 day'
-from (
-  select a.id as account_id, c.id as course_id,
-    (select count(*)::int from course_quiz_questions q where q.course_id = c.id) as qtotal
-  from accounts a
-  join courses c on c.track_id = (select id from tracks where name = 'AI Track')
-  where lower(a.email) = lower('kiet.ly@skedulo.com')
-    and c.expected_by_position = 'intern'
-) x
-on conflict (account_id, course_id) do update set
-  status = excluded.status,
-  quiz_total_questions = excluded.quiz_total_questions,
-  quiz_correct_first_try = excluded.quiz_correct_first_try,
-  updated_at = excluded.updated_at;
-
--- 5 of 6 Junior (own-tier) courses complete — same "one course away" demo
--- as thu (step 7 above), same excluded course.
-insert into course_assignments (account_id, course_id, status, quiz_total_questions, quiz_correct_first_try, updated_at)
-select
-  x.account_id, x.course_id, 'complete',
-  nullif(x.qtotal, 0),
-  case when x.qtotal > 0 then greatest(1, round(x.qtotal * 0.82)::int) else null end,
   now() - (5 + x.rn) * interval '1 day'
 from (
   select a.id as account_id, c.id as course_id,
@@ -331,8 +317,8 @@ from (
   from accounts a
   join courses c on c.track_id = (select id from tracks where name = 'AI Track')
   where lower(a.email) = lower('kiet.ly@skedulo.com')
-    and c.expected_by_position = 'junior'
-    and c.title <> 'Prompt Engineering: ChatGPT, Claude & AI Masterclass'
+    and c.expected_by_position = 'intern'
+    and c.title <> 'AI Fluency: Framework & Foundations'
 ) x
 on conflict (account_id, course_id) do update set
   status = excluded.status,
