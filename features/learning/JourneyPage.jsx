@@ -668,7 +668,7 @@ function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
 }
 
 export default function JourneyPage() {
-  const { user: me } = useSession();
+  const { user: me, refresh } = useSession();
   const router = useRouter();
   const [journey, setJourney] = useState([]);
   const [recentCompletions, setRecentCompletions] = useState([]);
@@ -817,17 +817,32 @@ export default function JourneyPage() {
   // "All tracks" shows a tag per enrolled track; one specific track shows just that one.
   const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
+  // A full account reset, not just course progress — clears
+  // course_assignments, un-enrolls from every track (account_tracks — the
+  // Get Started gateway's own "onboarded" check reads this), clears the
+  // assigned role (user_role), and disconnects Google Calendar
+  // (calendar_connections). Lands back on /learning-hub afterward, since
+  // that's now the same gateway a genuinely new account sees — the whole
+  // point of resetting this much is being able to re-test Get Started
+  // itself, not just re-run the roadmap with the same setup still in place.
   const resetJourney = async () => {
-    if (!confirm("Reset your journey back to the original track? This clears all recorded progress and skips, any custom reordering, and any target dates you've set — every course reverts to not started (only Intern stays unlocked). Any Auto Schedule events on your Google Calendar are deleted too.")) return;
+    if (!confirm("Reset your account completely? This clears all course progress (skips, custom order, target dates), un-enrolls you from every track, clears your assigned role, and disconnects Google Calendar — deleting any Auto Schedule events booked there too. You'll land back on the Get Started gateway, exactly like a brand-new account.")) return;
     setResetting(true);
     setErr("");
     try {
       const { calendarError } = await api("/api/journey/reset", { method: "POST" });
-      await load();
-      // Non-fatal: the roadmap reset already succeeded by this point — this
-      // just tells the learner their Google Calendar may still have a
-      // leftover event or two to clear by hand.
-      if (calendarError) setErr(calendarError);
+      await refresh(); // session's onboarded flips back to false
+      if (calendarError) {
+        // Non-fatal: everything else already reset successfully by this
+        // point — stay here (rather than navigating on) so the learner
+        // actually sees that Google Calendar may still have a leftover
+        // event or two to clear by hand.
+        await load();
+        setErr(calendarError);
+        setResetting(false);
+        return;
+      }
+      router.push("/learning-hub");
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -909,15 +924,15 @@ export default function JourneyPage() {
                   {" "}Drag a row to reorder it within its stage.
                 </p>
               </div>
-              {journey.length > 0 && (
+              {(journey.length > 0 || position || calendarConnected) && (
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, maxWidth: "100%" }}>
                   <button
                     onClick={resetJourney}
                     disabled={resetting}
-                    title="Clear all recorded progress and skips"
+                    title="Clear course progress, tracks, role, and Google Calendar — back to a brand-new account"
                     style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 14px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--muted)", cursor: resetting ? "wait" : "pointer", whiteSpace: "nowrap" }}
                   >
-                    {resetting ? "Resetting…" : "Reset"}
+                    {resetting ? "Resetting…" : "Reset everything"}
                   </button>
                 </div>
               )}

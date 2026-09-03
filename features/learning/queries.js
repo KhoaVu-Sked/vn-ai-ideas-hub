@@ -358,18 +358,53 @@ export async function skipPrerequisiteFor(courseId, accountId) {
   return { updated: rows.length };
 }
 
-// Reset a journey: deletes every course_assignments row for this account, so
-// every course reverts to its default 'not_started' (coalesce in the reads
-// above). With nothing recorded, only the Intern tier's gate is open — that
-// tier has no tier below it — so everything past it shows Locked again,
-// exactly the track's original state.
-// Returns the calendar_event_ids being orphaned by the delete, so the route
-// can also clean those up on the learner's actual Google Calendar — Reset
-// otherwise clears this app's own data while leaving Auto Schedule's events
-// sitting on their calendar with nothing here pointing at them anymore.
+// Reset EVERYTHING for this account, not just course progress — so the
+// whole Get Started flow (role -> optional Calendar connect -> browse/
+// enroll) can be re-tested from a genuinely fresh-account state, not just
+// a re-run of the roadmap with the same setup still in place:
+//   - course_assignments: every course reverts to 'not_started' (coalesce
+//     in the reads above) — only the Intern tier's gate is open, exactly
+//     the track's original state.
+//   - account_tracks: un-enrolled from every track — this is what flips
+//     the Get Started gateway's own "onboarded" check back to false.
+//   - user_role: seniority cleared, same as an account an admin has never
+//     assigned a position to.
+//   - calendar_connections: Google Calendar disconnected.
+// One round trip, same CTE idiom as features/accounts/queries.js's
+// createAccount/updateAccount. Returns the calendar_event_ids the
+// course_assignments delete just orphaned, so the route can also clean
+// those up on the learner's actual Google Calendar — the refresh token
+// needed to do that has to be read by the caller BEFORE this runs (see
+// app/api/journey/reset/route.js), since by the time this returns,
+// calendar_connections is already gone.
 export async function resetJourney(accountId) {
-  const rows = await sql`delete from course_assignments where account_id = ${accountId} returning course_id, calendar_event_id`;
-  return { reset: rows.length, eventIds: rows.map((r) => r.calendar_event_id).filter(Boolean) };
+  const rows = await sql`
+    with ca as (
+      delete from course_assignments where account_id = ${accountId} returning course_id, calendar_event_id
+    ),
+    at as (
+      delete from account_tracks where account_id = ${accountId} returning 1
+    ),
+    ur as (
+      delete from user_role where account_id = ${accountId} returning 1
+    ),
+    cc as (
+      delete from calendar_connections where account_id = ${accountId} returning 1
+    )
+    select
+      (select coalesce(json_agg(json_build_object('course_id', course_id, 'calendar_event_id', calendar_event_id)), '[]') from ca) as courses,
+      (select count(*)::int from at) as tracks_cleared,
+      (select count(*)::int from ur) as role_cleared,
+      (select count(*)::int from cc) as calendar_connection_cleared
+  `;
+  const r = rows[0];
+  return {
+    reset: r.courses.length,
+    eventIds: r.courses.map((c) => c.calendar_event_id).filter(Boolean),
+    tracksCleared: r.tracks_cleared,
+    roleCleared: r.role_cleared > 0,
+    calendarConnectionCleared: r.calendar_connection_cleared > 0,
+  };
 }
 
 // Toggle "I'm on this track" — same delete-first-else-insert idiom as
