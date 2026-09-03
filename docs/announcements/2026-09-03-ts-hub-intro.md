@@ -1,105 +1,50 @@
-# TS Hub — introduction message for a manager to send
+# TS Hub - introduction for the manager to post in Slack
 
-Two drafts. The email does the explaining; the Slack post only gets people to
-click. Don't send both as the same message at two lengths.
-
-Placeholders in `[SQUARE BRACKETS]` need a decision before sending. See
-**Before you send** at the bottom.
+Plain text, no asterisks, so it can be pasted straight into Slack without
+markdown getting in the way. Written as an introduction rather than
+instructions: it invites people in and does not tell them what to do.
 
 ---
 
-## Email / long-form
+Hi team,
 
-**Subject:** TS Hub: AI ideas and AI learning in one place
+I want to introduce something Khoa has been building for us: TS Hub.
 
-Team,
+You may already know it as the AI Ideas Hub, where we have been collecting the
+team's AI ideas through the beta. It now has a second half, so it has a new
+name to match. Alongside the ideas board there is a Learning Hub for working
+through AI training.
 
-The AI Ideas Hub has a new name and a second half. It is now **TS Hub**, and
-alongside the ideas board there is a **Learning Hub** for working through AI
-training.
+The Learning Hub is the part I am most pleased about. It holds training tracks
+ordered by seniority level, so when you open it you see the courses that make
+sense for where you are now rather than a long catalogue to wade through. You
+enroll yourself and nobody has to approve it. Each course links out to wherever
+it actually lives, and there is a short quiz at the end to help the material
+stick. If having the time blocked out helps, it can put study sessions on your
+calendar around the meetings you already have. There is also a dashboard that
+shows how you are getting on, alongside the ideas you have raised.
 
-When you open it you will be asked which half you want. Both live in the same
-app, and a button in the top right moves you between them, so there is only one
-link to remember. The ideas board itself has not changed.
+Nothing in there is a test and nobody is being scored on it. The point is
+simply to make learning this stuff easier to start, and easier to keep going
+once you have.
 
-### The Learning Hub
+Have a look when you get a chance. Khoa knows it best, so send him your
+questions, and do tell him what feels confusing while it is all still easy to
+change.
 
-It holds training tracks made up of courses, ordered by seniority level. Your
-own level sets what your roadmap expects of you now, so you see the next few
-courses rather than the whole catalogue.
-
-What is worth knowing before you open it:
-
-- **You enroll yourself.** There is no approval step and no waiting on me.
-- **Courses link out to where they actually live**, whether that is Anthropic
-  Academy, Udemy, or our own Confluence pages.
-- **Finishing a course's wrap-up quiz marks it complete.** There is no pass
-  mark and no attempt limit. The quiz is there to make the material stick, not
-  to grade you.
-- **Auto Schedule can book study time on your Google Calendar**, working around
-  meetings you already have. It is optional, and you connect your calendar the
-  first time you use it.
-- **My Dashboard shows your own progress:** how far through your level you are,
-  your quiz accuracy grouped by skill, and the ideas you have raised.
-
-So nobody goes hunting for them: there are no AI-generated course summaries or
-mind maps, and nothing reminds you before a booked study block. Both are on the
-list, neither is there yet.
-
-### If you missed the last update
-
-The ideas board also gained merging for duplicate ideas, starred ideas, a
-documentation box on every idea, and a clearer split between the Initiator who
-raises an idea and the Project Lead who drives it. That note is still in the app
-under What's New.
-
-### What I would ask of you
-
-[EXPECTATION: pick one — "Have a look this week and enroll in a track that fits
-where you are." / "Enrolling is optional for now; have a look when you get a
-moment." / "I would like everyone enrolled in a track by <date>."]
-
-Khoa built this and knows it best, so send questions his way. It is still in
-beta, so tell him what is confusing or broken while it is easy to change.
-
-[MANAGER NAME]
+[LINK]
 
 ---
 
-## Slack
+## Notes
 
-Different job: get people to open it. No feature list.
+An introduction does not need to set an expectation, which is why this one does
+not. If you do want people enrolled by a particular point, that needs one extra
+line, and it changes the tone of the whole message, so it is worth deciding
+deliberately rather than adding it in passing.
 
-> **TS Hub is live** — the AI Ideas Hub now has a second half for AI training,
-> and a new name to match.
->
-> The Learning Hub has training tracks ordered by seniority level. You enroll
-> yourself, no approval needed, and it can book study time on your calendar
-> around your existing meetings.
->
-> [LINK] — pick Learning Hub on the way in.
->
-> [EXPECTATION — one line, matching the email]
->
-> Questions to @khoa. Still in beta, so say if something looks wrong.
-
----
-
-## Before you send
-
-Three things only you can decide:
-
-1. **Is enrolling expected, encouraged, or optional?** This changes how the
-   whole message lands, and it is the one question people will actually have.
-   I have left it as a placeholder rather than guess.
-2. **Is there a date attached?** The app has an annual review date that Auto
-   Schedule uses as a default deadline, so people may reasonably read a
-   connection between learning tracks and reviews. If that link is not
-   intended, it is worth being explicit that it is not.
-3. **Should Khoa be named as the contact?** The draft does. If support requests
-   should go to a channel instead, swap it.
-
-One accuracy note: everything described above is live and was checked against
-the code, not the spec. The two absences called out in the email (summaries,
-mind maps, reminders) are real, and worth keeping in. People who were promised
-them earlier will otherwise assume the feature is broken rather than absent.
+One accuracy note worth keeping: the quiz genuinely has no pass mark and no
+attempt limit, so "nobody is being scored" is true rather than reassurance.
+There are also no AI-generated summaries or mind maps and no reminders before a
+study session. If anyone was told to expect those, they are absent rather than
+broken.
