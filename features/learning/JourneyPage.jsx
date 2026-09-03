@@ -295,11 +295,13 @@ const calendarWarnBanner = { background: "#fff4e0", border: "1px solid #ffdf9e",
 // when a learner actually studies; a course only really moves once its
 // wrap-up quiz is done — see QuizPage.jsx/completeCourse — so a hand-set
 // date was a suggestion nobody downstream ever read back, and Auto
-// Schedule already writes this same column for real). With nothing left
-// to share the header with, it gets to be the headline: bigger, solid-
-// filled, not the quiet accent pill it used to be one of two things next to.
-const autoScheduleBtn = { display: "inline-flex", alignItems: "center", gap: 8, border: "none", background: "var(--blue)", color: "#fff", borderRadius: 999, padding: "10px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 6px 16px rgba(0,85,255,0.28)" };
-const autoScheduleBtnDisabled = { ...autoScheduleBtn, background: "var(--bg)", color: "var(--faint)", boxShadow: "none", cursor: "not-allowed" };
+// Schedule already writes this same column for real). Same normal-sized
+// solid-blue button as every other primary action in this feature
+// (wizardBtnPrimary, LearningHubPage.jsx; modalBtnPrimary,
+// AutoScheduleModal.jsx) rather than an oversized pill of its own, for
+// consistency across the app.
+const autoScheduleBtn = { display: "inline-flex", alignItems: "center", gap: 8, border: "none", background: "var(--blue)", color: "#fff", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" };
+const autoScheduleBtnDisabled = { ...autoScheduleBtn, background: "var(--bg)", color: "var(--faint)", cursor: "not-allowed" };
 
 // The next 2 courses, not yet complete/skipped: dated ones first (soonest
 // target_date first), then undated ones filling any remaining slots in the
