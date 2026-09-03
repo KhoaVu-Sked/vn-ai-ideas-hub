@@ -1,36 +1,48 @@
 # TS Hub - introduction for the manager to post in Slack
 
-Plain text, no asterisks, so it can be pasted straight into Slack without
-markdown getting in the way. Written as an introduction rather than
-instructions: it invites people in and does not tell them what to do.
+Plain text, no asterisks, so it pastes into Slack without markdown getting in
+the way.
+
+The jokes all run on things that are actually true, rather than being bolted on:
+there really is no approval step, the quiz really has no pass mark or attempt
+limit, Auto Schedule really does read your calendar's free time, and the ideas
+board really did start because good ideas were dying in Slack threads. See the
+notes at the bottom for the two lines to consider cutting.
 
 ---
 
 Hi team,
 
-I want to introduce something Khoa has been building for us: TS Hub.
+Quick introduction: the AI Ideas Hub is now TS Hub. It grew a second half, and
+the old name stopped covering it.
 
-You may already know it as the AI Ideas Hub, where we have been collecting the
-team's AI ideas through the beta. It now has a second half, so it has a new
-name to match. Alongside the ideas board there is a Learning Hub for working
-through AI training.
+That second half is a Learning Hub, and it exists because most of us are
+carrying around a vague intention to get better at AI, plus a browser tab we
+have been meaning to open since roughly March. This turns that into an actual
+list, in an actual order.
 
-The Learning Hub is the part I am most pleased about. It holds training tracks
-ordered by seniority level, so when you open it you see the courses that make
-sense for where you are now rather than a long catalogue to wade through. You
-enroll yourself and nobody has to approve it. Each course links out to wherever
-it actually lives, and there is a short quiz at the end to help the material
-stick. If having the time blocked out helps, it can put study sessions on your
-calendar around the meetings you already have. There is also a dashboard that
-shows how you are getting on, alongside the ideas you have raised.
+You get training tracks sorted by seniority level, so you see the courses that
+make sense for where you are now, rather than a catalogue that opens at
+Principal and ruins your afternoon. You enroll yourself. Nobody approves it,
+nobody gatekeeps it, and there is no form.
 
-Nothing in there is a test and nobody is being scored on it. The point is
-simply to make learning this stuff easier to start, and easier to keep going
-once you have.
+Each course points out to wherever it actually lives, and there is a short quiz
+at the end so the material survives past Friday. There is no pass mark and no
+limit on attempts, so if your preferred technique is clicking every option
+until one goes green, that is technically studying and I am not going to stop
+you.
 
-Have a look when you get a chance. Khoa knows it best, so send him your
-questions, and do tell him what feels confusing while it is all still easy to
-change.
+If the real obstacle is your calendar, it will book study time around the
+meetings you already have. It is unnervingly good at finding the gaps you were
+pretending not to have.
+
+There is also a dashboard showing how you are getting on, sitting next to the
+ideas you have raised, which is a decent reminder that the other half is still
+there and still collecting the good ideas that used to die three replies deep
+in a Slack thread.
+
+Have a look when you get a chance. Khoa built the whole thing, so send him your
+questions, your bugs, and your strong opinions about the colour of the buttons.
 
 [LINK]
 
@@ -38,13 +50,21 @@ change.
 
 ## Notes
 
-An introduction does not need to set an expectation, which is why this one does
-not. If you do want people enrolled by a particular point, that needs one extra
-line, and it changes the tone of the whole message, so it is worth deciding
-deliberately rather than adding it in passing.
+Two lines to decide on:
 
-One accuracy note worth keeping: the quiz genuinely has no pass mark and no
-attempt limit, so "nobody is being scored" is true rather than reassurance.
-There are also no AI-generated summaries or mind maps and no reminders before a
-study session. If anyone was told to expect those, they are absent rather than
-broken.
+The quiz line ("clicking every option until one goes green") is accurate and it
+does useful work, because it tells people the stakes are low before they worry
+about being scored. If you would rather not appear to endorse brute-forcing it,
+cut from "so if your preferred technique" and end the sentence at "attempts."
+
+The calendar line ("gaps you were pretending not to have") is affectionate
+teasing about a shared habit. It reads as warm from a manager who is clearly
+including themselves, and slightly less so if your team is currently stretched.
+
+An introduction does not need to set an expectation, so this one does not. If
+you want people enrolled by a particular date, that is one extra line, and it
+will flatten the tone of everything above it. Worth deciding on purpose.
+
+Still true and worth keeping: no AI-generated summaries or mind maps, and
+nothing reminds you before a booked study session. Anyone promised those will
+otherwise assume it is broken rather than absent.
