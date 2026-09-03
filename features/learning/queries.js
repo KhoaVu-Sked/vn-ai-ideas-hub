@@ -8,9 +8,19 @@ import { POSITIONS } from "@/features/accounts/constants";
 // is the one place this list is spelled out.
 const POSITION_ORDER = POSITIONS;
 
-// Team view (admin only): one row per account enrolled in at least one
-// track, with enough to render the roster table and the KPI row/Needs
-// support card without a second query. "Stalled" = an in_progress course
+// Team view (admin only): one row per account in the whole app, not just
+// those enrolled in a track — the roster needs to show a not-yet-onboarded
+// account too (position/tracks/core_total/etc. all come back null for one,
+// via the left joins below), so an admin can see who hasn't started
+// without that person silently corrupting any team-wide stat computed from
+// this data. Distinguishing the two is exactly `tracks === null` (or
+// equivalently `core_total === null` — both null together, always, since
+// both depend on the same account_tracks row existing) — TeamPage.jsx's own
+// `enrolledMembers` filter is the one place that split actually happens;
+// every stat (KPI tiles, Needs support, the heatmap, distribution,
+// team-average benchmarks) is computed off that filtered list, never this
+// raw one. Enough to render the roster table and the KPI row/Needs support
+// card without a second query. "Stalled" = an in_progress course
 // whose status hasn't moved in 28+ days (course_assignments.updated_at);
 // stalled_course names the oldest such course, for the Needs support
 // card's per-person line and the roster's Pace column. Drill-down reuses
@@ -91,15 +101,11 @@ export async function getTeamOverview() {
     )
     select a.id, a.name, a.username, a.avatar_color, a.avatar_url,
       ur.position, tn.tracks,
-      coalesce(p.core_total, 0) as core_total,
-      coalesce(p.core_complete, 0) as core_complete,
-      coalesce(p.in_progress_count, 0) as in_progress_count,
-      p.last_activity,
+      p.core_total, p.core_complete, p.in_progress_count,
+      p.last_activity, p.stalled_course,
       coalesce(p.stalled, false) as stalled,
-      p.stalled_course,
       coalesce(p.courses, '[]') as courses
-    from (select distinct account_id from account_tracks) e
-    join accounts a on a.id = e.account_id
+    from accounts a
     left join user_role ur on ur.account_id = a.id
     left join track_names tn on tn.account_id = a.id
     left join progress p on p.account_id = a.id
