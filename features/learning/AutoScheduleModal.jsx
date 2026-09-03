@@ -1,9 +1,13 @@
 "use client";
 
-// Shared between JourneyPage (Up next's 🪄 button) and LearningHubPage (the
-// Get Started wizard's Tracks step, right after enrolling — only when
-// Calendar is already connected) — same modal, same behavior, one place to
-// keep it instead of two copies that could quietly drift apart.
+// Up next's 🪄 button (JourneyPage.jsx) — the editable, day-to-day Auto
+// Schedule tool. The Get Started wizard has its own, separate step for a
+// FIXED Intern-through-your-level range (AutoScheduleStep,
+// LearningHubPage.jsx) — deliberately not this component, since letting a
+// brand-new account pick an arbitrary range at setup time isn't the same
+// job as this one; that step duplicates the small amount of matching logic
+// (the date field, the endpoint call) rather than bending this component's
+// editable-range shape to also support a locked one.
 
 import { useState } from "react";
 import { api } from "@/lib/apiClient";
@@ -39,18 +43,10 @@ const quickPick = { border: "1px solid var(--line)", background: "var(--bg)", bo
 // show as an error banner, it's a real, expected first-run state, so it gets
 // its own "Connect Google Calendar" screen instead. That's a real browser
 // navigation (an <a>, not a fetch), since it has to leave the app for
-// Google's consent screen and come back to a fresh page load — connectReturnTo
-// picks where (see app/api/calendar/connect/route.js's own ?returnTo), so a
-// caller other than Up next's own wand (which wants to reopen right back
-// here) can send that round trip somewhere else instead.
-//
-// onGoToJourney is optional — when a caller passes it (the Get Started
-// wizard does, JourneyPage's own Up next usage doesn't), a prominent,
-// centered "Go to My Journey" replaces the default bottom-right "Done" in
-// the success view, as a shortcut past the wizard's own separate finish
-// button. Omit it and behavior is exactly what it always was: "Done" just
-// closes the modal.
-export default function AutoScheduleModal({ currentPosition, annualReviewDate, onClose, onScheduled, onGoToJourney, connectReturnTo = "/learning-hub/journey" }) {
+// Google's consent screen and come back to a fresh page load — back to
+// /learning-hub/journey specifically, so it reopens right where the
+// learner left off (see app/api/calendar/connect/route.js's own ?returnTo).
+export default function AutoScheduleModal({ currentPosition, annualReviewDate, onClose, onScheduled }) {
   const [from, setFrom] = useState(currentPosition || POSITION_ORDER[0]);
   const [to, setTo] = useState(currentPosition || POSITION_ORDER[POSITION_ORDER.length - 1]);
   const [targetDate, setTargetDate] = useState(nextAnnualReviewDateStr(annualReviewDate));
@@ -90,7 +86,7 @@ export default function AutoScheduleModal({ currentPosition, annualReviewDate, o
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button onClick={onClose} style={modalBtn}>Cancel</button>
-              <a href={`/api/calendar/connect?returnTo=${encodeURIComponent(connectReturnTo)}`} style={{ ...modalBtn, border: "none", background: "var(--blue)", color: "#fff" }}>Connect Google Calendar</a>
+              <a href="/api/calendar/connect" style={{ ...modalBtn, border: "none", background: "var(--blue)", color: "#fff" }}>Connect Google Calendar</a>
             </div>
           </>
         ) : result ? (
@@ -119,15 +115,9 @@ export default function AutoScheduleModal({ currentPosition, annualReviewDate, o
                 ))}
               </div>
             )}
-            {onGoToJourney ? (
-              <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
-                <button onClick={onGoToJourney} style={modalBtnPrimary(false)}>Go to My Journey →</button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
-                <button onClick={onClose} style={modalBtnPrimary(false)}>Done</button>
-              </div>
-            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+              <button onClick={onClose} style={modalBtnPrimary(false)}>Done</button>
+            </div>
           </>
         ) : (
           <>

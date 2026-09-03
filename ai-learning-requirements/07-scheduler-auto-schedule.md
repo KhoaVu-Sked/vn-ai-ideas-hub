@@ -15,6 +15,11 @@ This app's own auth is unaffected (Google Sign-in restricted to `@skedulo.com` �
 
 Auto Schedule's own button is greyed out until connected ([03-your-journey.md](03-your-journey.md), 4.7) rather than only failing inline on click.
 
+A fourth surface calls the same `/api/courses/auto-schedule` endpoint but isn't this modal at all: the Get Started wizard's own step 4 (`AutoScheduleStep`, `features/learning/LearningHubPage.jsx` — [02-track-enrollment.md](02-track-enrollment.md)), only reached once Calendar's connected. Its position range is **fixed** (Intern through whatever position was just picked in step 1), not the editable From/To this modal shows — a deliberate, separate component rather than a locked-down mode of this one, since a brand-new account's one-time "catch up your whole roadmap" moment isn't the same job as this modal's own day-to-day, any-range tool.
+
+### 8.2a Skipping doesn't ask twice
+Declining Calendar in the wizard's step 2 means step 4 (fixed-range Auto Schedule) is skipped entirely too — there's nothing for it to do without a connection, and it was already declined once. The wizard still ends at the same closing screen either way ("You've successfully completed your setup," a **Go to My Journey** button) rather than sometimes silently navigating away — it just doesn't name a study-block count when nothing was booked.
+
 ### 8.3 The OAuth client — reuses sign-in's by default, but overridable
 Google Sign-in already had a working `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, proven to work for `@skedulo.com` accounts in production. Auto Schedule defaults to reusing that **same** client rather than registering a new one — `features/learning/googleCalendar.js` requests `calendar.freebusy` + `calendar.events` in a second, separate consent step (`access_type=offline`, `prompt=consent`, so a refresh token comes back every time).
 
