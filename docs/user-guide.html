@@ -932,18 +932,25 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <div class="tw">
         <table>
-          <thead><tr><th style="width:180px">Level</th><th>What it means for your roadmap</th></tr></thead>
+          <thead><tr><th style="width:150px">Position</th><th>What your roadmap expects of you</th></tr></thead>
           <tbody>
-            <tr><td><b>Intern</b></td><td>The first tier of courses.</td></tr>
-            <tr><td><b>Junior</b></td><td>Everything Intern expects, plus its own tier.</td></tr>
-            <tr><td><b>Mid level</b></td><td>And so on up the ladder.</td></tr>
-            <tr><td><b>Senior</b></td><td></td></tr>
-            <tr><td><b>Principal</b></td><td>The full roadmap.</td></tr>
+            <tr><td><b>Intern</b></td><td>The Intern tier of courses.</td></tr>
+            <tr><td><b>Junior</b></td><td>Intern and Junior.</td></tr>
+            <tr><td><b>Mid level</b></td><td>Intern through Mid level.</td></tr>
+            <tr><td><b>Senior</b></td><td>Intern through Senior.</td></tr>
+            <tr><td><b>Principal</b></td><td>Every tier &mdash; the full roadmap.</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>Your level decides which courses your roadmap <i>expects</i> of you, and it is what the locking rules in section 13 are built on. If your level looks wrong, ask an admin &mdash; it changes what you see.</p>
+      <p>The tiers are cumulative, and once you have finished your own tier you get <b>one tier of early access</b> above it &mdash; so a Junior who is done with Junior can already see Mid level work.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">The dashboard uses different names</span>
+        <p>Your dashboard&rsquo;s &ldquo;Progress by level&rdquo; chart regroups these five positions into <b>four</b> named levels &mdash; Foundations, Applied, Intermediate, Advanced &mdash; so a <b>Junior</b> sees a bar labelled <b>Applied</b>. It is the same ladder under a different set of names, and only that one chart uses them. Section 14 has the mapping.</p>
+      </div>
+
+      <p>Your level decides which courses your roadmap <i>expects</i> of you, and it is what the locking rules in section 14 are built on. If your level looks wrong, ask an admin &mdash; it changes what you see.</p>
 
       <h3>Enrolling in a track</h3>
 
@@ -997,20 +1004,14 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
             <tr><td><b>Not started</b></td><td>Available, untouched.</td></tr>
             <tr><td><b>In progress</b></td><td>The one you are on. Usually set for you &mdash; see <b>Up next</b> below.</td></tr>
             <tr><td><b>Complete</b></td><td>You finished its wrap-up quiz.</td></tr>
-            <tr><td><b>Skipped</b></td><td>Passed over via <b>Skip prerequisite</b>. Recorded, not hidden.</td></tr>
+            <tr><td><b>Skipped</b></td><td>Passed over via <b>Skip prerequisite</b> on the mind map (section 14). Recorded, not hidden.</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3>Locked courses, and skipping past them</h3>
-
-      <p>A course is <b>Locked</b> until every course in the tier <i>below</i> it is complete or skipped. The lock is per tier, not per course &mdash; the label tells you which tier is in the way, for example <i>&ldquo;Requires all Intern courses&rdquo;</i>. An empty tier blocks nothing.</p>
-
-      <p><b>Skip prerequisite</b> on a locked course unlocks <b>the whole tier at once</b>, not just the course you clicked. It marks everything in the tier below as skipped. You are asked to confirm first, and the wording is deliberate: the skip is recorded on your roadmap and is visible to your manager.</p>
-
       <h3>Order, dates, and Up next</h3>
 
-      <p>You can <b>drag rows to reorder</b> them, but only within the same level &mdash; a course cannot be dragged into a different tier.</p>
+      <p>You can <b>drag rows to reorder</b> them, but only within the same level &mdash; a course cannot be dragged into a different tier. Reordering is also switched off while you have a single track filtered; clear the filter back to all tracks to rearrange.</p>
 
       <p>The <b>Up next</b> card shows the next two courses you have not finished, dated ones first. Three controls sit on it:</p>
 
@@ -1030,30 +1031,6 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <p>Whichever course is top of Up next flips itself from Not started to <b>In progress</b> automatically. It never overwrites real progress &mdash; a course already further along is left alone.</p>
 
 
-      <figure>
-        <div class="ui">
-          <div class="ui-body">
-            <div class="ui-panel" style="padding:0;overflow:hidden">
-              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--u-line)">
-                <span style="font-size:12px">Claude 101</span>
-                <span class="ui-pill" style="background:#d9f2df;color:#2b8a3e">Complete</span>
-              </div>
-              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--u-line)">
-                <span style="font-size:12px">Prompting patterns</span>
-                <span class="ui-pill" style="background:#fdf1dd;color:#b7791f">In progress</span>
-              </div>
-              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;background:#fafbfd">
-                <span class="ui-faint" style="font-size:12px">🔒 Agentic workflows</span>
-                <span class="ui-row" style="gap:7px">
-                  <span class="ui-meta" style="font-size:10px">Requires all Intern courses</span>
-                  <span class="ui-btn">Skip prerequisite</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <figcaption><b>Your Journey</b> — the lock names the tier in the way, not one course</figcaption>
-      </figure>
 
       <figure>
         <div class="ui">
@@ -1124,32 +1101,102 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
     <section id="s17">
       <p class="sec-num">Section 14</p>
       <h2>Your learning dashboard</h2>
-      <p class="lede">The read-only view of how your learning is actually going.</p>
+      <p class="lede">Where your progress is measured &mdash; and where locked courses actually live.</p>
 
-      <p><b>My Dashboard</b> in the top bar shows your own progress. Nothing on it is editable &mdash; it reports, it does not configure. You will find:</p>
+      <p><b>My Dashboard</b> in the top bar. Four tiles head the page:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:180px">Tile</th><th>What it counts</th></tr></thead>
+          <tbody>
+            <tr><td><b>Roadmap complete</b></td><td>Of what is expected of you <i>by now</i> &mdash; your tier and below, plus one tier of early access once yours is done &mdash; how much is complete. Not the whole track.</td></tr>
+            <tr><td><b>Level</b></td><td>Your position, and the next rung up. &ldquo;Top of the ladder&rdquo; at Principal.</td></tr>
+            <tr><td><b>Weekly streak</b></td><td>Consecutive Monday&ndash;Sunday weeks in which you completed a course <b>booked through Auto Schedule</b>.</td></tr>
+            <tr><td><b>Ideas shipped</b></td><td>Ideas you raised on the board that reached <b>Launched</b>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--warn">
+        <span class="note__tag">Why your streak may read 0</span>
+        <p>The streak only counts courses that were scheduled through <b>Auto Schedule</b>. Finish a dozen courses without ever using it and the streak stays at <b>0</b> &mdash; that is correct, not broken. Auto Schedule is the only thing in the app that resembles a booked study session, so it is the only signal available.</p>
+      </div>
+
+      <h3>Progress by level</h3>
+
+      <p>This chart is the one place the ladder is renamed. Your five positions are regrouped into <b>four display levels</b>, so the name here will not match the position on your profile:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:180px">Shown as</th><th>Your position</th></tr></thead>
+          <tbody>
+            <tr><td><b>Foundations</b></td><td>Intern</td></tr>
+            <tr><td><b>Applied</b></td><td>Junior</td></tr>
+            <tr><td><b>Intermediate</b></td><td>Mid level</td></tr>
+            <tr><td><b>Advanced</b></td><td>Senior <i>and</i> Principal, sharing one bar</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>It is display only. Every rule that actually gates a course &mdash; locking, ordering, what your roadmap expects &mdash; uses the five positions, not these four names.</p>
+
+      <p>Below the bars, <b>My courses</b> is the same list as Your Journey, not a read-only copy: you can drag to reorder and open a wrap-up quiz from here exactly as you can there.</p>
+
+      <h3>The mind map, and courses that are locked</h3>
+
+      <p>The <b>mind map</b> lives here, at the bottom of this page, with its own track filter. It is the only place a course shows as <b>Locked</b>, and the only place <b>Skip prerequisite</b> appears &mdash; not on Your Journey.</p>
+
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <div class="ui-panel" style="padding:0;overflow:hidden">
+              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--u-line)">
+                <span style="font-size:12px">Claude 101</span>
+                <span class="ui-pill" style="background:#d9f2df;color:#2b8a3e">Complete</span>
+              </div>
+              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--u-line)">
+                <span style="font-size:12px">Prompting patterns</span>
+                <span class="ui-pill" style="background:#fdf1dd;color:#b7791f">In progress</span>
+              </div>
+              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;background:#fafbfd">
+                <span class="ui-faint" style="font-size:12px">🔒 Agentic workflows</span>
+                <span class="ui-row" style="gap:7px">
+                  <span class="ui-meta" style="font-size:10px">Requires all Intern courses</span>
+                  <span class="ui-btn">Skip prerequisite</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Mind map</b> — the lock names the tier in the way, not one course</figcaption>
+      </figure>
+
+      <p>A course is <b>Locked</b> until every course in the tier <i>below</i> it is complete or skipped. The gate is per tier, not per course, and the label says which tier is in the way &mdash; for example <i>&ldquo;Requires all Intern courses&rdquo;</i>. An empty tier blocks nothing.</p>
+
+      <p><b>Skip prerequisite</b> unlocks <b>the whole tier at once</b>, not just the course you clicked, by marking everything in the tier below as skipped. You confirm first, and the wording is deliberate: the skip is recorded on your roadmap and is visible to your manager.</p>
+
+      <h3>The rest of the page</h3>
 
       <div class="tw">
         <table>
           <thead><tr><th style="width:180px">Card</th><th>What it tells you</th></tr></thead>
           <tbody>
-            <tr><td><b>Progress by level</b></td><td>How far through each tier of your roadmap you are.</td></tr>
-            <tr><td><b>My courses</b></td><td>The courses your own level expects, plus one tier of early access once yours is done.</td></tr>
-            <tr><td><b>Consistency</b></td><td>Whether you are working at a steady pace, including a weekly streak tied to the study blocks Auto Schedule booked.</td></tr>
-            <tr><td><b>Retention</b></td><td><b>Confidence by skill</b> &mdash; your quiz accuracy grouped by the skills courses are tagged with, rather than by course.</td></tr>
-            <tr><td><b>What&rsquo;s next</b></td><td>The suggested next step from where you are.</td></tr>
-            <tr><td><b>Application</b></td><td>Ideas you have raised on the board &mdash; the one place the two halves of this app meet.</td></tr>
+            <tr><td><b>Learning activity</b></td><td>Courses completed, hours logged, in progress, and your current streak. All-time, not this month.</td></tr>
+            <tr><td><b>Confidence by skill</b></td><td>Your quiz accuracy grouped by <b>skill</b> rather than by course. A skill you have not started any course toward is <b>left out entirely</b> rather than shown at zero.</td></tr>
+            <tr><td><b>What&rsquo;s next</b></td><td>The same next pick as Your Journey&rsquo;s Up next, plus a nudge drawn from the last course you finished.</td></tr>
+            <tr><td><b>Application</b></td><td>Every idea you have raised, with its board status. This is the one place the two halves of the app meet.</td></tr>
           </tbody>
         </table>
       </div>
 
       <div class="note">
         <span class="note__tag">Not built yet</span>
-        <p>Two things people reasonably expect are genuinely absent: <b>AI-generated mind maps and course summaries</b>, and <b>reminders</b> before a booked study block. Auto Schedule puts time on your calendar; nothing nudges you when it arrives. If you were told to expect either, it is not hiding &mdash; it is not there.</p>
+        <p>Two things people reasonably expect are genuinely absent. <b>AI-generated summaries and exams</b> &mdash; the mind map is a roadmap view, not generated study material. And <b>reminders</b>: Auto Schedule puts time on your calendar, but nothing nudges you when it arrives. Neither is hiding; neither is there.</p>
       </div>
+
+      <p>The dashboard also cannot tell you <i>which</i> course or skill an idea came from. Nothing in the app links the two, so the Application card shows the idea and its status, and no attribution.</p>
     </section>
 
-
-    <!-- 13 ──────────────────────────────────────────────────── -->
     <section id="s13">
       <p class="sec-num">Section 15</p>
       <h2>Reference</h2>
