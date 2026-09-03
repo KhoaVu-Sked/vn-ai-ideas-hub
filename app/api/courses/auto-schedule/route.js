@@ -8,6 +8,7 @@ import {
 import { refreshAccessToken, freeBusy, createEvent, updateEvent } from "@/features/learning/googleCalendar";
 import { computeSchedule } from "@/features/learning/scheduler";
 import { decrypt } from "@/lib/crypto";
+import { APP_NAME } from "@/lib/brand";
 
 // Falls back to this only when the account has never set accounts.timezone —
 // most of this team is Vietnam-based, so it's a reasonable default rather
@@ -83,7 +84,7 @@ export async function POST(request) {
 
       const event = {
         summary: `Study: ${course.title}`,
-        description: [course.link, course.outcome, "Auto-scheduled by TS - AI Ideas Hub · Learning Hub"].filter(Boolean).join("\n\n"),
+        description: [course.link, course.outcome, `Auto-scheduled by ${APP_NAME} · Learning Hub`].filter(Boolean).join("\n\n"),
         start: { dateTime: slot.start.toISOString(), timeZone: tz },
         end: { dateTime: slot.end.toISOString(), timeZone: tz },
       };

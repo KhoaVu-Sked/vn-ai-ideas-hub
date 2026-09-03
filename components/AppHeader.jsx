@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { MANAGE_SECTIONS } from "@/features/admin/sections";
 import SkeduloMark from "@/components/SkeduloMark";
@@ -15,8 +15,18 @@ import { useSession } from "@/features/auth/SessionProvider";
 //   crumb     — optional text after the app name (e.g. an idea's title)
 //   onNewIdea — opens the submit modal in place; otherwise "+" routes to the board
 //   search / onSearch — controlled search box (board passes its own state)
+//
+// Which hub's navigation shows is read from the URL rather than passed in.
+// Thirteen components render this header; a `hub` prop would mean thirteen
+// edits and a fourteenth page that silently gets the wrong nav by forgetting
+// it. The shared admin pages (/tasks, /activity, /manage, /profile) count as
+// ideas pages, which is what lets the pathname be a sufficient answer.
 export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
   const router = useRouter();
+  const pathname = usePathname() || "/";
+  // "/" is the chooser: brand and avatar only. Offering hub links there would
+  // pre-answer the question that page exists to ask.
+  const hub = pathname === "/" ? null : pathname.startsWith("/learning") ? "learning" : "ideas";
   const { user: me } = useSession();
   const [openMenu, setOpenMenu] = useState(null); // 'manage' | 'avatar'
   const [term, setTerm] = useState(search ?? "");
@@ -40,7 +50,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
   };
   const submitSearch = (e) => {
     e.preventDefault();
-    if (!onSearch) router.push(term.trim() ? `/?q=${encodeURIComponent(term.trim())}` : "/");
+    if (!onSearch) router.push(term.trim() ? `/ideas?q=${encodeURIComponent(term.trim())}` : "/ideas");
   };
 
   return (
@@ -52,14 +62,14 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
       {crumb && <span className="app-header__crumb">› {crumb}</span>}
 
       <nav style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 8 }}>
-        <Link href="/" className="hdr-nav">Board</Link>
-        <Link href="/learning-hub" className="hdr-nav">Learning Hub</Link>
-        <Link href="/learning-hub/dashboard" className="hdr-nav">My Dashboard</Link>
-        {admin && <Link href="/learning-hub/team" className="hdr-nav">Team</Link>}
-        {admin && <Link href="/dashboard" className="hdr-nav">Dashboard</Link>}
-        {admin && <Link href="/tasks" className="hdr-nav">Tasks</Link>}
-        {admin && <Link href="/activity" className="hdr-nav">Activity</Link>}
-        {admin && (
+        {hub === "ideas" && <Link href="/ideas" className="hdr-nav">Board</Link>}
+        {hub === "ideas" && admin && <Link href="/dashboard" className="hdr-nav">Dashboard</Link>}
+        {hub === "learning" && <Link href="/learning" className="hdr-nav">Learning Hub</Link>}
+        {hub === "learning" && <Link href="/learning/dashboard" className="hdr-nav">My Dashboard</Link>}
+        {hub === "learning" && admin && <Link href="/learning/team" className="hdr-nav">Team</Link>}
+        {hub && admin && <Link href="/tasks" className="hdr-nav">Tasks</Link>}
+        {hub && admin && <Link href="/activity" className="hdr-nav">Activity</Link>}
+        {hub && admin && (
           <div style={{ position: "relative" }} onMouseEnter={() => setOpenMenu("manage")} onMouseLeave={() => setOpenMenu((m) => (m === "manage" ? null : m))}>
             <Link href="/manage" className="hdr-nav">Manage <span className="hdr-nav__caret">▼</span></Link>
             {openMenu === "manage" && (
@@ -73,6 +83,11 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
 
       <span className="app-header__spacer" />
 
+      {hub === "learning" && (
+        <Link href="/ideas" className="hdr-cross hdr-cross--hot">💡 Go to the Ideas Hub</Link>
+      )}
+
+      {hub === "ideas" && (
       <form className="hdr-search" onSubmit={submitSearch}>
         <span className="hdr-search__icon" aria-hidden="true">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
@@ -82,13 +97,22 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
         <input value={term} onChange={(e) => runSearch(e.target.value)} placeholder="Search ideas" aria-label="Search ideas" />
         {term && <button type="button" className="hdr-search__clear" onClick={() => runSearch("")} aria-label="Clear search">✕</button>}
       </form>
+      )}
 
-      <button
-        className="hdr-plus"
-        title="Submit a new idea"
-        aria-label="Submit a new idea"
-        onClick={() => (onNewIdea ? onNewIdea() : router.push("/?submit=1"))}
-      >+</button>
+      {/* Sits between the search box and "+", so the two ideas-only controls
+          stay adjacent and the way out of the hub reads as part of the row. */}
+      {hub === "ideas" && (
+        <Link href="/learning" className="hdr-cross">🎓 Learning Hub</Link>
+      )}
+
+      {hub === "ideas" && (
+        <button
+          className="hdr-plus"
+          title="Submit a new idea"
+          aria-label="Submit a new idea"
+          onClick={() => (onNewIdea ? onNewIdea() : router.push("/ideas?submit=1"))}
+        >+</button>
+      )}
 
       <div ref={avatarRef} style={{ position: "relative" }}>
         <button

@@ -442,7 +442,7 @@ export default function IdeaPage() {
   };
   const deleteIdea = () => {
     if (!confirm("Delete this idea permanently? This also removes its team, likes, requests, and files.")) return;
-    run(async () => { await api(`/api/ideas/${id}`, { method: "DELETE" }); router.push("/"); });
+    run(async () => { await api(`/api/ideas/${id}`, { method: "DELETE" }); router.push("/ideas"); });
   };
   const requestDeletion = () => {
     const reason = prompt("Reason for deletion (optional) — the admin will review:");

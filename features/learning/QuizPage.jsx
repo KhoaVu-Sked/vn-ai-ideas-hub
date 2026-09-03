@@ -1,6 +1,6 @@
 "use client";
 
-// Course wrap-up: /learning-hub/journey/[courseId]/quiz — one question per
+// Course wrap-up: /learning/journey/[courseId]/quiz — one question per
 // card, Salesforce-Trailhead style. Click any option to check it against
 // course_quiz_questions.correct_answer; wrong just says so and stays
 // clickable (no attempt limit, and every other option stays clickable too —
@@ -206,10 +206,10 @@ function CompletionCard({ courseTitle, correct, total }) {
           </p>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: hasScore ? 0 : 20 }}>
-          <Link href="/learning-hub/journey" style={{ ...completionBtn, background: "var(--blue)", color: "#fff" }}>
+          <Link href="/learning/journey" style={{ ...completionBtn, background: "var(--blue)", color: "#fff" }}>
             Back to Your Journey
           </Link>
-          <Link href="/learning-hub/dashboard" style={{ ...completionBtn, border: "1px solid var(--line)", background: "var(--card)", color: "var(--body)" }}>
+          <Link href="/learning/dashboard" style={{ ...completionBtn, border: "1px solid var(--line)", background: "var(--card)", color: "var(--body)" }}>
             View your progress
           </Link>
         </div>
@@ -306,7 +306,7 @@ export default function QuizPage() {
           <Loading label="Loading quiz" />
         ) : (
           <>
-            <Link href="/learning-hub/journey" style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none", display: "inline-block", marginBottom: 14 }}>
+            <Link href="/learning/journey" style={{ fontSize: 12.5, color: "var(--muted)", textDecoration: "none", display: "inline-block", marginBottom: 14 }}>
               ← Back to Your Journey
             </Link>
             {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}

@@ -65,7 +65,7 @@ export function buildIdeaEmail({ meta, actor = "Someone", kind, detail = "", bod
   }
   const parts = {
     heading, intro, rows, quote, ctaLabel: "View the idea", ctaUrl: link,
-    footer: `You're receiving this because you're a member or follower of ${meta.number} in ${APP_NAME}, Skedulo's internal AI ideas tracker. To stop these, reply with "unsubscribe".`,
+    footer: `You're receiving this because you're a member or follower of ${meta.number} in ${APP_NAME}, Skedulo's internal AI ideas and learning hub. To stop these, reply with "unsubscribe".`,
   };
   return { subject, html: renderEmail(parts), text: renderEmailText(parts) };
 }
@@ -109,7 +109,7 @@ export async function notifyAdmins({ actorId, subject, heading, intro, rows = []
       heading, intro, rows, quote,
       ctaLabel: `Open ${APP_NAME}`,
       ctaUrl: url,
-      footer: `You're receiving this because you're an admin of ${APP_NAME}, Skedulo's internal AI ideas tracker. To stop these, reply with "unsubscribe".`,
+      footer: `You're receiving this because you're an admin of ${APP_NAME}, Skedulo's internal AI ideas and learning hub. To stop these, reply with "unsubscribe".`,
     };
     await sendEmail({ subject, to: recipients, html: renderEmail(parts), text: renderEmailText(parts) });
   } catch (e) {

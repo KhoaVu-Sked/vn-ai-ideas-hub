@@ -37,7 +37,7 @@ export default function DashboardPage() {
 
       <main style={{ maxWidth: 1080, margin: "0 auto", padding: "20px 22px 0" }}>
         {me === null ? (
-          <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>Admins only. <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>
+          <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>Admins only. <Link href="/ideas" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>
         ) : err ? (
           <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>{err} <button onClick={() => load(period)} style={{ ...ghost, color: "#c92a2a", borderColor: "#f5c9c9" }}>Retry</button></div>
         ) : !data ? (

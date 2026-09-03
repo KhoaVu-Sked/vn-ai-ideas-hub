@@ -61,7 +61,7 @@ export default function TasksPage() {
         {me === undefined || (me && !ready) ? (
           <Loading label="Loading tasks" />
         ) : me === null ? (
-          <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>Admins only. <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>
+          <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>Admins only. <Link href="/ideas" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>
         ) : (
           <section style={card}>
             <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 14px" }}>Admin tasks</h1>

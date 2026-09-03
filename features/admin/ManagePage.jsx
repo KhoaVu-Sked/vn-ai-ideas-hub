@@ -172,7 +172,7 @@ function ManagePage() {
         {me === undefined || (me && !ready) ? (
           <Loading label="Loading" />
         ) : me === null ? (
-          <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>Admins only. <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>
+          <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>Admins only. <Link href="/ideas" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link></div>
         ) : (
           <>
             {err && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 16 }}>{err}</div>}
