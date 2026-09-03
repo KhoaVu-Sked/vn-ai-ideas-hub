@@ -197,6 +197,34 @@ const wizardField = { display: "flex", flexDirection: "column", gap: 5, fontSize
 const wizardSelect = { border: "1px solid var(--line)", borderRadius: 8, padding: "7px 8px", fontSize: 13, color: "var(--ink)", fontWeight: 500, background: "var(--card)" };
 const wizardLockedValue = { border: "1px solid var(--line)", borderRadius: 8, padding: "7px 8px", fontSize: 13, color: "var(--ink)", fontWeight: 700, background: "var(--bg)" };
 const wizardQuickPick = { border: "1px solid var(--line)", background: "var(--bg)", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "var(--body)", cursor: "pointer" };
+// The selected state of a quick-pick that's a real persistent choice
+// (study session length), not a one-off shortcut like the "Complete by"
+// date quick-picks (which never stay visually "chosen" — the date field
+// itself is the source of truth for those).
+const wizardQuickPickSelected = { ...wizardQuickPick, border: "1px solid var(--blue)", background: "var(--blue)", color: "#fff" };
+// Auto Schedule's own study-session-length choices — the only three this
+// form offers, validated against this exact list server-side too
+// (app/api/courses/auto-schedule/route.js's own ALLOWED_SESSION_HOURS).
+const SESSION_LENGTH_OPTIONS = [
+  { label: "15 min", hours: 0.25 },
+  { label: "30 min", hours: 0.5 },
+  { label: "1 hour", hours: 1 },
+];
+
+// A "?" badge next to the header explains the calculation — same
+// computeSchedule() logic as AutoScheduleModal.jsx's own day-to-day tool,
+// so the same explanation applies here too. .icon-tip-wide (globals.css)
+// lets the tip actually wrap instead of running a paragraph off the edge.
+const HOW_IT_WORKS_HINT = "Each course's estimated hours are split into sessions of your chosen length (the last one may be shorter). Sessions land on the earliest open weekday slot — 9am–6pm, never 11am–1pm lunch — one per day per course, working around your calendar.";
+const helpBadge = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--line)", background: "none", color: "var(--muted)", fontSize: 10.5, fontWeight: 700, cursor: "help", padding: 0 };
+function AutoScheduleTitle() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, ...wizardTitle, marginBottom: 6 }}>
+      Auto Schedule your roadmap
+      <button type="button" className="icon-tip icon-tip-wide" data-tip={HOW_IT_WORKS_HINT} aria-label="How Auto Schedule calculates sessions" style={helpBadge}>?</button>
+    </div>
+  );
+}
 
 // First-time-only replacement for "Your tracks"/"Suggested tracks" (the
 // user's explicit ask: remove the browse UI, add one animated button).
@@ -378,10 +406,12 @@ function TracksStep({ tracks, onPreview, onEnrollMany, onContinue }) {
 // just picked in step 1), not the editable From/To AutoScheduleModal shows
 // elsewhere, on purpose: this is a one-time "catch up your whole roadmap so
 // far" action for a brand-new account, not the same day-to-day tool Up
-// next's own wand is. Only the Complete-by date stays adjustable. Reuses
-// the same /api/courses/auto-schedule endpoint and not_connected handling
+// next's own wand is. Session length and the Complete-by date both stay
+// adjustable — only the position range is fixed. Reuses the same
+// /api/courses/auto-schedule endpoint and not_connected handling
 // AutoScheduleModal does — see that file for the full editable version.
 function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }) {
+  const [sessionHours, setSessionHours] = useState(0.5); // 30 min default
   const [targetDate, setTargetDate] = useState(nextAnnualReviewDateStr(annualReviewDate));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -394,7 +424,7 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
     try {
       const res = await api("/api/courses/auto-schedule", {
         method: "POST",
-        body: JSON.stringify({ from_position: POSITION_ORDER[0], to_position: currentPosition || POSITION_ORDER[0], timeline_months }),
+        body: JSON.stringify({ from_position: POSITION_ORDER[0], to_position: currentPosition || POSITION_ORDER[0], timeline_months, session_hours: sessionHours }),
       });
       onSaved(res);
     } catch (e) {
@@ -408,7 +438,7 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
   if (needsConnect) {
     return (
       <>
-        <div style={wizardTitle}>Auto Schedule your roadmap</div>
+        <AutoScheduleTitle />
         <p style={wizardSubtext}>Google Calendar isn't connected after all — connect it to finish setting this up, or skip and do it later from Your Journey.</p>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button onClick={onSkip} style={wizardBtn}>Skip for now</button>
@@ -420,13 +450,28 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
 
   return (
     <>
-      <div style={wizardTitle}>Auto Schedule your roadmap</div>
+      <AutoScheduleTitle />
       <p style={wizardSubtext}>
-        Books one study block per not-yet-done course, from {POSITION_LABEL[POSITION_ORDER[0]]} through your own {POSITION_LABEL[currentPosition] || POSITION_LABEL[POSITION_ORDER[0]]} level, working around your existing meetings. This range is fixed for setup — you can plan any other range later from Your Journey's own 🪄 button.
+        Splits every not-yet-done course from {POSITION_LABEL[POSITION_ORDER[0]]} through your own {POSITION_LABEL[currentPosition] || POSITION_LABEL[POSITION_ORDER[0]]} level into study sessions, working around your existing meetings. This range is fixed for setup — you can plan any other range later from Your Journey's own 🪄 button.
       </p>
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
         <div style={wizardField}>From<div style={wizardLockedValue}>{POSITION_LABEL[POSITION_ORDER[0]]}</div></div>
         <div style={wizardField}>To<div style={wizardLockedValue}>{POSITION_LABEL[currentPosition] || POSITION_LABEL[POSITION_ORDER[0]]}</div></div>
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", marginBottom: 5 }}>How long is a study session you'd like?</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {SESSION_LENGTH_OPTIONS.map((opt) => (
+            <button
+              key={opt.hours}
+              type="button"
+              onClick={() => setSessionHours(opt.hours)}
+              style={sessionHours === opt.hours ? wizardQuickPickSelected : wizardQuickPick}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
       <label style={wizardField}>Complete by
         <input type="date" min={todayStr()} value={targetDate} onChange={(e) => setTargetDate(e.target.value)} style={wizardSelect} />
@@ -457,13 +502,14 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
 // Schedule just booked real events" — a fabricated block count would be
 // worse than no count at all.
 function DoneStep({ scheduled, onGoToJourney, finishing }) {
+  const totalSessions = scheduled?.reduce((sum, s) => sum + s.sessions_booked, 0) || 0;
   return (
     <div style={{ textAlign: "center", padding: "8px 4px 4px" }}>
       <div style={{ fontSize: 34, marginBottom: 10 }}>🎉</div>
       <div style={{ ...wizardTitle, textAlign: "center" }}>You've successfully completed your setup</div>
       <p style={{ ...wizardSubtext, textAlign: "center" }}>
-        {scheduled?.length
-          ? `${scheduled.length} study block${scheduled.length === 1 ? "" : "s"} already booked on your calendar.`
+        {totalSessions > 0
+          ? `${totalSessions} study session${totalSessions === 1 ? "" : "s"} already booked on your calendar.`
           : "Your roadmap is ready whenever you are."}
       </p>
       <button onClick={onGoToJourney} disabled={finishing} style={wizardBtnPrimary(finishing)}>

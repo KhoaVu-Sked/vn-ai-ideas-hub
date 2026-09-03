@@ -218,6 +218,18 @@ a {
   opacity: 1;
 }
 
+/* Same tooltip, for a real explanation rather than a short label (e.g. "how
+   does Auto Schedule figure out these session times?") — .icon-tip's own
+   nowrap would just run a paragraph off the edge of the screen. Add this
+   class ALONGSIDE .icon-tip, not instead of it — everything but width/wrap
+   stays shared. */
+.icon-tip-wide::after {
+  white-space: normal;
+  width: 230px;
+  text-align: left;
+  line-height: 1.4;
+}
+
 /* ── Task drawer ──────────────────────────────────────────────────
    The panel comes in from the right edge it is anchored to, so the
    motion matches where it lives. The scrim only fades — sliding it

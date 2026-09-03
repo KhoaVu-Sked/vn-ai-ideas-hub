@@ -130,20 +130,6 @@ export async function createEvent(accessToken, event) {
   return body; // { id, htmlLink, ... }
 }
 
-// Used to re-schedule a course that already has a calendar_event_id, instead
-// of creating a duplicate. A 404 (the learner deleted the event themselves)
-// carries status on the thrown error so the caller can fall back to createEvent.
-export async function updateEvent(accessToken, eventId, event) {
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
-    method: "PATCH",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(event),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(body.error?.message || "Could not update the calendar event."), { status: res.status });
-  return body;
-}
-
 // Used by Reset (Your Journey) to clean up whatever Auto Schedule booked, so
 // a demo account can be reset and re-run without stale events piling up on
 // the connected calendar. 404/410 both mean it's already gone (deleted by

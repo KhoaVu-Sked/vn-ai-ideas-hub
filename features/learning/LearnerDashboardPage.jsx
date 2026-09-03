@@ -32,14 +32,14 @@
 // copy of it.
 //
 // Weekly streak (weeklyStreak, shared.js) is scoped to courses actually
-// booked through Auto Schedule (calendar_event_id set) — Auto Schedule is
-// the only place this app has anything resembling a "session," so that's
-// the signal, not every completion regardless of how it was scheduled. No
-// live Google Calendar read: completion only ever lives in
-// course_assignments.status, never in the calendar event itself, so
-// calendar_event_id already carries the one bit a live fetch would add
-// ("was this actually booked") without the token-refresh/revoked-access
-// failure modes a live call brings.
+// booked through Auto Schedule (has_scheduled_session true) — Auto
+// Schedule is the only place this app has anything resembling a
+// "session," so that's the signal, not every completion regardless of how
+// it was scheduled. No live Google Calendar read: completion only ever
+// lives in course_assignments.status, never in the calendar event itself,
+// so has_scheduled_session already carries the one bit a live fetch would
+// add ("was this actually booked") without the token-refresh/revoked-
+// access failure modes a live call brings.
 //
 // The mockup's own "My Progress / Team View" toggle is dropped here — this
 // app already separates those as two nav links in AppHeader ("My Dashboard"

@@ -134,7 +134,8 @@ create table if not exists course_assignments (
   position    integer,  -- learner's own display order within a position tier
   quiz_total_questions    integer,  -- snapshot at completion time (see migration 026)
   quiz_correct_first_try  integer,  -- how many of those were right on the first click
-  calendar_event_id       text,     -- Google Calendar event Auto Schedule created for this course (see migration 027)
+  calendar_event_id       text,     -- Google Calendar event Auto Schedule created for this course (see migration 027) — legacy single-event bookings only, see calendar_event_ids below
+  calendar_event_ids      text[] not null default '{}', -- one per study SESSION now that Auto Schedule splits a course into several (migration 029)
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (account_id, course_id)

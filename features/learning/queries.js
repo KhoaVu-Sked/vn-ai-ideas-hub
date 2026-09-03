@@ -229,7 +229,8 @@ export async function getJourney(accountId) {
           'skills', c.skills, 'track_id', t.id, 'track_name', t.name,
           'status', coalesce(ca.status, 'not_started'), 'target_date', ca.target_date,
           'quiz_total_questions', ca.quiz_total_questions, 'quiz_correct_first_try', ca.quiz_correct_first_try,
-          'calendar_event_id', ca.calendar_event_id, 'updated_at', ca.updated_at
+          'has_scheduled_session', (ca.calendar_event_id is not null or coalesce(array_length(ca.calendar_event_ids, 1), 0) > 0),
+          'updated_at', ca.updated_at
         ) order by
           coalesce(array_position(${POSITION_ORDER}::text[], c.expected_by_position), 999),
           coalesce(ca.position, 2147483647), t.name asc, c.stage asc, c.created_at asc
@@ -381,7 +382,8 @@ export async function skipPrerequisiteFor(courseId, accountId) {
 export async function resetJourney(accountId) {
   const rows = await sql`
     with ca as (
-      delete from course_assignments where account_id = ${accountId} returning course_id, calendar_event_id
+      delete from course_assignments where account_id = ${accountId}
+      returning course_id, calendar_event_id, calendar_event_ids
     ),
     at as (
       delete from account_tracks where account_id = ${accountId} returning 1
@@ -390,14 +392,21 @@ export async function resetJourney(accountId) {
       delete from calendar_connections where account_id = ${accountId} returning 1
     )
     select
-      (select coalesce(json_agg(json_build_object('course_id', course_id, 'calendar_event_id', calendar_event_id)), '[]') from ca) as courses,
+      (select coalesce(json_agg(json_build_object(
+        'course_id', course_id, 'calendar_event_id', calendar_event_id, 'calendar_event_ids', calendar_event_ids
+      )), '[]') from ca) as courses,
       (select count(*)::int from at) as tracks_cleared,
       (select count(*)::int from cc) as calendar_connection_cleared
   `;
   const r = rows[0];
   return {
     reset: r.courses.length,
-    eventIds: r.courses.map((c) => c.calendar_event_id).filter(Boolean),
+    // Legacy single events (calendar_event_id, migration 027) union'd with
+    // the new one-per-session array (calendar_event_ids, migration 029) —
+    // a row touched by Auto Schedule since 029 shipped has one or the
+    // other, not both, but this covers whichever it is without needing to
+    // know which.
+    eventIds: r.courses.flatMap((c) => [c.calendar_event_id, ...(c.calendar_event_ids || [])]).filter(Boolean),
     tracksCleared: r.tracks_cleared,
     calendarConnectionCleared: r.calendar_connection_cleared > 0,
   };
@@ -511,12 +520,17 @@ export async function getAccountSchedulingInfo(accountId) {
 // Every not-yet-done course between fromPosition and toPosition (inclusive),
 // across the account's own enrolled tracks — same tier-then-custom-order
 // shape as getJourney, so Auto Schedule proposes courses in the same order
-// the learner already sees them in. calendar_event_id comes along so the
-// caller can update an existing event instead of creating a duplicate.
+// the learner already sees them in. existing_event_ids flattens the legacy
+// single event (calendar_event_id, migration 027) and the current
+// one-per-session array (calendar_event_ids, migration 029) into one list
+// per course, so the caller can delete whatever's already booked before
+// placing this run's fresh sessions — see app/api/courses/auto-schedule/
+// route.js for why delete-then-recreate, not an in-place update, is what
+// a re-run does now that a course can have more than one session.
 export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosition) {
-  return sql`
+  const rows = await sql`
     select c.id, c.title, c.est_hours, c.link, c.outcome, c.expected_by_position,
-      ca.calendar_event_id
+      ca.calendar_event_id, ca.calendar_event_ids
     from account_tracks acct
     join courses c on c.track_id = acct.track_id
     left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
@@ -529,19 +543,27 @@ export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosit
       array_position(${POSITION_ORDER}::text[], c.expected_by_position),
       coalesce(ca.position, 2147483647), c.created_at asc
   `;
+  return rows.map((r) => ({
+    ...r,
+    existing_event_ids: [r.calendar_event_id, ...(r.calendar_event_ids || [])].filter(Boolean),
+  }));
 }
 
 // Writes what Auto Schedule decided for one course: the target_date Up next
-// already reads (ai-learning-requirements/03-your-journey.md, 4.7) plus the
-// Google event id, so a re-run knows to update that event rather than create
-// a second one.
-export async function saveScheduledEvent(accountId, courseId, { targetDate, eventId }) {
+// already reads (ai-learning-requirements/03-your-journey.md, 4.7) plus
+// every session's Google event id. Always writes calendar_event_ids and
+// clears the legacy singular calendar_event_id (migration 027) — a row
+// touched by this since migration 029 shipped has one or the other, not
+// both, which is what lets readers eventually stop checking the legacy
+// column at all once nothing old is left pointing at it.
+export async function saveScheduledSessions(accountId, courseId, { targetDate, eventIds }) {
   const rows = await sql`
-    insert into course_assignments (account_id, course_id, target_date, calendar_event_id)
-    values (${accountId}, ${courseId}, ${targetDate}, ${eventId})
+    insert into course_assignments (account_id, course_id, target_date, calendar_event_ids, calendar_event_id)
+    values (${accountId}, ${courseId}, ${targetDate}, ${eventIds}, null)
     on conflict (account_id, course_id) do update set
-      target_date = excluded.target_date, calendar_event_id = excluded.calendar_event_id, updated_at = now()
-    returning target_date, calendar_event_id
+      target_date = excluded.target_date, calendar_event_ids = excluded.calendar_event_ids,
+      calendar_event_id = null, updated_at = now()
+    returning target_date, calendar_event_ids
   `;
   return rows[0];
 }

@@ -137,22 +137,24 @@ create table if not exists course_assignments (
   position    integer,  -- learner's own display order within a position tier
   quiz_total_questions    integer,  -- snapshot at completion time (see migration 026)
   quiz_correct_first_try  integer,  -- how many of those were right on the first click
-  calendar_event_id       text,     -- Google Calendar event Auto Schedule created for this course (see migration 027)
+  calendar_event_id       text,     -- Google Calendar event Auto Schedule created for this course (see migration 027) — legacy single-event bookings only, see calendar_event_ids below
+  calendar_event_ids      text[] not null default '{}', -- one per study SESSION now that Auto Schedule splits a course into several (migration 029) — new bookings write here, not calendar_event_id above
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (account_id, course_id)
 );
 create index if not exists course_assignments_account_id_idx on course_assignments (account_id);
--- Existing databases predate all four of these columns (position: migration
+-- Existing databases predate all five of these columns (position: migration
 -- 024, the two quiz_* columns: migration 026, calendar_event_id: migration
--- 027). Kept right here next to the table they belong to — rather than down
--- in the generic migration-history block below — so the whole AI Learning
--- schema (tables plus every column ever added to them) stays in one place
--- for anyone re-running this file.
+-- 027, calendar_event_ids: migration 029). Kept right here next to the
+-- table they belong to — rather than down in the generic migration-history
+-- block below — so the whole AI Learning schema (tables plus every column
+-- ever added to them) stays in one place for anyone re-running this file.
 alter table course_assignments add column if not exists position integer;
 alter table course_assignments add column if not exists quiz_total_questions integer;
 alter table course_assignments add column if not exists quiz_correct_first_try integer;
 alter table course_assignments add column if not exists calendar_event_id text;
+alter table course_assignments add column if not exists calendar_event_ids text[] not null default '{}';
 
 -- Quiz for a course: pure reference content (question/options/answer/
 -- rationale), no per-learner state. The front end shows all options and
