@@ -310,7 +310,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <li><a href="#s11">Your profile</a></li>
       <li><a href="#s15">The Learning Hub</a></li>
       <li><a href="#s16">Your Journey</a></li>
-      <li><a href="#s17">Your learning dashboard</a></li>
+      <li><a href="#s17">My Dashboard</a></li>
       <li><a href="#s13">Reference</a></li>
       <li><a href="#s14">Getting help</a></li>
     </ol>
@@ -426,8 +426,8 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
           <tbody>
             <tr><td><b>TS - AI Ideas Hub</b></td><td>Returns you to the board from anywhere.</td></tr>
             <tr><td><b>Board</b></td><td>All ideas as cards, grouped by status.</td></tr>
-            <tr><td><b>Learning Hub</b></td><td>Training tracks you can enrol in. See section 12.</td></tr>
-            <tr><td><b>My Dashboard</b></td><td>Your own learning progress. See section 14.</td></tr>
+            <tr><td><b>Learning Hub</b></td><td>Training tracks you can enroll in. See section 12.</td></tr>
+            <tr><td><b>My Dashboard</b></td><td>Your own learning progress, and the mind map. See section 14.</td></tr>
             <tr><td><b>Search</b></td><td>Filters the board by idea name as you type.</td></tr>
             <tr><td><b>+</b></td><td>Opens the Submit an idea form, from any page.</td></tr>
             <tr><td><b>Your avatar</b></td><td>My profile, and Sign out.</td></tr>
@@ -926,7 +926,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <h2>The Learning Hub</h2>
       <p class="lede">Training tracks you work through at your own pace, ordered by seniority level.</p>
 
-      <p>The Learning Hub is a second thing living in the same app as the ideas board. Where the board is about ideas, the Hub is about you: a set of <b>tracks</b>, each holding <b>courses</b> grouped by seniority level, that you enrol in and work through yourself.</p>
+      <p>The Learning Hub is a second thing living in the same app as the ideas board. Where the board is about ideas, the Hub is about you: a set of <b>tracks</b>, each holding <b>courses</b> grouped by seniority level, that you enroll in and work through yourself.</p>
 
       <p>Your seniority level is one of five, and an <b>admin sets it for you</b> &mdash; you cannot change your own:</p>
 
@@ -954,33 +954,78 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <h3>Enrolling in a track</h3>
 
-      <p>Open <b>Learning Hub</b> in the top bar. Every track appears under <b>Suggested tracks</b> with a course count and whether you are already on it. Click one to preview its whole roadmap before committing.</p>
+      <p>Open <b>Learning Hub</b> in the top bar. The page has two lists: <b>Your tracks</b>, the ones you are on, and <b>Suggested tracks</b>, which shows <i>every</i> track &mdash; including ones you have already joined, so a track you are on appears in both.</p>
 
-      <p>The <b>Enrol</b> button self-assigns you. There is <b>no approval step</b> &mdash; nobody has to let you in, and you can enrol in more than one track at once. Enrolled tracks move up into <b>Your tracks</b> with an <b>Enrolled</b> badge, which becomes <b>Completed</b> once every course in that track is complete for you.</p>
+      <p>A track card carries a course count, an <b>Enrolled</b> badge if you are on it, and one link: <b>Preview roadmap &rarr;</b>. <b>There is no Enroll button on the card.</b> The link opens the roadmap in a panel, grouped by stage, and the <b>Enroll</b> button sits in that panel&rsquo;s header &mdash; so you always see what you are joining before you join it.</p>
+
+      <p>There is <b>no approval step</b>: nobody has to let you in, and you can be on more than one track at once. Once joined, the button reads <b>Enrolled &check;</b> &mdash; and clicking it again <b>unenrolls</b> you, so take care not to click it to confirm anything.</p>
+
+      <p>The badge on your card becomes <b>Completed</b> once every course in that track is complete for you.</p>
 
 
       <figure>
         <div class="ui">
           <div class="ui-body">
-            <p class="ui-label" style="margin:0 0 7px">Your tracks</p>
-            <div class="ui-panel ui-row" style="justify-content:space-between;margin-bottom:11px">
-              <span>
-                <span class="ui-h" style="font-size:13.5px">AI Track</span>
-                <span class="ui-meta" style="display:block;margin-top:2px">20 courses · Intern → Principal</span>
-              </span>
-              <span class="ui-pill" style="background:#d9f2df;color:#2b8a3e">Enrolled</span>
+            <div class="ui-panel" style="margin-bottom:11px">
+              <div class="ui-row" style="justify-content:space-between;margin-bottom:9px">
+                <span>
+                  <span class="ui-h" style="font-size:14px">Your tracks</span>
+                  <span class="ui-meta" style="display:block">Tracks you&rsquo;re enrolled in.</span>
+                </span>
+                <span style="font-size:11.5px;font-weight:700;color:var(--u-accent)">View your journey &rarr;</span>
+              </div>
+              <div style="border:1px solid var(--u-line);border-radius:9px;padding:11px;max-width:210px">
+                <span style="display:inline-flex;width:26px;height:26px;border-radius:7px;background:var(--u-accent);color:#fff;font-weight:800;font-size:12px;align-items:center;justify-content:center">A</span>
+                <div class="ui-row" style="gap:7px;margin-top:8px">
+                  <span style="font-weight:700;font-size:12.5px;color:var(--u-ink)">AI Track</span>
+                  <span class="ui-pill" style="background:#e6f4ea;color:#1f7a3c">Enrolled</span>
+                </div>
+                <div class="ui-meta" style="margin-top:2px">20 courses</div>
+                <div style="font-size:11.5px;font-weight:700;color:var(--u-accent);margin-top:7px">Preview roadmap &rarr;</div>
+              </div>
             </div>
-            <p class="ui-label" style="margin:0 0 7px">Suggested tracks</p>
-            <div class="ui-panel ui-row" style="justify-content:space-between">
-              <span>
-                <span class="ui-h" style="font-size:13.5px">Core Competency</span>
-                <span class="ui-meta" style="display:block;margin-top:2px">8 courses</span>
-              </span>
-              <span class="ui-btn ui-btn--pri">Enrol</span>
+            <div class="ui-panel">
+              <span class="ui-h" style="font-size:14px">Suggested tracks</span>
+              <span class="ui-meta" style="display:block;margin-bottom:9px">Pick a track to preview its roadmap, and enroll when you&rsquo;re ready to start it.</span>
+              <div class="ui-row" style="gap:9px;align-items:stretch">
+                <div style="border:1px solid var(--u-line);border-radius:9px;padding:11px;flex:1">
+                  <div class="ui-row" style="gap:7px">
+                    <span style="font-weight:700;font-size:12.5px;color:var(--u-ink)">AI Track</span>
+                    <span class="ui-pill" style="background:#e6f4ea;color:#1f7a3c">Enrolled</span>
+                  </div>
+                  <div class="ui-meta" style="margin-top:2px">20 courses</div>
+                  <div style="font-size:11.5px;font-weight:700;color:var(--u-accent);margin-top:7px">Preview roadmap &rarr;</div>
+                </div>
+                <div style="border:1px solid var(--u-line);border-radius:9px;padding:11px;flex:1">
+                  <span style="font-weight:700;font-size:12.5px;color:var(--u-ink)">Core Competency</span>
+                  <div class="ui-meta" style="margin-top:2px">0 courses</div>
+                  <div style="font-size:11.5px;font-weight:700;color:var(--u-accent);margin-top:7px">Preview roadmap &rarr;</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <figcaption><b>Learning Hub</b> — enrolling needs nobody's approval</figcaption>
+        <figcaption><b>Learning Hub</b> &mdash; a track you are on appears in both lists, and no card carries an Enroll button</figcaption>
+      </figure>
+
+      <figure>
+        <div class="ui">
+          <div class="ui-scrim" style="padding:20px">
+            <div class="ui-modal" style="max-width:340px">
+              <div class="ui-row" style="justify-content:space-between;align-items:flex-start">
+                <span>
+                  <span class="ui-h" style="font-size:15px">AI Track</span>
+                  <span class="ui-meta" style="display:block;margin-top:1px">Ordered by stage &middot; 20 courses</span>
+                </span>
+                <span class="ui-row" style="gap:10px">
+                  <span class="ui-btn ui-btn--pri">Enroll</span>
+                  <span class="ui-faint" style="font-size:15px">&times;</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Preview roadmap</b> &mdash; the Enroll button lives here. Once joined it reads <b>Enrolled &check;</b>, and clicking it again unenrolls you</figcaption>
       </figure>
 
       <div class="note note--good">
@@ -994,6 +1039,12 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <p class="sec-num">Section 13</p>
       <h2>Your Journey</h2>
       <p class="lede">Your roadmap: what to take, in what order, and when you plan to finish it.</p>
+
+      <p>A strip across the top carries your avatar, your name, a pill per enrolled track, and how far you are through the courses your own level expects &mdash; for example <b>0 of 19 core courses complete</b>, with a bar.</p>
+
+      <p>Below it, the <b>Your Journey</b> panel holds a track filter, a <b>Reset</b> button, and the roadmap table itself, ordered Intern through Principal across every track you are on. Its columns are <b>#</b>, <b>Course</b>, <b>Track</b>, <b>Platform</b>, <b>Est. hrs</b>, <b>Target</b> and <b>Status</b>. <b>Target</b> shows a dash until you set one.</p>
+
+      <p>Clicking a row expands it to reveal a link out to the course on its own platform, an <b>After this course</b> line describing what you should be able to do, and the <b>Wrap-up</b> button.</p>
 
       <p>Every course on your roadmap sits in one of four states:</p>
 
@@ -1017,14 +1068,16 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <div class="tw">
         <table>
-          <thead><tr><th style="width:180px">Control</th><th>What it does</th></tr></thead>
+          <thead><tr><th style="width:190px">Control</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><b>Pencil</b></td><td>Sets your own target date for that course. Nothing is saved until you confirm with the green tick.</td></tr>
-            <tr><td><b>Sync</b></td><td>Re-checks which courses qualify, in case something changed elsewhere.</td></tr>
-            <tr><td><b>Magic wand</b></td><td>Opens <b>Auto Schedule</b> &mdash; see below.</td></tr>
+            <tr><td><b>🪄 Auto Schedule</b></td><td>The only always-visible action, and a labelled button rather than an icon. See below.</td></tr>
+            <tr><td><b>⋯ menu</b></td><td>Holds the two less frequent actions: <b>Refresh</b>, which re-checks which courses qualify, and <b>Edit dates</b>.</td></tr>
+            <tr><td><b>✓ Done</b></td><td>While you are editing dates, this replaces the <b>⋯</b> menu in the same spot, so leaving edit mode never means reopening a menu. Nothing is saved until you press it.</td></tr>
           </tbody>
         </table>
       </div>
+
+      <p>Each row shows the course, its status, and either <b>Target</b> with a date or <b>No target set</b>, followed by the estimated hours. When everything is done the card reads <i>&ldquo;Nothing left to plan &mdash; every course is complete or skipped.&rdquo;</i></p>
 
       <p>A target date is <b>a plan, not a deadline</b>. Nothing enforces it, nothing chases you, and you can change it whenever you like.</p>
 
@@ -1035,25 +1088,72 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <figure>
         <div class="ui">
           <div class="ui-body">
-            <div class="ui-panel">
-              <div class="ui-row" style="justify-content:space-between;margin-bottom:10px">
-                <span class="ui-label" style="margin:0">Up next</span>
-                <span class="ui-row ui-faint" style="gap:9px;font-size:12px">
-                  <span title="Set a target date">✎</span><span title="Re-check">⟳</span><span title="Auto Schedule">✨</span>
-                </span>
+            <div class="ui-panel" style="padding:0;overflow:hidden">
+              <div class="ui-row" style="padding:8px 11px;border-bottom:1px solid var(--u-line);gap:0;font-size:9px;font-weight:700;color:var(--u-muted);letter-spacing:.05em;text-transform:uppercase">
+                <span style="width:18px">#</span><span style="flex:1">Course</span>
+                <span style="width:54px">Track</span><span style="width:74px">Platform</span>
+                <span style="width:44px">Est. hrs</span><span style="width:46px">Target</span><span style="width:64px">Status</span>
               </div>
-              <div class="ui-row" style="justify-content:space-between;margin-bottom:7px">
-                <span style="font-size:12px">Prompting patterns</span>
-                <span class="ui-tag">Oct 13</span>
+              <div class="ui-row" style="padding:9px 11px;gap:0;font-size:11.5px">
+                <span class="ui-faint" style="width:18px">1</span>
+                <span style="flex:1;font-weight:700;color:var(--u-ink)">Claude 101</span>
+                <span class="ui-meta" style="width:54px">AI Track</span>
+                <span class="ui-meta" style="width:74px">Anthropic Academy</span>
+                <span class="ui-meta" style="width:44px">2</span>
+                <span class="ui-faint" style="width:46px">&mdash;</span>
+                <span style="width:64px"><span class="ui-pill" style="background:#e8f0ff;color:#2f5fd0">In progress</span></span>
               </div>
-              <div class="ui-row" style="justify-content:space-between">
-                <span style="font-size:12px">Agentic workflows</span>
-                <span class="ui-tag ui-faint">No date</span>
+              <div style="padding:9px 11px;background:#fafbfd;border-top:1px solid var(--u-line);border-bottom:1px solid var(--u-line)">
+                <div style="font-size:11.5px;font-weight:700;color:var(--u-accent)">Open course on Anthropic Academy &nearr;</div>
+                <div class="ui-meta" style="margin:4px 0 7px"><b>After this course:</b> Use Claude for writing, summarizing, and analyzing documents.</div>
+                <span class="ui-btn">Wrap-up</span>
+              </div>
+              <div class="ui-row" style="padding:9px 11px;gap:0;font-size:11.5px">
+                <span class="ui-faint" style="width:18px">2</span>
+                <span style="flex:1;font-weight:700;color:var(--u-ink)">AI Fluency: Framework &amp; Foundations</span>
+                <span class="ui-meta" style="width:54px">AI Track</span>
+                <span class="ui-meta" style="width:74px">Anthropic Academy</span>
+                <span class="ui-meta" style="width:44px">4</span>
+                <span class="ui-faint" style="width:46px">&mdash;</span>
+                <span style="width:64px"><span class="ui-pill" style="background:#eef0f4;color:#5e687a">Not started</span></span>
               </div>
             </div>
           </div>
         </div>
-        <figcaption><b>Up next</b> — pencil sets a date, wand opens Auto Schedule</figcaption>
+        <figcaption><b>Your Journey</b> &mdash; a row expands to the platform link, the outcome line and <b>Wrap-up</b></figcaption>
+      </figure>
+
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <div class="ui-panel">
+              <div class="ui-row" style="justify-content:space-between;margin-bottom:12px">
+                <span class="ui-row" style="gap:6px">
+                  <span>📅</span><span class="ui-h" style="font-size:13.5px">Up next</span>
+                </span>
+                <span class="ui-row" style="gap:6px">
+                  <span class="ui-pill" style="background:#e8f0ff;color:var(--u-accent);border:1px solid #cddffb;padding:5px 11px">🪄 Auto Schedule</span>
+                  <span class="ui-btn" style="padding:4px 8px">&ctdot;</span>
+                </span>
+              </div>
+              <div style="padding-bottom:10px;border-bottom:1px solid var(--u-line)">
+                <div style="font-weight:700;font-size:12.5px;color:var(--u-ink);margin-bottom:5px">Claude 101</div>
+                <span class="ui-row" style="gap:7px">
+                  <span class="ui-pill" style="background:#e8f0ff;color:#2f5fd0">In progress</span>
+                  <span class="ui-meta">No target set &middot; 2 hrs</span>
+                </span>
+              </div>
+              <div style="padding-top:10px">
+                <div style="font-weight:700;font-size:12.5px;color:var(--u-ink);margin-bottom:5px">AI Fluency: Framework &amp; Foundations</div>
+                <span class="ui-row" style="gap:7px">
+                  <span class="ui-pill" style="background:#eef0f4;color:#5e687a">Not started</span>
+                  <span class="ui-meta">No target set &middot; 4 hrs</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Up next</b> &mdash; <b>🪄 Auto Schedule</b> is the only labelled action; Refresh and Edit dates sit behind <b>&ctdot;</b></figcaption>
       </figure>
 
       <h3>Auto Schedule and Google Calendar</h3>
@@ -1078,7 +1178,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <h3>The wrap-up quiz</h3>
 
-      <p>Each course's expanded row has a <b>Wrap-up</b> link. The quiz is one question per card: click any option and it tells you immediately whether it was right. A wrong answer says so and stays clickable &mdash; there is <b>no attempt limit and no lock-out</b>. A right answer reveals the reasoning and unlocks <b>Next question</b>.</p>
+      <p>Each course's expanded row carries a <b>Wrap-up</b> button. The quiz is one question per card: click any option and it tells you immediately whether it was right. A wrong answer says so and stays clickable &mdash; there is <b>no attempt limit and no lock-out</b>. A right answer reveals the reasoning and unlocks <b>Next question</b>.</p>
 
       <p>Finishing the last question marks the course <b>Complete</b> and records how many you got right <b>on the first click</b>. That first-try figure is what your accuracy percentage means, everywhere it appears.</p>
 
@@ -1100,10 +1200,10 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
     <!-- 14 ──────────────────────────────────────────────────── -->
     <section id="s17">
       <p class="sec-num">Section 14</p>
-      <h2>Your learning dashboard</h2>
-      <p class="lede">Where your progress is measured &mdash; and where locked courses actually live.</p>
+      <h2>My Dashboard</h2>
+      <p class="lede">Called <b>My Dashboard</b> in the top bar. Where your progress is measured, and where locked courses actually live.</p>
 
-      <p><b>My Dashboard</b> in the top bar. Four tiles head the page:</p>
+      <p>Four tiles head the page:</p>
 
       <div class="tw">
         <table>
@@ -1121,6 +1221,29 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <span class="note__tag">Why your streak may read 0</span>
         <p>The streak only counts courses that were scheduled through <b>Auto Schedule</b>. Finish a dozen courses without ever using it and the streak stays at <b>0</b> &mdash; that is correct, not broken. Auto Schedule is the only thing in the app that resembles a booked study session, so it is the only signal available.</p>
       </div>
+
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <div class="ui-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:11px">
+              <div class="ui-kpi"><b>43%</b><span>Roadmap complete</span></div>
+              <div class="ui-kpi"><b>Junior</b><span>Target: Mid level</span></div>
+              <div class="ui-kpi"><b>0</b><span>Weekly streak</span></div>
+              <div class="ui-kpi"><b>2</b><span>Ideas shipped</span></div>
+            </div>
+            <div class="ui-panel">
+              <p class="ui-label" style="margin:0 0 9px">Progress by level</p>
+              <div class="ui-bars">
+                <div><span style="width:78px">Foundations</span><i style="width:62%;background:var(--u-brand)"></i><span class="ui-meta">62%</span></div>
+                <div><span style="width:78px">Applied</span><i style="width:24%;background:var(--u-brand)"></i><span class="ui-meta">24%</span></div>
+                <div><span style="width:78px">Intermediate</span><i style="width:4%;background:#dadee6"></i><span class="ui-meta">0%</span></div>
+                <div><span style="width:78px">Advanced</span><i style="width:4%;background:#dadee6"></i><span class="ui-meta">0%</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>My Dashboard</b> &mdash; four tiles, then the four <i>display</i> levels. A Junior sees a bar labelled <b>Applied</b></figcaption>
+      </figure>
 
       <h3>Progress by level</h3>
 
@@ -1149,26 +1272,29 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <figure>
         <div class="ui">
           <div class="ui-body">
-            <div class="ui-panel" style="padding:0;overflow:hidden">
-              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--u-line)">
-                <span style="font-size:12px">Claude 101</span>
-                <span class="ui-pill" style="background:#d9f2df;color:#2b8a3e">Complete</span>
+            <div class="ui-row" style="align-items:stretch;gap:9px">
+              <div style="border:1px solid var(--u-line);border-radius:9px;padding:10px;flex:1;background:#fff">
+                <div class="ui-row" style="gap:5px">
+                  <span class="ui-faint" style="font-size:10px">1</span>
+                  <span style="width:14px;height:14px;border-radius:50%;background:#1f7a3c;color:#fff;font-size:9px;display:inline-flex;align-items:center;justify-content:center">&check;</span>
+                  <span style="font-weight:700;font-size:11.5px;color:var(--u-ink)">Claude 101</span>
+                </div>
+                <div class="ui-meta" style="font-size:10px;margin:3px 0 5px">AI Track &middot; Anthropic Academy</div>
+                <span class="ui-pill" style="background:#e6f4ea;color:#1f7a3c">Complete</span>
               </div>
-              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--u-line)">
-                <span style="font-size:12px">Prompting patterns</span>
-                <span class="ui-pill" style="background:#fdf1dd;color:#b7791f">In progress</span>
-              </div>
-              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;background:#fafbfd">
-                <span class="ui-faint" style="font-size:12px">🔒 Agentic workflows</span>
-                <span class="ui-row" style="gap:7px">
-                  <span class="ui-meta" style="font-size:10px">Requires all Intern courses</span>
-                  <span class="ui-btn">Skip prerequisite</span>
-                </span>
+              <div style="border:1px dashed #c9d3e6;border-radius:9px;padding:10px;flex:1;background:var(--u-bg);opacity:.9">
+                <div class="ui-row" style="gap:5px">
+                  <span class="ui-faint" style="font-size:10px">2</span>
+                  <span class="ui-meta" style="font-weight:700;font-size:11.5px">Agentic workflows</span>
+                </div>
+                <div class="ui-meta" style="font-size:10px;margin:3px 0 5px">AI Track &middot; Anthropic Academy</div>
+                <span class="ui-pill" style="background:#eef0f4;color:#5e687a">Locked</span>
+                <div style="margin-top:6px;font-size:11px;font-weight:700;color:var(--u-accent);text-decoration:underline">Skip prerequisite</div>
               </div>
             </div>
           </div>
         </div>
-        <figcaption><b>Mind map</b> — the lock names the tier in the way, not one course</figcaption>
+        <figcaption><b>Mind map</b> &mdash; a locked node is dashed and greyed, and <b>Skip prerequisite</b> appears only there, as a text link</figcaption>
       </figure>
 
       <p>A course is <b>Locked</b> until every course in the tier <i>below</i> it is complete or skipped. The gate is per tier, not per course, and the label says which tier is in the way &mdash; for example <i>&ldquo;Requires all Intern courses&rdquo;</i>. An empty tier blocks nothing.</p>
