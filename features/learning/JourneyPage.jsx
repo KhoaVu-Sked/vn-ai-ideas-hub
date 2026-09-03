@@ -38,7 +38,7 @@ import AutoScheduleModal from "@/features/learning/AutoScheduleModal";
 import ConfirmModal from "@/features/learning/ConfirmModal";
 import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, HEADER_H, ROW_H, VISIBLE_ROWS, th, td,
-  fmtDate, toDateStr, relTime,
+  fmtDate, relTime,
   formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, effectivePosition, isTierDone,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
@@ -277,99 +277,43 @@ function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, cor
   );
 }
 
-// Up next's action row (see UpNextCard). Auto Schedule is the headline
-// action — a labeled, accented pill, always visible. Refresh and Edit dates
-// are lower-frequency (Refresh is mostly a defensive re-fetch; editing a
-// target date is occasional, not a per-visit action), so they live behind
-// the "⋯" menu (UpNextMenu below) instead of competing for header space.
-const pillBtnAccent = { display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "var(--blue)", cursor: "pointer", whiteSpace: "nowrap" };
-const pillBtnDone = { display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #bfe3c9", background: "#e6f4ea", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "#1f7a3c", cursor: "pointer", whiteSpace: "nowrap" };
 // Milestone banners (tierJustFinished/atCeiling, below) — same light-blue
-// accent combo as pillBtnAccent above, not the generic green a progress-app
-// reflex reaches for by default. Skedulo's own brand palette (CLAUDE.md)
-// is navy/blue; it has no green in it, so a green "success" banner would
-// be the one thing on this page that isn't actually on-brand.
+// accent combo Up next's own header used to share with this before Auto
+// Schedule became the card's one and only action, not the generic green a
+// progress-app reflex reaches for by default. Skedulo's own brand palette
+// (CLAUDE.md) is navy/blue; it has no green in it, so a green "success"
+// banner would be the one thing on this page that isn't actually on-brand.
 const milestoneBanner = { background: "#e8f0ff", border: "1px solid #cddcff", color: "var(--navy)", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 };
 // Up next's "Calendar not connected" notice — a heads-up, not an error, so
 // it reuses STATUS_META's own "skipped" amber (shared.js) rather than
 // errBanner's red or milestoneBanner's blue: this app's one existing
 // "attention, not alarming" color, not a new one invented for this.
 const calendarWarnBanner = { background: "#fff4e0", border: "1px solid #ffdf9e", color: "#a15c00", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14, lineHeight: 1.5 };
-const ellipsisBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, width: 28, height: 28, fontSize: 15, lineHeight: 1, color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
-const menuPopover = { position: "absolute", top: "calc(100% + 6px)", right: 0, background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 8px 24px rgba(10,22,44,0.16)", padding: 6, display: "flex", flexDirection: "column", gap: 2, minWidth: 170, zIndex: 30 };
-const menuItem = { display: "flex", alignItems: "center", gap: 8, border: "none", background: "none", borderRadius: 6, padding: "8px 10px", fontSize: 12.5, fontWeight: 600, color: "var(--body)", cursor: "pointer", textAlign: "left", width: "100%" };
-
-// "⋯" overflow for Up next's lower-frequency actions (Refresh, Edit dates).
-// Click-to-open, click-outside-to-close — same idiom AppHeader's own avatar
-// menu uses (a mousedown listener checked against a ref), not hover, since
-// hover menus don't work on touch and are easy to trigger by accident.
-function UpNextMenu({ onRefresh, syncing, onEdit }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-
-  const hoverable = (e, on) => { e.currentTarget.style.background = on ? "var(--bg)" : "none"; };
-
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-label="More actions"
-        aria-haspopup="true"
-        aria-expanded={open}
-        style={ellipsisBtn}
-      >
-        ⋯
-      </button>
-      {open && (
-        <div style={menuPopover}>
-          <button
-            onClick={() => { setOpen(false); onRefresh(); }}
-            disabled={syncing}
-            style={{ ...menuItem, cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.6 : 1 }}
-            onMouseEnter={(e) => hoverable(e, true)}
-            onMouseLeave={(e) => hoverable(e, false)}
-          >
-            🔄 {syncing ? "Refreshing…" : "Refresh"}
-          </button>
-          <button
-            onClick={() => { setOpen(false); onEdit(); }}
-            style={menuItem}
-            onMouseEnter={(e) => hoverable(e, true)}
-            onMouseLeave={(e) => hoverable(e, false)}
-          >
-            ✏️ Edit dates
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
+// Auto Schedule is the ONLY action Up next has now — no Refresh (redundant
+// with useRevalidateOnFocus, which already re-fetches this whole page on
+// tab-focus) and no manual target-date editing (this app doesn't track
+// when a learner actually studies; a course only really moves once its
+// wrap-up quiz is done — see QuizPage.jsx/completeCourse — so a hand-set
+// date was a suggestion nobody downstream ever read back, and Auto
+// Schedule already writes this same column for real). With nothing left
+// to share the header with, it gets to be the headline: bigger, solid-
+// filled, not the quiet accent pill it used to be one of two things next to.
+const autoScheduleBtn = { display: "inline-flex", alignItems: "center", gap: 8, border: "none", background: "var(--blue)", color: "#fff", borderRadius: 999, padding: "10px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 6px 16px rgba(0,85,255,0.28)" };
+const autoScheduleBtnDisabled = { ...autoScheduleBtn, background: "var(--bg)", color: "var(--faint)", boxShadow: "none", cursor: "not-allowed" };
 
 // The next 2 courses, not yet complete/skipped: dated ones first (soonest
 // target_date first), then undated ones filling any remaining slots in the
 // roadmap's own order (courses arrives already sorted intern -> principal,
 // tier order, track/stage/created_at — that's the "order" fallback).
-// target_date is a suggestion the learner sets themselves via the edit
-// icon here, never an enforced deadline — editable anytime, no locking
-// check. Date picks are staged locally (drafts) and only sent when the
-// confirm tick is clicked, not on every keystroke/pick. Sync re-fetches
-// in case editing elsewhere changed what qualifies.
+// target_date is read-only here now — Auto Schedule is the only thing that
+// still writes it (POST /api/courses/:id/target and its own manual-edit UI
+// are gone, see the comment above autoScheduleBtn).
 //
 // The soonest/next pick (upcoming[0]) auto-flips not_started -> in_progress
 // — "this is the one you're on now" — the moment it becomes the top pick,
 // not on any click. Guarded by a ref so the same course only gets the
 // start call once per mount, not on every re-render.
-function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, onAutoSchedule, calendarConnected }) {
-  const [editing, setEditing] = useState(false);
-  const [drafts, setDrafts] = useState({}); // courseId -> date string, staged until confirmed
-  const today = new Date().toISOString().slice(0, 10);
-
+function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected }) {
   const eligible = courses.filter((c) => c.status !== "complete" && c.status !== "skipped");
   const dated = eligible.filter((c) => c.target_date).sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
   const undated = eligible.filter((c) => !c.target_date);
@@ -384,60 +328,34 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, on
     }
   }, [upcoming[0]?.id, upcoming[0]?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startEditing = () => { setDrafts({}); setEditing(true); };
-  // Only sends what actually changed, and only on confirm — typing/picking a
-  // date never talks to the server by itself.
-  const confirmEditing = () => {
-    for (const [courseId, dateStr] of Object.entries(drafts)) {
-      const original = upcoming.find((c) => c.id === courseId)?.target_date;
-      if (dateStr !== toDateStr(original)) onSetTargetDate(courseId, dateStr || null);
-    }
-    setDrafts({});
-    setEditing(false);
-  };
-
   return (
     <section style={card}>
-      {/* Single row: title left, actions right — Auto Schedule is the only
-          always-visible, labeled action; Refresh/Edit dates live behind the
-          "⋯" menu (lower-frequency actions, see UpNextMenu above). While
-          editing, the menu is replaced by a visible "✓ Done" pill in the
-          same slot, so exiting edit mode never requires reopening a menu. */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 15 }}>📅</span>
           <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: 0 }}>Up next</h2>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {/* Greyed out (not just left to fail on click) once Calendar isn't
-              connected — connecting is skippable during Get Started, and
-              this is the one thing that stops being available afterward
-              until it's done, from the profile strip above or here.
-              AutoScheduleModal's own 409 `needsConnect` screen stays as a
-              defensive fallback for a connection that dies between this
-              page's load and the click. */}
-          <button
-            onClick={calendarConnected ? onAutoSchedule : undefined}
-            disabled={!calendarConnected}
-            aria-label={calendarConnected ? "Auto Schedule — book study time on your calendar" : "Auto Schedule — connect Google Calendar first, above"}
-            className={calendarConnected ? undefined : "icon-tip"}
-            data-tip={calendarConnected ? undefined : "Connect Google Calendar first — see your profile above"}
-            style={calendarConnected ? pillBtnAccent : { ...pillBtnAccent, background: "var(--bg)", border: "1px solid var(--line)", color: "var(--faint)", cursor: "not-allowed" }}
-          >
-            🪄 Auto Schedule
-          </button>
-          {editing ? (
-            <button onClick={confirmEditing} aria-label="Done editing target dates" style={pillBtnDone}>
-              ✓ Done
-            </button>
-          ) : (
-            <UpNextMenu onRefresh={onSync} syncing={syncing} onEdit={startEditing} />
-          )}
-        </div>
+        {/* Greyed out (not just left to fail on click) once Calendar isn't
+            connected — connecting is skippable during Get Started, and
+            this is the one thing that stops being available afterward
+            until it's done, from the profile strip above or here.
+            AutoScheduleModal's own 409 `needsConnect` screen stays as a
+            defensive fallback for a connection that dies between this
+            page's load and the click. */}
+        <button
+          onClick={calendarConnected ? onAutoSchedule : undefined}
+          disabled={!calendarConnected}
+          aria-label={calendarConnected ? "Auto Schedule — book study time on your calendar" : "Auto Schedule — connect Google Calendar first, above"}
+          className={calendarConnected ? undefined : "icon-tip"}
+          data-tip={calendarConnected ? undefined : "Connect Google Calendar first — see your profile above"}
+          style={calendarConnected ? autoScheduleBtn : autoScheduleBtnDisabled}
+        >
+          🪄 Auto Schedule
+        </button>
       </div>
       {!calendarConnected && (
         <div style={calendarWarnBanner}>
-          📅 Google Calendar isn't connected, so Auto Schedule can't book study time or set target dates for you. You can still set a target date yourself with the pencil icon below — connect from your profile above to turn Auto Schedule back on.
+          📅 Google Calendar isn't connected, so Auto Schedule can't book study time or set target dates for you — connect from your profile above to turn it on.
         </div>
       )}
       {upcoming.length === 0 ? (
@@ -453,19 +371,9 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, on
                 <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)", marginBottom: 6 }}>{c.title}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={statusPill(c.status)}>{status.label}</span>
-                  {editing ? (
-                    <input
-                      type="date"
-                      min={today}
-                      value={drafts[c.id] ?? toDateStr(c.target_date)}
-                      onChange={(e) => setDrafts((d) => ({ ...d, [c.id]: e.target.value }))}
-                      style={{ border: "1px solid var(--line)", borderRadius: 6, padding: "3px 6px", fontSize: 11.5, color: "var(--ink)" }}
-                    />
-                  ) : (
-                    <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                      {c.target_date ? `Target ${fmtDate(c.target_date)}` : "No target set"}{c.est_hours != null ? ` · ${c.est_hours} hrs` : ""}
-                    </span>
-                  )}
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                    {c.target_date ? `Target ${fmtDate(c.target_date)}` : "No target set"}{c.est_hours != null ? ` · ${c.est_hours} hrs` : ""}
+                  </span>
                 </div>
               </div>
             );
@@ -542,7 +450,6 @@ export default function JourneyPage() {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState("all");
   const [position, setPosition] = useState(null);
-  const [syncingUpNext, setSyncingUpNext] = useState(false);
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false);
   const [annualReviewDate, setAnnualReviewDate] = useState(DEFAULT_ANNUAL_REVIEW_MONTH_DAY);
   const [calendarConnected, setCalendarConnected] = useState(false);
@@ -724,19 +631,6 @@ export default function JourneyPage() {
       .catch((e) => setErr(e.message));
   };
 
-  // Optimistic — updates immediately so the date input doesn't feel laggy;
-  // resyncs from the server on failure rather than leaving a stale value.
-  const setCourseTarget = (courseId, dateStr) => {
-    setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, target_date: dateStr } : c)));
-    api(`/api/courses/${courseId}/target`, { method: "POST", body: JSON.stringify({ target_date: dateStr }) })
-      .catch((e) => { setErr(e.message); load(); });
-  };
-
-  const syncUpNext = async () => {
-    setSyncingUpNext(true);
-    try { await load(); } finally { setSyncingUpNext(false); }
-  };
-
   // Best-effort and silent — this is a background auto-signal, not a user
   // action, so a failure here shouldn't surface a scary error banner.
   const autoStartCourse = (courseId) => {
@@ -844,7 +738,7 @@ export default function JourneyPage() {
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
-            <UpNextCard courses={visibleJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} onAutoStart={autoStartCourse} onAutoSchedule={() => setAutoScheduleOpen(true)} calendarConnected={calendarConnected} />
+            <UpNextCard courses={visibleJourney} onAutoStart={autoStartCourse} onAutoSchedule={() => setAutoScheduleOpen(true)} calendarConnected={calendarConnected} />
             <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourse={inProgressCourse} />
           </div>
           </div>
