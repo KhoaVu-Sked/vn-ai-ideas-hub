@@ -3,6 +3,7 @@ import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { after } from "next/server";
 import { adminEvent } from "@/features/notifications/notify";
+import { publishIdea, publishBoard } from "@/features/realtime/publish";
 
 // POST /api/ideas/:id/delete-request { reason } → project lead asks admin to delete
 export async function POST(request, { params }) {
@@ -26,6 +27,10 @@ export async function POST(request, { params }) {
       quote: reason || "",
       ctaPath: `/idea/${id}`, base,
     }));
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "delete-request");
+    publishBoard("delete-request");
     return Response.json({ ok: true }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not send the request.");
@@ -39,6 +44,10 @@ export async function DELETE(_request, { params }) {
     if (user.role !== "admin") return Response.json({ error: "Admins only." }, { status: 403 });
     const { id } = await params;
     await clearDeleteRequest(id);
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "delete-request");
+    publishBoard("delete-request");
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not update the request.");

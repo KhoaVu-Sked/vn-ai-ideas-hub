@@ -434,7 +434,10 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <span class="note__tag">Note</span>
         <p>Administrators see four more items here — Dashboard, Tasks, Activity and Manage. Those are covered in the separate <b>Administrator guide</b>.</p>
       </div>
-    </section>
+    
+      <h3>What's New</h3>
+      <p>After an update you will see a short <b>What's New</b> panel the first time you open the Hub. Read it and press <b>Got it</b> and it will not come back — the next one appears only when something else changes.</p>
+</section>
 
     <!-- 5 ───────────────────────────────────────────────────── -->
     <section id="s5">
@@ -579,7 +582,13 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <div class="note note--good">
         <span class="note__tag">What happens next</span>
-        <p>Your idea is created at <b>Submitted</b>, you become its <b>Project Lead</b>, and it is given a permanent number such as <code>IDEA-015</code>. All administrators are emailed. You can paste the idea's link straight into Slack.</p>
+        <p>Your idea is created at <b>Submitted</b>, you become its <b>Initiator</b>, and it is given a permanent number such as <code>IDEA-015</code>. All administrators are emailed. You can paste the idea's link straight into Slack.</p>
+      <div class="note">
+        <span class="note__tag">Who is in charge</span>
+        <p>Raising an idea makes you its <b>Initiator</b> — the person who spotted it. <b>Project Lead</b>, the person accountable for driving it, is left open.</p>
+        <p>Until somebody takes the lead, <b>you have every permission the lead would have</b>: edit the content, move the status, accept or decline requests. You are never waiting on an admin to work on your own idea. The moment someone becomes Project Lead, that authority passes to them.</p>
+        <p>You can take the lead yourself, or an admin can appoint whoever is actually going to drive it. Nobody else can simply claim it.</p>
+      </div>
       </div>
 
       <div class="note note--warn">
@@ -605,6 +614,15 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       </div>
 
       <p>The page gets wider when you open <b>Tasks</b> and the team sidebar steps out of the way, because a five-column board needs the room. Switching back brings it straight back.</p>
+
+      <h3>The Documentation box</h3>
+      <p>Under <b>Team &amp; roles</b> there is a box for everything written about the idea somewhere else — a spec, a spreadsheet, a Figma file, a Confluence page.</p>
+      <p>Press <b>+ Add</b>, give it a name, then choose <b>Link</b> or <b>File</b>. A link is pasted in; a file is uploaded. Either way it appears as its name with an <b>Enter</b> button beside it, which opens the link or downloads the file.</p>
+      <p><b>Anyone can add.</b> Renaming or removing is limited to whoever added it, the idea's lead, or an admin — so nobody quietly deletes your document, and you can always tidy up your own.</p>
+
+      <h3>Starred ideas</h3>
+      <p>A <b>★</b> next to an idea's title means an administrator has marked it as important. Starred ideas sit at the top of the board, and work on them counts for a little more on the dashboard's contributors list.</p>
+      <p>Only administrators can add or remove a star. Everyone else simply sees it.</p>
 
       <figure>
         <div class="ui">
@@ -662,7 +680,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <figcaption><b>An idea page</b> — as a team member sees it</figcaption>
       </figure>
 
-      <p>Reading down the page: the <b>status pill and tags</b>, the <b>title</b>, then a line giving the idea's number, its current Project Lead, when it was submitted and its target time frame. Below that the action buttons, the three content sections, attachments, the requests thread, and the progress timeline. The sidebar always shows who is on the team and in what role.</p>
+      <p>Reading down the page: the <b>status pill and tags</b>, the <b>title</b>, then a line giving the idea's number, its current Project Lead, when it was submitted and its target time frame. Below that the action buttons, the three content sections, the comment thread, and the progress timeline. The sidebar shows who is on the team and in what role, and below it the <b>Documentation</b> box.</p>
 
       <div class="note">
         <span class="note__tag">Note</span>
@@ -685,6 +703,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <h3>Comment</h3>
       <p>The comment box sits at the bottom of the <b>Overview</b> tab. Use it for anything you would say out loud: a question, a reaction, a bit of context somebody else is missing. Comments are a conversation — nobody has to action them, and nothing is tracked.</p>
       <p>If what you want is for <em>somebody to do something</em>, that is a request, not a comment.</p>
+      <p>Removing your own comment asks you to confirm first — a comment cannot be brought back.</p>
 
       <h3>Add a request</h3>
       <p>Open the <b>Tasks</b> tab and press <b>+ Add request</b>. Give it a short name, and as much detail as you like. Your request becomes a card in the first column, and the project lead is notified.</p>
@@ -708,6 +727,15 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <p>Moving a card <b>into or out of</b> Pending approval or Declined is a decision, so only the project lead or an admin can do it. If a card is assigned to you, you can move it between <b>Accepted</b>, <b>In progress</b> and <b>Done</b> yourself as the work proceeds.</p>
       </div>
 
+      <h3>When two people raise the same idea</h3>
+      <p>Duplicates are normal and not a problem — two people noticing the same thing is a signal, not a mistake. Rather than deleting one, the two can be <b>merged</b>.</p>
+      <p>The idea's lead (or an admin) presses <b>Merge…</b>, picks which idea to keep, and selects the duplicates. <b>Preview</b> shows an idea without leaving the page; <b>Promote</b> switches which one is kept, if you picked the wrong one first.</p>
+      <div class="note">
+        <span class="note__tag">An admin has to approve it</span>
+        <p>Pressing <b>Request merge</b> does not merge anything. It asks an administrator, who reviews it in Manage. Merging cannot be undone, so it never happens on one person's click.</p>
+      </div>
+      <p>When it is approved, each merged idea's write-up — context, pain points, expected benefit, category, time frame and any extra fields — becomes a single comment on the idea that was kept, and its documentation moves across. Its requests, likes, follows and team are removed. Its link still works: it takes you to the idea it became part of.</p>
+
       <h4>Opening a card</h4>
       <p>Click any card and a panel slides in from the right. It holds the full detail, who raised it, who it is assigned to, and its own comment thread — so discussion about one piece of work stays with that piece of work instead of scrolling past in the main thread.</p>
 
@@ -723,7 +751,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
           <thead><tr><th style="width:200px">Role</th><th>What you are taking on</th></tr></thead>
           <tbody>
             <tr><td><b>Initiator</b></td><td>Credited with raising the idea. <b>One per idea</b> — the option disappears from this list once somebody holds it.</td></tr>
-            <tr><td><b>Project Lead</b></td><td>Accountable for the idea. Edits content, moves the status, decides which requests are accepted. <b>One per idea</b>, and transferable by an admin.</td></tr>
+            <tr><td><b>Project Lead</b></td><td>Accountable for the idea. Edits content, moves the status, decides which requests are accepted. <b>One per idea</b>. Taken by the Initiator or appointed by an admin; not something anyone can claim.</td></tr>
             <tr><td><b>AI Design</b></td><td>Shapes the prompt, model or agent behaviour.</td></tr>
             <tr><td><b>Form / UX Design</b></td><td>Designs the interface or the intake flow.</td></tr>
             <tr><td><b>Data / Ops</b></td><td>Data sources, pipelines, integration and rollout.</td></tr>

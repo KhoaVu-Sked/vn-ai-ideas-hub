@@ -1,10 +1,11 @@
 import { del } from "@vercel/blob";
-import { LEAD_ROLE } from "@/features/ideas/constants";
+import { actsAsLead } from "@/features/ideas/constants";
 import { deleteIdea, getIdea, isProjectLead, updateContent } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { after } from "next/server";
 import { ideaEvent } from "@/features/notifications/notify";
+import { publishIdea, publishBoard } from "@/features/realtime/publish";
 
 // GET /api/ideas/:id → full detail for the /idea/[id] page
 export async function GET(_request, { params }) {
@@ -15,7 +16,7 @@ export async function GET(_request, { params }) {
     data.meId = user.uid;
     data.isAdmin = user.role === "admin";
     // Whether the viewer may edit content / change status.
-    data.canEdit = data.isAdmin || (data.myRoles || []).includes(LEAD_ROLE);
+    data.canEdit = data.isAdmin || actsAsLead(data.myRoles, data.members);
     return Response.json(data);
   } catch (e) {
     return jsonError(e, "Could not load this idea.");
@@ -40,6 +41,10 @@ export async function PATCH(request, { params }) {
         auditAction: `edited ${res.changed.join(", ")} on "${res.name}"`,
       }));
     }
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "idea");
+    publishBoard("idea");
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not update the idea.");
@@ -56,6 +61,10 @@ export async function DELETE(_request, { params }) {
     if ((process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN) && urls?.length) {
       for (const u of urls) { try { await del(u); } catch { /* ignore */ } }
     }
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "idea");
+    publishBoard("idea");
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not delete the idea.");

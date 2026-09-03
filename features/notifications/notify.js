@@ -7,7 +7,7 @@
 // The idea helpers also write the audit entry, so a route calls one function.
 
 import { addAuditEntry } from "@/features/admin/queries";
-import { getAdminEmails, getIdeaMeta, getIdeaRecipients } from "@/features/notifications/queries";
+import { emailsFor, getAdminEmails, getIdeaMeta, getIdeaRecipients } from "@/features/notifications/queries";
 import { sendEmail } from "@/features/notifications/mail";
 import { notificationsEnabled } from "@/features/admin/queries";
 import { renderEmail, renderEmailText } from "@/features/notifications/emailTemplate";
@@ -26,7 +26,7 @@ export async function audit({ actorId, actor, action, entity, entityId }) {
 // ── idea events → members + followers ─────────────────────────
 // Builds the subject + HTML for an idea event. Exported so the "send sample"
 // tool renders the real thing rather than a mock that can drift.
-// kind: 'request' | 'member' | 'status' | 'content'
+// kind: 'request' | 'member' | 'status' | 'content' | 'merge'
 export function buildIdeaEmail({ meta, actor = "Someone", kind, detail = "", body = "", link }) {
   const name = meta.name;
   let subject, heading, intro, rows = [], quote;
@@ -46,6 +46,13 @@ export function buildIdeaEmail({ meta, actor = "Someone", kind, detail = "", bod
     heading = "New team member";
     intro = `<b>${actor}</b> joined the team on <b>${name}</b> as <b>${detail}</b>.`;
     rows = [["Idea", `${meta.number} · ${name}`], ["Member", actor], ["Role", detail]];
+  } else if (kind === "merge") {
+    subject = `Ideas were merged into ${meta.number} ${name}`;
+    heading = "Ideas merged";
+    intro = `<b>${actor}</b> merged one or more duplicate ideas into <b>${name}</b>. `
+          + `Their written content is now a comment on this idea, and their files have moved across.`;
+    rows = [["Idea", `${meta.number} · ${name}`], ["Merged by", actor]];
+    quote = body;
   } else if (kind === "content") {
     subject = `${meta.number} ${name} was edited`;
     heading = "Idea updated";
@@ -63,11 +70,17 @@ export function buildIdeaEmail({ meta, actor = "Someone", kind, detail = "", bod
   return { subject, html: renderEmail(parts), text: renderEmailText(parts) };
 }
 
-export async function notifyIdea(ideaId, { actorId, actor = "Someone", kind, detail = "", body = "", base } = {}) {
+// `also` is a list of account ids to reach in addition to this idea's members
+// and followers. Merging needs it: the people who followed the absorbed idea
+// have had their follow deleted by the time this runs, so they cannot be found
+// from the idea any more, and they are the ones most affected.
+export async function notifyIdea(ideaId, { actorId, actor = "Someone", kind, detail = "", body = "", base, also = [] } = {}) {
   try {
     const meta = await getIdeaMeta(ideaId);
     if (!meta) return;
-    const recipients = await getIdeaRecipients(ideaId, actorId);
+    const own = await getIdeaRecipients(ideaId, actorId);
+    const extra = await emailsFor(also, actorId);
+    const recipients = [...new Set([...own, ...extra])];
     if (recipients.length === 0) return;
     // Admin kill switch — see Manage → Settings. Deliberately checked here and
     // not in sendEmail, so sign-up and password-reset codes keep working.

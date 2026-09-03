@@ -1,0 +1,119 @@
+"use client";
+
+// Shown once per release. Fetches on mount; if there is nothing new the request
+// is one cheap row and nothing renders.
+//
+// Dismiss is optimistic on purpose: the panel closes immediately and the stamp
+// is saved in the background. If that save fails the worst case is seeing the
+// same note again next time, which is better than a modal that will not close.
+
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { api } from "@/lib/apiClient";
+
+const AUTH_PATHS = new Set(["/login", "/register", "/forgot", "/skedadmin"]);
+
+// Module scope, so it survives the pathname changes below. This component lives
+// in the root layout and never unmounts, so keying the effect on the path meant
+// a database round trip on every navigation — for a value that changes once per
+// release, against a driver that charges a round trip per query.
+let asked = false;
+
+export default function WhatsNew() {
+  const [news, setNews] = useState(null);
+  const [imgFailed, setImgFailed] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Nothing to announce to someone who has not signed in — and /api/whats-new
+    // would 401, which apiClient turns into a redirect.
+    if (AUTH_PATHS.has(pathname) || asked) return undefined;
+    asked = true;
+    let live = true;
+    api("/api/whats-new")
+      .then((d) => { if (live && d.show) setNews(d.news); })
+      .catch(() => {});   // news is never worth an error message
+    return () => { live = false; };
+  }, [pathname]);
+
+  if (!news) return null;
+
+  const close = () => {
+    setNews(null);
+    api("/api/whats-new", { method: "POST" }).catch(() => {});
+  };
+
+  return (
+    <div
+      onClick={close}
+      style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.45)", display: "flex",
+               alignItems: "center", justifyContent: "center", zIndex: 90, padding: 20 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        // A column that does not itself scroll: the body below scrolls, the
+        // footer does not. Most people will not read all five items, and the way
+        // out should never be something you have to scroll to find.
+        style={{ background: "#fff", borderRadius: 14, width: 560, maxWidth: "100%",
+                 maxHeight: "85vh", display: "flex", flexDirection: "column",
+                 boxShadow: "0 24px 70px rgba(10,22,44,0.32)" }}
+      >
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "24px 26px 18px" }}>
+        <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase",
+                      color: "var(--blue)", marginBottom: 6 }}>What&apos;s new</div>
+
+        {news.greeting && (
+          <div style={{ fontSize: 14, color: "var(--body)", marginBottom: 10 }}>{news.greeting}</div>
+        )}
+
+        <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20,
+                     color: "var(--ink)", margin: "0 0 10px", lineHeight: 1.3 }}>{news.title}</h2>
+
+        {news.intro && (
+          <p style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6, margin: "0 0 16px" }}>{news.intro}</p>
+        )}
+
+        {/* Hidden rather than broken: if the file was not deployed alongside the
+            note, everyone would otherwise see an alt-text placeholder. */}
+        {news.image?.src && !imgFailed && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={news.image.src} alt={news.image.alt || ""}
+            onError={() => setImgFailed(true)}
+            // Capped: at full width a wide image pushed all five items below the
+            // fold, so the first thing anyone saw was a picture and no news.
+            // contain + centre: the image keeps its own proportions and sits in
+            // the middle, whatever shape someone drops in next time.
+            style={{ display: "block", width: "100%", maxHeight: 250, objectFit: "contain",
+                     objectPosition: "center", borderRadius: 10, background: "#f6f8fb",
+                     border: "1px solid var(--line)", marginBottom: 18 }}
+          />
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {(news.items || []).map((it) => (
+            <div key={it.heading}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 3 }}>{it.heading}</div>
+              <div style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.55 }}>{it.body}</div>
+            </div>
+          ))}
+        </div>
+
+      </div>
+
+      <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 12,
+                    borderTop: "1px solid var(--line)", padding: "14px 26px",
+                    background: "#fff", borderRadius: "0 0 14px 14px" }}>
+        <span style={{ fontSize: 12, color: "var(--faint)" }}>You will only see this once.</span>
+        <button
+          onClick={close}
+          style={{ marginLeft: "auto", background: "var(--blue)", color: "#fff", border: "none", borderRadius: 9,
+                   padding: "10px 20px", fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}
+        >
+          Got it
+        </button>
+      </div>
+      </div>
+    </div>
+  );
+}

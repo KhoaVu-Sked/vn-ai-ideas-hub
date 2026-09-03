@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { tagPill } from "@/features/admin/tagColors";
-import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, ROLES, STATUS_META, STATUS_ORDER } from "@/features/ideas/constants";
+import { ALL_STATUSES, INITIATOR_ROLE, LEAD_ROLE, ROLES, STAR_GOLD, STATUS_META, STATUS_ORDER, actsAsLead } from "@/features/ideas/constants";
 import { ACCEPT_ATTR, validateUpload } from "@/lib/upload";
 import Avatar from "@/components/Avatar";
 import TagChip from "@/components/TagChip";
@@ -13,10 +13,14 @@ import AppHeader from "@/components/AppHeader";
 import SubmitModal from "@/features/ideas/SubmitModal";
 import Loading from "@/components/Loading";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
+import useLive from "@/features/realtime/useLive";
 import TaskBoard from "@/features/ideas/TaskBoard";
 import TaskModal from "@/features/ideas/TaskModal";
 import TaskDrawer from "@/features/ideas/TaskDrawer";
-import { api } from "@/lib/apiClient";
+import MergeModal from "@/features/ideas/MergeModal";
+import { api, onSessionEnd } from "@/lib/apiClient";
+import { serialize } from "@/lib/serialize";
+import { onEnter } from "@/lib/onEnter";
 
 
 function Pill({ bg, fg, children }) {
@@ -65,9 +69,15 @@ export default function IdeaPage() {
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState("");
   const [actionErr, setActionErr] = useState("");
+  // The page had only an error channel, so a confirmation was being drawn in
+  // red on pink and read as a failure.
+  const [actionOk, setActionOk] = useState("");
   const [tab, setTab] = useState("overview");     // overview | tasks
   const [commentText, setCommentText] = useState("");
   const [taskModal, setTaskModal] = useState(null); // { task } | {} while open
+  const [showMerge, setShowMerge] = useState(false);
+  const [docForm, setDocForm] = useState(null);   // { kind, label, url } while adding
+  const [renaming, setRenaming] = useState(null); // { id, label } while editing
   const [openTask, setOpenTask] = useState(null);
   const [showRoles, setShowRoles] = useState(false);
   const [pickedRoles, setPickedRoles] = useState([]);
@@ -76,6 +86,29 @@ export default function IdeaPage() {
   const [tagCatalog, setTagCatalog] = useState([]);
   const [formFields, setFormFields] = useState([]);
   const [showSubmit, setShowSubmit] = useState(false);
+
+  // Reconciling local edits with server snapshots.
+  //
+  // refresh() replaces the whole idea with what the server had when the request
+  // went out. Two ways that goes wrong:
+  //   - a response already in flight when you change something describes the
+  //     world before your change, and applying it undoes what you just did
+  //   - a response fetched WHILE your write is in flight has not seen the write
+  //     yet, so applying it undoes it just the same
+  //
+  // So: every local change bumps `generation`, every unconfirmed write counts in
+  // `pendingWrites`, and a snapshot is only applied when neither has moved and
+  // nothing is outstanding. Otherwise it is dropped and retried once things
+  // settle, so we still converge on the server rather than trusting local state
+  // forever.
+  const generation = useRef(0);
+  const pendingWrites = useRef(0);
+  const posting = useRef(false);      // a comment POST is in flight
+  const staleRetry = useRef(null);
+  const retryCount = useRef(0);
+  // Mirrors the "is it safe to replace the view" condition into a ref, so
+  // refresh() can consult it wherever it was called from.
+  const refreshAllowed = useRef(true);
 
   const load = useCallback(async () => {
     setBusy(true); setErr("");
@@ -91,25 +124,66 @@ export default function IdeaPage() {
   // Quietly pull in other people's requests/status changes — no spinner, and
   // never while a modal or the content editor is open, so nothing typed is lost.
   const refresh = useCallback(async () => {
+    const again = () => {
+      // Bounded: a permanently blocked page must not spin a timer forever.
+      if (retryCount.current >= 20) return;
+      retryCount.current += 1;
+      clearTimeout(staleRetry.current);
+      staleRetry.current = setTimeout(() => { refresh(); }, 500);
+    };
+    // The guard lives HERE, not only in the useLive/useRevalidateOnFocus
+    // wrappers — the retry chain calls refresh() directly, so a guard applied
+    // only at those two call sites is not load-bearing.
+    if (!refreshAllowed.current) { again(); return; }
+    // Reading mid-write is pointless: the row we would read back has not been
+    // written yet.
+    if (pendingWrites.current > 0) { again(); return; }
+    const at = generation.current;
     try {
       const d = await api(`/api/ideas/${id}`);
+      if (generation.current !== at || pendingWrites.current > 0 || !refreshAllowed.current) { again(); return; }
+      retryCount.current = 0;
       setData(d);
     } catch { /* leave the current view alone */ }
   }, [id]);
-  useRevalidateOnFocus(refresh, { enabled: !editing && !showSubmit && !showRoles && !taskModal && !openTask });
+  useEffect(() => () => clearTimeout(staleRetry.current), []);
+  // A 401 leaves api() hanging on purpose, so its finally never runs and the
+  // in-flight count would stay above zero, freezing refreshes for good.
+  useEffect(() => onSessionEnd(() => { pendingWrites.current = 0; }), []);
+  const safeToRefresh = !editing && !showSubmit && !showRoles && !taskModal && !openTask && !showMerge && !docForm;
+  refreshAllowed.current = safeToRefresh;
+  useRevalidateOnFocus(refresh, { enabled: safeToRefresh });
+  // Same guard as above: a live ping must not land mid-edit either.
+  useLive(id, refresh, { enabled: safeToRefresh });
   useEffect(() => { api("/api/tags").then(({ tags }) => setTagCatalog(tags || [])).catch(() => {}); }, []);
   useEffect(() => { api("/api/form-fields").then(({ fields }) => setFormFields(fields || [])).catch(() => {}); }, []);
 
   // Merge into local state (obj or updater); run an action with optional revert.
-  const patch = (upd) => setData((d) => ({ ...d, ...(typeof upd === "function" ? upd(d) : upd) }));
-  const run = async (fn, revert) => { setActionErr(""); try { await fn(); } catch (e) { if (revert) revert(); setActionErr(e.message); } };
+  const patch = (upd) => {
+    generation.current += 1;            // invalidates any refetch already in flight
+    setData((d) => ({ ...d, ...(typeof upd === "function" ? upd(d) : upd) }));
+  };
+  // Counting writes here covers every action that goes through run(). saveTask
+  // and saveContent handle their own errors, so they call track() directly.
+  const track = async (fn) => {
+    pendingWrites.current += 1;
+    try { return await fn(); } finally { pendingWrites.current -= 1; }
+  };
+  const run = async (fn, revert) => {
+    setActionErr("");
+    try { await track(fn); } catch (e) { if (revert) revert(); setActionErr(e.message); }
+  };
 
   if (busy && !data) return <Shell><Loading label="Loading idea" /></Shell>;
   if (err) return <Shell><div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 10, padding: 16 }}>{err} <button onClick={load} style={{ ...btnBase, marginLeft: 8 }}>Retry</button></div></Shell>;
   if (!data) return null;
 
   const { idea, members, tasks, comments, attachments, likeCount, likedByMe, followedByMe, myRoles, meId, isAdmin, deleteRequested, deleteReason } = data;
-  const isLead = (myRoles || []).includes(LEAD_ROLE);
+
+  // This idea was folded into another one. Its row is kept so old links still
+  // work — they just land on the idea it became part of.
+  if (idea.merged_into) return <MergedRedirect to={idea.merged_into} />;
+  const isLead = actsAsLead(myRoles, members);
   // Derived, not read from the payload — joining, leaving or a role change
   // must flip this immediately.
   const canEdit = isAdmin || isLead;
@@ -127,49 +201,131 @@ export default function IdeaPage() {
 
   const toggleLike = () => {
     patch({ likedByMe: !likedByMe, likeCount: likeCount + (likedByMe ? -1 : 1) }); // optimistic
-    run(async () => { const r = await api(`/api/ideas/${id}/like`, { method: "POST" }); patch({ likedByMe: r.liked, likeCount: r.count }); },
+    run(async () => { const r = await serialize(`like:${id}`, () => api(`/api/ideas/${id}/like`, { method: "POST" })); patch({ likedByMe: r.liked, likeCount: r.count }); },
         () => patch({ likedByMe, likeCount }));
   };
   const toggleFollow = () => {
     patch({ followedByMe: !followedByMe }); // optimistic
-    run(async () => { const r = await api(`/api/ideas/${id}/follow`, { method: "POST" }); patch({ followedByMe: r.following }); },
+    run(async () => { const r = await serialize(`follow:${id}`, () => api(`/api/ideas/${id}/follow`, { method: "POST" })); patch({ followedByMe: r.following }); },
         () => patch({ followedByMe }));
   };
+  // Insert-or-replace, never blind append. A refetch can land between the
+  // comment being committed and this tab processing its own POST response, in
+  // which case the server copy is already on screen and appending would show it
+  // twice. Matching upsertTask, which has always done this.
+  // Insert-or-replace, and never leave two copies behind. The placeholder may
+  // already have been dropped by a refetch, and the server row may already be
+  // present from one — so look for both before appending.
+  const upsertComment = (comment, replacingId) => patch((d) => {
+    const at = d.comments.findIndex((c) => c.id === replacingId || c.id === comment.id);
+    if (at === -1) return { comments: [...d.comments, comment] };
+    const next = d.comments.filter((c, i) => i === at || (c.id !== replacingId && c.id !== comment.id));
+    next[next.findIndex((c) => c.id === replacingId || c.id === comment.id)] = comment;
+    return { comments: next };
+  });
+
   const postComment = () => {
+    // Guard against posting the same text twice. postComment closes over
+    // commentText from its render, so two triggers in the same tick both read
+    // the old value and both POST — which is exactly what happens with a
+    // Vietnamese or other IME keyboard, where Enter commits the composition and
+    // then fires a second keydown. That produced two rows in the database, not
+    // just two on screen.
+    if (posting.current) return;
     const body = commentText.trim();
     if (!body) return;
+    posting.current = true;
+    const tempId = `pending-${Date.now()}`;
     setCommentText("");
+    // Show it straight away. Waiting for the round trip made posting feel like
+    // nothing had happened.
+    upsertComment({
+      id: tempId, body, date: "now", mine: true, pending: true,
+      author: (members || []).find((m) => m.account_id === meId) || { id: meId },
+    });
     run(async () => {
-      const { comment } = await api(`/api/ideas/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
-      patch((d) => ({ comments: [...d.comments, comment] }));
-    }, () => setCommentText(body));
+      try {
+        const { comment } = await api(`/api/ideas/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
+        upsertComment(comment, tempId);
+      } finally { posting.current = false; }
+    }, () => {
+      posting.current = false;
+      patch((d) => ({ comments: d.comments.filter((c) => c.id !== tempId) }));
+      setCommentText(body);
+    });
   };
   const removeComment = (cid) => {
-    const prev = comments;
+    if (!confirm("Remove this comment? This can't be undone.")) return;
+    // Keep the row so the revert can put back exactly it, rather than restoring
+    // a whole array captured before this action — which would also wipe
+    // anything else the user has done since, mid-flight.
+    const removed = comments.find((c) => c.id === cid);
+    const at = comments.findIndex((c) => c.id === cid);
     patch((d) => ({ comments: d.comments.filter((c) => c.id !== cid) })); // optimistic
-    run(() => api(`/api/ideas/${id}/comments/${cid}`, { method: "DELETE" }), () => patch({ comments: prev }));
+    run(() => api(`/api/ideas/${id}/comments/${cid}`, { method: "DELETE" }), () => patch((d) => {
+      if (!removed || d.comments.some((c) => c.id === cid)) return {};
+      const next = d.comments.slice();
+      next.splice(Math.min(at, next.length), 0, removed);
+      return { comments: next };
+    }));
   };
 
   const upsertTask = (t) => patch((d) => ({
     tasks: d.tasks.some((x) => x.id === t.id) ? d.tasks.map((x) => (x.id === t.id ? t : x)) : [...d.tasks, t],
   }));
+  // Close the modal and show the card straight away. Waiting for the round trip
+  // made adding a request the slowest thing on the page, for no reason — the
+  // server can only reject it for a reason we already checked in the form.
+  //
+  // A new card has no id or number until the server answers, so it gets a
+  // temporary one and sits at reduced opacity until the real row replaces it.
   const saveTask = async (formValues) => {
     const editingTask = taskModal?.task;
-    const { task } = await api(
-      editingTask ? `/api/ideas/${id}/tasks/${editingTask.id}` : `/api/ideas/${id}/tasks`,
-      { method: editingTask ? "PATCH" : "POST", body: JSON.stringify(formValues) },
-    );
-    upsertTask(task);
-    setTaskModal(null);
-    setOpenTask((o) => (o && o.id === task.id ? task : o));
+    const tempId = `pending-${Date.now()}`;
+
+    const optimistic = editingTask
+      ? { ...editingTask, ...formValues,
+          assignee: (members || []).find((m) => m.account_id === formValues.assignee_id) || null }
+      : { id: tempId, number: "…", title: formValues.title, detail: formValues.detail || "",
+          state: "pending_approval", position: Number.MAX_SAFE_INTEGER,
+          created_at: new Date().toISOString(), state_changed_at: new Date().toISOString(),
+          commentCount: 0, mine: true, pending: true,
+          author: (members || []).find((m) => m.account_id === meId) || { id: meId },
+          assignee: (members || []).find((m) => m.account_id === formValues.assignee_id) || null };
+
+    upsertTask(optimistic);
     setTab("tasks");
+
+    try {
+      const { task } = await track(() => api(
+        editingTask ? `/api/ideas/${id}/tasks/${editingTask.id}` : `/api/ideas/${id}/tasks`,
+        { method: editingTask ? "PATCH" : "POST", body: JSON.stringify(formValues) },
+      ));
+      // Swap the placeholder for the real row, keyed on the temp id for a create.
+      patch((d) => ({ tasks: d.tasks.map((x) => (x.id === (editingTask ? task.id : tempId) ? task : x)) }));
+      setOpenTask((o) => (o && (o.id === task.id || o.id === tempId) ? task : o));
+      // Only now — closing it earlier meant a failed save unmounted the form
+      // and threw away everything typed, while TaskModal's own setErr/setBusy
+      // landed on an unmounted component and did nothing.
+      setTaskModal(null);
+    } catch (e) {
+      // Remove just the placeholder, rather than restoring a whole array
+      // captured before this action — that would also undo anything else done
+      // in the meantime.
+      patch((d) => ({ tasks: d.tasks.filter((x) => x.id !== tempId) }));
+      setActionErr(e.message);
+      throw e;                          // the still-mounted modal shows the error
+    }
   };
   const moveTask = (t, state) => {
     const prev = tasks;
     patch((d) => ({ tasks: d.tasks.map((x) => (x.id === t.id ? { ...x, state } : x)) })); // optimistic
     setOpenTask((o) => (o && o.id === t.id ? { ...o, state } : o));
+    // Per-card queue: two quick drags of the same card must reach the server in
+    // the order they happened, or the second one gets overwritten by the first.
     run(async () => {
-      const { task } = await api(`/api/ideas/${id}/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ state }) });
+      const { task } = await serialize(`task:${t.id}`, () =>
+        api(`/api/ideas/${id}/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ state }) }));
       upsertTask(task);
       setOpenTask((o) => (o && o.id === task.id ? task : o));
     }, () => { patch({ tasks: prev }); setOpenTask((o) => (o && o.id === t.id ? t : o)); });
@@ -182,10 +338,61 @@ export default function IdeaPage() {
     run(() => api(`/api/ideas/${id}/tasks/${t.id}`, { method: "DELETE" }), () => patch({ tasks: prev }));
   };
 
+  // Only an admin can star. It pins the idea to the top of the board and
+  // weights its contributors' scores, so it is not something a lead can award
+  // its own idea.
+  const toggleStar = () => {
+    const next = !idea.starred;
+    if (!confirm(next
+      ? `Mark "${idea.name}" as a starred idea? It will pin to the top of the board.`
+      : `Remove the star from "${idea.name}"?`)) return;
+    patch((d) => ({ idea: { ...d.idea, starred: next } }));   // optimistic
+    run(async () => {
+      const { idea: got } = await serialize(`star:${id}`, () =>
+        api(`/api/ideas/${id}/star`, { method: "PATCH", body: JSON.stringify({ starred: next }) }));
+      patch((d) => ({ idea: { ...d.idea, starred: got.starred } }));
+    }, () => patch((d) => ({ idea: { ...d.idea, starred: !next } })));
+  };
+
+  // Documentation: a link or a file, both stored as attachments so the
+  // permissions are the same either way — anyone adds, the uploader or the
+  // acting lead or an admin removes.
+  const addLink = () => {
+    const label = (docForm?.label || "").trim();
+    const url = (docForm?.url || "").trim();
+    if (!label) { setActionErr("Give the link a name."); return; }
+    if (!/^https?:\/\//i.test(url)) { setActionErr("A link must start with http:// or https://"); return; }
+    setDocForm(null);
+    run(async () => {
+      const { attachment } = await api(`/api/ideas/${id}/attachments`, {
+        method: "POST", body: JSON.stringify({ kind: "link", label, url }),
+      });
+      patch((d) => ({ attachments: [...d.attachments, attachment] }));
+    });
+  };
+
+  // "Edit" here means the name only. Swapping the file or the link target would
+  // be a different document wearing the same label, which is worse than adding
+  // a new entry and removing the old one.
+  const saveDocName = () => {
+    const { id: attId, label } = renaming || {};
+    const name = (label || "").trim();
+    if (!name) { setActionErr("Give it a name."); return; }
+    const before = attachments.find((a) => a.id === attId);
+    setRenaming(null);
+    patch((d) => ({ attachments: d.attachments.map((a) => (a.id === attId ? { ...a, label: name } : a)) }));
+    run(async () => {
+      const { attachment } = await api(`/api/ideas/${id}/attachments/${attId}`, {
+        method: "PATCH", body: JSON.stringify({ label: name }),
+      });
+      patch((d) => ({ attachments: d.attachments.map((a) => (a.id === attId ? { ...a, ...attachment } : a)) }));
+    }, () => patch((d) => ({ attachments: d.attachments.map((a) => (a.id === attId ? before : a)) })));
+  };
+
   const changeStatus = (status) => {
     const prev = idea.status;
     patch((d) => ({ idea: { ...d.idea, status } })); // optimistic
-    run(async () => { const { project } = await api(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }); patch((d) => ({ idea: { ...d.idea, status: project.status } })); },
+    run(async () => { const { project } = await serialize(`status:${id}`, () => api(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ status }) })); patch((d) => ({ idea: { ...d.idea, status: project.status } })); },
         () => patch((d) => ({ idea: { ...d.idea, status: prev } })));
   };
   const join = (roles) => {
@@ -244,12 +451,15 @@ export default function IdeaPage() {
   };
   const dismissDeletion = () => run(async () => { await api(`/api/ideas/${id}/delete-request`, { method: "DELETE" }); patch({ deleteRequested: false, deleteReason: "" }); });
 
-  const uploadFile = (file) => {
+  const uploadFile = (file, label) => {
     if (!file) return;
     const bad = validateUpload({ name: file.name, type: file.type, size: file.size });
     if (bad) { setActionErr(bad); return; }
     const fd = new FormData();
     fd.append("file", file);
+    // Optional: the Documentation box lets you name a file; the plain uploader
+    // does not, and falls back to the filename.
+    if ((label || "").trim()) fd.append("label", label.trim());
     run(async () => {
       const { attachment } = await api(`/api/ideas/${id}/attachments`, { method: "POST", body: fd });
       patch((d) => ({ attachments: [...d.attachments, attachment] }));
@@ -270,6 +480,17 @@ export default function IdeaPage() {
           onClose={() => setTaskModal(null)} onSave={saveTask}
         />
       )}
+      {showMerge && (
+        <MergeModal
+          ideaId={id} ideaNumber={idea.number} ideaName={idea.name}
+          ideaContext={idea.context} isAdmin={isAdmin}
+          onClose={() => setShowMerge(false)}
+          onRequested={(n) => {
+            setActionOk(`Merge requested for ${n} idea${n === 1 ? "" : "s"} — an admin will review it.`);
+            setTimeout(() => setActionOk(""), 6000);
+          }}
+        />
+      )}
       {openTask && (
         <TaskDrawer
           ideaId={id} task={openTask} canModerate={canEdit} isAdmin={isAdmin}
@@ -279,6 +500,7 @@ export default function IdeaPage() {
         />
       )}
       {actionErr && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 14 }}>{actionErr}</div>}
+      {actionOk && <div style={{ background: "#ebf6ed", border: "1px solid #bde2c5", color: "#2f7a43", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 16, fontWeight: 600 }}>✓ {actionOk}</div>}
 
       {deleteRequested && (
         <div style={{ background: "#fff8ec", border: "1px solid #f4c8a4", borderRadius: 10, padding: "10px 14px", fontSize: 12.5, color: "#9f5314", marginBottom: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -306,7 +528,19 @@ export default function IdeaPage() {
             {idea.tags.map((t) => <TagChip key={t} name={t} catalog={tagColors} />)}
           </div>
 
-          <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px", lineHeight: 1.25, overflowWrap: "anywhere" }}>{idea.name}</h1>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)", margin: "0 0 6px", lineHeight: 1.25, overflowWrap: "anywhere", flex: 1, minWidth: 0 }}>{idea.name}</h1>
+            {/* Admins see a control; everyone else sees the star only when it is
+                set, because to them it is a fact about the idea, not a button. */}
+            {isAdmin ? (
+              <button onClick={toggleStar} title={idea.starred ? "Remove the star" : "Mark as a starred idea"}
+                style={{ border: "none", background: "none", cursor: "pointer", fontSize: 24, lineHeight: 1,
+                         padding: "2px 4px", color: idea.starred ? STAR_GOLD : "#c8d0dc",
+                         transition: "color 160ms" }}>★</button>
+            ) : idea.starred ? (
+              <span title="A starred idea" style={{ fontSize: 24, lineHeight: 1, padding: "2px 4px", color: STAR_GOLD }}>★</span>
+            ) : null}
+          </div>
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
             {idea.number}
             {/* Who raised it, and who is driving it — two separate roles. Each
@@ -338,6 +572,7 @@ export default function IdeaPage() {
             )}
             <button onClick={() => setTaskModal({})} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none" }}>+ Add request</button>
             {isAdmin && <button onClick={deleteIdea} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Delete idea</button>}
+            {canEdit && <button onClick={() => setShowMerge(true)} style={btnBase} title="Fold duplicate ideas into this one">Merge ideas</button>}
             {!isAdmin && isLead && !deleteRequested && <button onClick={requestDeletion} style={{ ...btnBase, color: "#d53c30", borderColor: "#f5c9c9" }}>Request deletion</button>}
           </div>
 
@@ -419,23 +654,6 @@ export default function IdeaPage() {
           )}
 
           {/* Attachments */}
-          <div style={{ ...sectionLabel, marginTop: 26 }}>Attachments ({attachments.length})</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {attachments.map((a) => (
-              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px" }}>
-                <span style={{ fontSize: 14 }}>📎</span>
-                <a href={`/api/ideas/${id}/attachments/${a.id}/download`} style={{ flex: 1, fontSize: 13, color: "var(--blue)", fontWeight: 600, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.filename}</a>
-                <span style={{ fontSize: 11, color: "var(--faint)" }}>{fmtSize(a.size)}</span>
-                {(a.mine || canEdit) && <button onClick={() => removeAttachment(a.id)} title="Remove" style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>}
-              </div>
-            ))}
-            {attachments.length === 0 && <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No files yet.</div>}
-          </div>
-          <label style={{ ...btnBase, display: "inline-block", marginTop: 10, cursor: "pointer" }}>
-            + Upload file
-            <input type="file" accept={ACCEPT_ATTR} onChange={(e) => { uploadFile(e.target.files?.[0]); e.target.value = ""; }} style={{ display: "none" }} />
-          </label>
-          <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>Word, Excel, PDF, or images · max 5 MB each.</div>
 
           {/* Comments — the Overview thread */}
           <div style={{ ...sectionLabel, marginTop: 26 }}>Comments ({comments.length})</div>
@@ -458,7 +676,7 @@ export default function IdeaPage() {
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <input
               value={commentText} onChange={(e) => setCommentText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && postComment()}
+              onKeyDown={onEnter(postComment)}
               placeholder="Add a comment — members and followers are notified"
               style={{ flex: 1, border: "1px solid #dde3ec", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, outline: "none" }}
             />
@@ -535,6 +753,97 @@ export default function IdeaPage() {
             </div>
             {isAdmin && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Admin: change a role, or set someone as {LEAD_ROLE} to transfer the lead. There can be one {LEAD_ROLE} and one {INITIATOR_ROLE} per idea.</div>}
           </div>
+
+          {/* ── Documentation ──────────────────────────────────────
+              Links and files in one place. Anyone may add; the person who added
+              it, the acting lead, or an admin may remove. Files already went
+              through attachments, so a link is the same row with kind='link'. */}
+          <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 18px" }}>
+            <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 12 }}>Documentation</div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {attachments.map((a) => (
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", border: "1px solid var(--line)", borderRadius: 8, padding: "7px 10px" }}>
+                  <span style={{ fontSize: 13 }}>{a.kind === "link" ? "\u{1F517}" : "\u{1F4CE}"}</span>
+                  {renaming?.id === a.id ? (
+                    <input
+                      value={renaming.label} autoFocus
+                      onChange={(e) => setRenaming((r) => ({ ...r, label: e.target.value }))}
+                      onKeyDown={onEnter(saveDocName)}
+                      onBlur={saveDocName}
+                      style={{ flex: 1, minWidth: 0, border: "1px solid #d5dce6", borderRadius: 6, padding: "4px 7px", fontSize: 12.5, outline: "none" }}
+                    />
+                  ) : (
+                    <span className="breakable" style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: "var(--body)", fontWeight: 600 }}>
+                      {a.label || a.filename}
+                    </span>
+                  )}
+                  {(a.mine || canEdit) && renaming?.id !== a.id && (
+                    <button onClick={() => setRenaming({ id: a.id, label: a.label || a.filename })}
+                      title="Rename" style={{ border: "none", background: "none", color: "var(--faint)", cursor: "pointer", fontSize: 11.5, fontWeight: 700 }}>Edit</button>
+                  )}
+                  {a.kind === "link" ? (
+                    <a href={a.url} target="_blank" rel="noopener noreferrer"
+                       style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>Enter</a>
+                  ) : (
+                    <a href={`/api/ideas/${id}/attachments/${a.id}/download`}
+                       style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>Enter</a>
+                  )}
+                  {(a.mine || canEdit) && (
+                    <button onClick={() => removeAttachment(a.id)} title="Remove"
+                      style={{ border: "none", background: "none", color: "#adb5c2", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>
+                  )}
+                </div>
+              ))}
+              {attachments.length === 0 && <div style={{ fontSize: 12, color: "var(--muted)" }}>Nothing yet.</div>}
+            </div>
+
+            {!docForm ? (
+              <button onClick={() => setDocForm({ kind: "link", label: "", url: "" })}
+                style={{ ...btnBase, marginTop: 10, fontSize: 12, padding: "6px 12px" }}>+ Add</button>
+            ) : (
+              <div style={{ marginTop: 10, border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px", background: "#f8fafc" }}>
+                <input
+                  value={docForm.label} autoFocus
+                  onChange={(e) => setDocForm((f) => ({ ...f, label: e.target.value }))}
+                  placeholder="Name (e.g. Design doc)"
+                  style={{ width: "100%", border: "1px solid #d5dce6", borderRadius: 7, padding: "7px 10px", fontSize: 12.5, outline: "none", marginBottom: 8 }}
+                />
+                <select
+                  value={docForm.kind}
+                  onChange={(e) => setDocForm((f) => ({ ...f, kind: e.target.value }))}
+                  style={{ width: "100%", border: "1px solid #d5dce6", borderRadius: 7, padding: "7px 10px", fontSize: 12.5, background: "#fff", color: "var(--body)", marginBottom: 8 }}
+                >
+                  <option value="link">Link</option>
+                  <option value="file">File</option>
+                </select>
+
+                {docForm.kind === "link" ? (
+                  <input
+                    value={docForm.url}
+                    onChange={(e) => setDocForm((f) => ({ ...f, url: e.target.value }))}
+                    onKeyDown={onEnter(addLink)}
+                    placeholder="https://…"
+                    style={{ width: "100%", border: "1px solid #d5dce6", borderRadius: 7, padding: "7px 10px", fontSize: 12.5, outline: "none" }}
+                  />
+                ) : (
+                  <label style={{ ...btnBase, display: "inline-block", fontSize: 12, padding: "6px 12px", cursor: "pointer" }}>
+                    Choose a file
+                    <input type="file" accept={ACCEPT_ATTR} style={{ display: "none" }}
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { setDocForm(null); uploadFile(f, docForm.label); } }} />
+                  </label>
+                )}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  {docForm.kind === "link" && (
+                    <button onClick={addLink} style={{ ...btnBase, background: "var(--blue)", color: "#fff", border: "none", fontSize: 12, padding: "6px 12px" }}>Add</button>
+                  )}
+                  <button onClick={() => setDocForm(null)} style={{ ...btnBase, fontSize: 12, padding: "6px 12px" }}>Cancel</button>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 8 }}>Word, Excel, PDF or images · max 5 MB</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -575,4 +884,13 @@ function Shell({ onNewIdea, wide, children }) {
       <main style={{ maxWidth: wide ? 1360 : 1060, margin: "0 auto", padding: "20px 22px 0", transition: "max-width 500ms cubic-bezier(0.22, 1, 0.36, 1)" }}>{children}</main>
     </div>
   );
+}
+
+// A merged idea keeps its row so old links still work. Redirecting belongs in an
+// effect, not the render body — and router.replace keeps it a client navigation
+// rather than a full reload.
+function MergedRedirect({ to }) {
+  const router = useRouter();
+  useEffect(() => { router.replace(`/idea/${to}`); }, [router, to]);
+  return <Shell><Loading label="This idea was merged — taking you there" /></Shell>;
 }

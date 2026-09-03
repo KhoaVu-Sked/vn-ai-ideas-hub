@@ -8,6 +8,7 @@ import { useSession } from "@/features/auth/SessionProvider";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import { api } from "@/lib/apiClient";
 import Pager, { usePaging } from "@/components/Pager";
+import { onEnter } from "@/lib/onEnter";
 
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 22px" };
@@ -67,7 +68,7 @@ export default function TasksPage() {
             {err && <div style={{ background: "#fff4f4", border: "1px solid #ffc9c9", color: "#c92a2a", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 14 }}>{err}</div>}
 
             <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Add a task…" style={{ flex: 1, border: "1px solid #d5dce6", borderRadius: 8, padding: "9px 12px", fontSize: 13.5, outline: "none" }} />
+              <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={onEnter(add)} placeholder="Add a task…" style={{ flex: 1, border: "1px solid #d5dce6", borderRadius: 8, padding: "9px 12px", fontSize: 13.5, outline: "none" }} />
               <button onClick={add} style={{ background: "var(--blue)", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Add</button>
             </div>
 

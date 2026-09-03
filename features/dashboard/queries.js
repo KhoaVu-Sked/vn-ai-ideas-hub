@@ -16,16 +16,17 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
         count(*) filter (where status in ('In Review','Approved','In Progress','Pilot'))::int as active,
         count(*) filter (where status = 'Launched')::int as launched
       from ideas i
-      where (${since}::timestamptz is null or i.created_at >= ${since})
+      where i.merged_into is null
+        and (${since}::timestamptz is null or i.created_at >= ${since})
     `,
     quarterStart
-      ? sql`select count(*)::int as n from ideas where created_at >= ${quarterStart}`
+      ? sql`select count(*)::int as n from ideas where merged_into is null and created_at >= ${quarterStart}`
       : Promise.resolve([{ n: 0 }]),
     sql`
       select
         (select count(*) from accounts)::int as total_accounts,
         (select count(*) from (
-          select initiator_account_id as acct from ideas where initiator_account_id is not null
+          select initiator_account_id as acct from ideas where initiator_account_id is not null and merged_into is null
           union select account_id from likes
           union select account_id from requests
           union select account_id from idea_members
@@ -34,7 +35,8 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
     `,
     sql`
       select status, count(*)::int as n from ideas i
-      where (${since}::timestamptz is null or i.created_at >= ${since})
+      where i.merged_into is null
+        and (${since}::timestamptz is null or i.created_at >= ${since})
       group by status
     `,
     sql`
@@ -42,7 +44,8 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
       from ideas i
       cross join unnest(i.tags) as t
       left join tags tg on tg.name = t
-      where (${since}::timestamptz is null or i.created_at >= ${since})
+      where i.merged_into is null
+        and (${since}::timestamptz is null or i.created_at >= ${since})
       group by t order by n desc, t asc
     `,
     sql`
@@ -50,7 +53,9 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
         greatest(0, extract(day from (now() - updated_at))::int) as days_update,
         greatest(0, extract(day from (now() - created_at))::int) as days_created
       from ideas
-      where status in ('On Hold', 'In Review') and (${since}::timestamptz is null or created_at >= ${since})
+      where merged_into is null
+        and status in ('On Hold', 'In Review')
+        and (${since}::timestamptz is null or created_at >= ${since})
     `,
     sql`
       select * from (
@@ -59,16 +64,33 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
           (select count(*) from requests r where r.idea_id = i.id)::int as requests,
           (select count(*) from idea_members m where m.idea_id = i.id)::int as members
         from ideas i
-        where (${since}::timestamptz is null or i.created_at >= ${since})
+        where i.merged_into is null
+          and (${since}::timestamptz is null or i.created_at >= ${since})
       ) x
       order by (likes + requests + members) desc, name asc
       limit 8
     `,
     sql`
+      -- The score is weighted per idea, not per person: each contribution counts
+      -- 1.2x when the idea it belongs to is starred. A flat count of totals has
+      -- nowhere to apply that, which is why this sums per row instead.
+      -- Merged ideas are excluded — they are no longer ideas in their own right.
       select a.id, coalesce(a.name, a.username) as name, a.username, a.avatar_color, a.avatar_url,
-        (select count(*) from ideas i where i.initiator_account_id = a.id)::int as ideas,
-        (select count(*) from requests r where r.account_id = a.id)::int as requests,
-        (select count(*) from idea_members m where m.account_id = a.id)::int as teams
+        (select count(*) from ideas i where i.initiator_account_id = a.id and i.merged_into is null)::int as ideas,
+        (select count(*) from requests r join ideas i on i.id = r.idea_id
+          where r.account_id = a.id and i.merged_into is null)::int as requests,
+        (select count(*) from idea_members m join ideas i on i.id = m.idea_id
+          where m.account_id = a.id and i.merged_into is null)::int as teams,
+        (
+          coalesce((select sum(case when i.starred then 5 * 1.2 else 5 end) from ideas i
+                    where i.initiator_account_id = a.id and i.merged_into is null), 0)
+        + coalesce((select sum(case when i.starred then 1 * 1.2 else 1 end) from requests r
+                    join ideas i on i.id = r.idea_id
+                    where r.account_id = a.id and i.merged_into is null), 0)
+        + coalesce((select sum(case when i.starred then 2 * 1.2 else 2 end) from idea_members m
+                    join ideas i on i.id = m.idea_id
+                    where m.account_id = a.id and i.merged_into is null), 0)
+        )::float as score
       from accounts a
     `,
   ]);
@@ -101,7 +123,8 @@ export async function getDashboard({ since = null, quarterStart = null } = {}) {
   }));
 
   const contributors = contributorRows
-    .map((c) => ({ ...c, score: c.ideas * 5 + c.requests * 1 + c.teams * 2 }))
+    // Comes weighted from SQL now; rounding keeps the tile readable.
+    .map((c) => ({ ...c, score: Math.round(Number(c.score) || 0) }))
     .filter((c) => c.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 6);

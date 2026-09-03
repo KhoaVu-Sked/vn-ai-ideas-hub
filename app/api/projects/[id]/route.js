@@ -1,8 +1,9 @@
 import { after } from "next/server";
-import { getProject, isProjectLead, updateStatus } from "@/features/ideas/queries";
+import { getProject, isProjectLead, updateStatus , assertNotMerged } from "@/features/ideas/queries";
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { ideaEvent } from "@/features/notifications/notify";
+import { publishIdea, publishBoard } from "@/features/realtime/publish";
 
 // GET /api/projects/:id → one project's full detail
 // (fetched only when a card is clicked; the board list never includes this)
@@ -22,6 +23,7 @@ export async function PATCH(request, { params }) {
   try {
     const user = await requireUser();
     const { id } = await params;
+    await assertNotMerged(id);
     const canEdit = user.role === "admin" || (await isProjectLead(id, user.uid));
     if (!canEdit) return Response.json({ error: "Only the project lead can change status." }, { status: 403 });
     const { status } = await request.json();
@@ -33,6 +35,10 @@ export async function PATCH(request, { params }) {
       detail: { from: project.previousStatus, to: project.status }, base,
       auditAction: `changed status of "${project.name}" from ${project.previousStatus} to ${project.status}`,
     }));
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "status");
+    publishBoard("status");
     return Response.json({ project });
   } catch (e) {
     return jsonError(e, "Could not update the status.");

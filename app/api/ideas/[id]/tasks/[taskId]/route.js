@@ -3,6 +3,7 @@ import { deleteIdeaTask, moveIdeaTask, updateIdeaTask } from "@/features/ideas/q
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { ideaEvent } from "@/features/notifications/notify";
+import { publishIdea } from "@/features/realtime/publish";
 
 // PATCH /api/ideas/:id/tasks/:taskId
 //   { state } → move it to another board column
@@ -27,6 +28,9 @@ export async function PATCH(request, { params }) {
         auditAction: `moved task ${task.number} to ${task.state.replace(/_/g, " ")}`,
       }));
     }
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "task");
     return Response.json({ task });
   } catch (e) {
     return jsonError(e, "Could not update the task.");
@@ -37,8 +41,11 @@ export async function PATCH(request, { params }) {
 export async function DELETE(_request, { params }) {
   try {
     const user = await requireUser();
-    const { taskId } = await params;
+    const { id, taskId } = await params;
     await deleteIdeaTask(taskId, user.uid, user.role === "admin");
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishIdea(id, "task");
     return Response.json({ ok: true });
   } catch (e) {
     return jsonError(e, "Could not remove the task.");
