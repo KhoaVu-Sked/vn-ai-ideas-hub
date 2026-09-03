@@ -375,14 +375,16 @@ function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, cor
           {/* Permanent home for Calendar-connect — Get Started's own
               Calendar step is skippable, so this is where "do it later"
               actually happens. Same /api/calendar/connect route Auto
-              Schedule's own connect flow uses; no backend change. */}
+              Schedule's own connect flow uses, but back to the Learning Hub
+              landing page (?returnTo=/learning-hub) rather than reopening
+              Auto Schedule here — this button isn't part of that flow. */}
           <div style={{ marginTop: 8 }}>
             {calendarConnected ? (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #bfe3c9", background: "#e6f4ea", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#1f7a3c" }}>
                 ✓ Google Calendar connected
               </span>
             ) : (
-              <a href="/api/calendar/connect" style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
+              <a href="/api/calendar/connect?returnTo=/learning-hub" style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
                 📅 Connect Google Calendar
               </a>
             )}
@@ -700,14 +702,19 @@ export default function JourneyPage() {
   // Read via window.location rather than next/navigation's useSearchParams so
   // this client component doesn't need a Suspense boundary just for this.
   //
-  // A not-yet-onboarded visitor can reach this same callback from the Get
-  // Started wizard's Calendar step (LearningHubPage.jsx) — the connect/
-  // callback routes are shared with Auto Schedule's own entry point and
-  // always redirect here, never back to the wizard. Bounce that case
-  // straight back to /learning-hub with the same param so the wizard (not
-  // this page) is what reopens and resumes — gated on `me` actually having
-  // loaded, so a not-yet-resolved session can't misread as "not onboarded"
-  // and bounce someone who's really done with setup.
+  // The Get Started wizard's own Calendar step passes ?returnTo=/learning-hub
+  // (app/api/calendar/connect/route.js), so it lands there directly and
+  // never touches this page in the common case. This bounce is a defensive
+  // fallback for the one other way a not-yet-onboarded visitor can still
+  // reach Google Calendar-connect while sitting on THIS page: Auto
+  // Schedule's own inline prompt (a 409 mid-modal), which doesn't pass
+  // returnTo and defaults back here on purpose (see 4.7's own comment) — if
+  // that happens before the account has enrolled in a track, send them to
+  // /learning-hub instead, same param, so the wizard is what reopens and
+  // resumes rather than this page reacting to a param the wizard actually
+  // owns. Gated on `me` actually having loaded, so a not-yet-resolved
+  // session can't misread as "not onboarded" and bounce someone who's
+  // really done with setup.
   useEffect(() => {
     if (me === undefined) return;
     const cal = new URLSearchParams(window.location.search).get("calendar");

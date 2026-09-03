@@ -240,7 +240,7 @@ function CalendarStep({ onSkip }) {
       </p>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
         <button onClick={onSkip} style={wizardBtn}>Skip for now</button>
-        <a href="/api/calendar/connect" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
+        <a href="/api/calendar/connect?returnTo=/learning-hub" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
       </div>
     </>
   );
@@ -274,14 +274,17 @@ function TracksStep({ tracks, onPreview, onFinish, finishing }) {
 // Resumes at whichever step is actually left to do, re-derived from server
 // state every time it opens (no client- or server-side "current step"
 // flag to desync): role is skipped once me.position is set; calendar is
-// skipped once already connected OR once a `?calendar=` outcome is present
-// (JourneyPage bounces a not-yet-onboarded visitor back here with that
-// param after the OAuth round trip — see JourneyPage.jsx's `?calendar=`
-// effect — since the connect/callback routes themselves always redirect to
-// /learning-hub/journey and are shared with Auto Schedule's own connect
-// entry point, not worth special-casing there). "Skip for now" writes
-// nothing — there's no "declined" flag, matching this codebase's existing
-// derive-don't-flag pattern (JourneyPage's milestone banners).
+// skipped once already connected OR once a `?calendar=` outcome is present.
+// The Calendar step's own connect link passes ?returnTo=/learning-hub (see
+// app/api/calendar/connect/route.js), so the OAuth round trip lands
+// straight back here with that param — JourneyPage's own `?calendar=`
+// bounce is a defensive fallback for the one other way to reach this app's
+// Calendar-connect while not yet onboarded (Auto Schedule's own inline
+// prompt, which doesn't pass returnTo and defaults to /learning-hub/journey
+// — see JourneyPage.jsx's `?calendar=` effect), not the primary path.
+// "Skip for now" writes nothing — there's no "declined" flag, matching
+// this codebase's existing derive-don't-flag pattern (JourneyPage's
+// milestone banners).
 function OnboardingWizard({ me, tracks, onPreview, onClose, onFinish }) {
   const calOutcome = useMemo(() => new URLSearchParams(window.location.search).get("calendar"), []);
   const [step, setStep] = useState(() => {
