@@ -6,8 +6,11 @@ the way.
 The jokes all run on things that are actually true, rather than being bolted on:
 there really is no approval step, the quiz really has no pass mark or attempt
 limit, Auto Schedule really does read your calendar's free time, and the ideas
-board really did start because good ideas were dying in Slack threads. See the
-notes at the bottom for the two lines to consider cutting.
+board really did start because good ideas were dying in Slack threads.
+
+The credit paragraph is deliberately played straight. Thanks land badly with a
+joke in the middle of them, so the humour stops before the names start and
+picks up again on the last line.
 
 ---
 
@@ -41,8 +44,14 @@ ideas you have raised, which is a decent reminder that the other half is still
 there and still collecting the good ideas that used to die three replies deep
 in a Slack thread.
 
-Have a look when you get a chance. Khoa built the whole thing, so send him your
-questions, your bugs, and your strong opinions about the colour of the buttons.
+Credit where it is due. This second phase is a huge amount of work from Kiet Ly
+and Thu Duong Nguyen, and the Learning Hub is theirs end to end: the tracks,
+the roadmap, the quizzes, the calendar scheduling, all of it. Equal thanks to
+Khoa Vu for turning it around and getting it deployed as quickly as this, and
+for being our key administrator for the Hub.
+
+So have a look when you get a chance, and send Khoa your questions, your bugs,
+and your strong opinions about the colour of the buttons.
 
 [LINK]
 
@@ -61,10 +70,16 @@ The calendar line ("gaps you were pretending not to have") is affectionate
 teasing about a shared habit. It reads as warm from a manager who is clearly
 including themselves, and slightly less so if your team is currently stretched.
 
+On the credit: the earlier draft said Khoa built the whole thing, which was
+wrong. The Learning Hub came from Kiet Ly and Thu Duong Nguyen, and Khoa's part
+was deployment and running it. If anyone else worked on the second phase, this
+is the paragraph to add them to, and it is easier to add a name now than to
+apologise for missing one later.
+
 An introduction does not need to set an expectation, so this one does not. If
 you want people enrolled by a particular date, that is one extra line, and it
 will flatten the tone of everything above it. Worth deciding on purpose.
 
-Still true and worth keeping: no AI-generated summaries or mind maps, and
-nothing reminds you before a booked study session. Anyone promised those will
-otherwise assume it is broken rather than absent.
+Still true and worth keeping in mind: there are no AI-generated summaries or
+mind maps, and nothing reminds you before a booked study session. Anyone
+promised those will otherwise assume it is broken rather than absent.
