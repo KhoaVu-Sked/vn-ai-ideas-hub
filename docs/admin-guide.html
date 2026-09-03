@@ -323,6 +323,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <li><a href="#a7">Manage — Feedback</a></li>
       <li><a href="#a8">Manage — Delete requests</a></li>
       <li><a href="#a8b">Manage — Merge requests</a></li>
+      <li><a href="#a14">Learning Hub — Team view</a></li>
       <li><a href="#a9">Tasks</a></li>
       <li><a href="#a10">Activity log</a></li>
       <li><a href="#a11">Authority on any idea</a></li>
@@ -492,6 +493,12 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <h2>Manage — User accounts</h2>
       <p class="lede">Everyone with access, and what they can do.</p>
 
+      <div class="note">
+        <span class="note__tag">Also sets seniority</span>
+        <p>The <b>Position</b> column on this table is where a learner&rsquo;s Learning Hub level is set &mdash; Intern, Junior, Mid level, Senior or Principal. Nobody can set their own, so this is the only place it changes.</p>
+        <p>It is not cosmetic. A learner&rsquo;s position decides which tier of courses their roadmap expects, which courses are locked, and where they sit in Team view&rsquo;s distribution and averages. Setting it wrong gives that person the wrong roadmap, so it is worth getting right when you create the account.</p>
+      </div>
+
       <figure>
         <div class="ui">
           <div class="ui-body">
@@ -597,9 +604,93 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <p>If part of a merge fails — an idea already merged by someone else a moment earlier, for instance — you are told how many went through and how many were left untouched. The ones that failed are unchanged.</p>
     </section>
+    <!-- 09 ──────────────────────────────────────────────────── -->
+    <section id="a14">
+      <p class="sec-num">Section 09</p>
+      <h2>Learning Hub — Team view</h2>
+      <p class="lede">Every enrolled learner&rsquo;s progress, and who needs help.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">Read this first</span>
+        <p>This app has <b>no manager hierarchy</b> &mdash; there is no concept of &ldquo;my direct reports&rdquo; anywhere in it. Team view is gated on admin, exactly like Dashboard and Manage. That means <b>any admin sees every enrolled learner org-wide</b>, not a team scoped to them. Treat it as an org-wide view, because that is what it is.</p>
+      </div>
+
+      <p>Open <b>Team</b> in the top bar. Four tiles head the page:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:200px">Tile</th><th>How it is calculated</th></tr></thead>
+          <tbody>
+            <tr><td><b>Team completion</b></td><td>The average of each learner&rsquo;s own percentage. Everyone counts equally, whatever the size of their roadmap &mdash; so it matches what the roster&rsquo;s own % column visibly averages to.</td></tr>
+            <tr><td><b>Active this week</b></td><td>How many learners touched anything in the last 7 days. A rolling window, not a Monday-to-Sunday week.</td></tr>
+            <tr><td><b>Avg exam accuracy</b></td><td>First-try correct answers over total questions, across everyone&rsquo;s courses pooled together.</td></tr>
+            <tr><td><b>Ideas shipped</b></td><td>Ideas raised by an enrolled learner that reached <b>Launched</b>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>None of these carry a month-on-month trend. That is deliberate: nothing snapshots history, so a delta would have to be invented.</p>
+
+      <h3>Needs support</h3>
+
+      <p>The one card worth checking regularly. A person appears once, under the most urgent reason that applies:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:160px">Reason</th><th>Trigger</th></tr></thead>
+          <tbody>
+            <tr><td><b>Stalled</b></td><td>Has gone quiet &mdash; hasn&rsquo;t touched their roadmap in weeks. Takes priority, since silence is more urgent than trailing.</td></tr>
+            <tr><td><b>Struggling</b></td><td>Their own average first-try accuracy is <b>below 70%</b>.</td></tr>
+            <tr><td><b>Behind</b></td><td>Their percentage complete is below the team&rsquo;s own average &mdash; a moving comparison, not a fixed target.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="note__tag">On that 70%</span>
+        <p>It is the only hardcoded number anywhere in the Learning Hub, and it exists because it was explicitly asked for. Everywhere else the wrap-up quiz is deliberately unscored and ungated &mdash; a learner is never blocked by a quiz result. Reading &ldquo;Struggling&rdquo; as a fail mark misrepresents it.</p>
+      </div>
+
+      <p>Each row has a working <b>View roadmap</b> button, which opens the same drill-down described below.</p>
+
+      <h3>The roster</h3>
+
+      <p>One row per learner: name, <b>Level &rarr; target</b>, enrolled tracks, percentage of core courses complete, in-progress count, <b>Pace</b>, <b>Avg Accuracy</b>, last activity, and how many board ideas they have raised. Filter by track; sort by name or percentage.</p>
+
+      <p><b>Pace</b> is three states in priority order: <b>Stalled</b>, then <b>Behind</b> (below the team average), then <b>On track</b>. There is no fixed pacing target &mdash; the comparison always moves with the team.</p>
+
+      <h3>Skills, distribution and application</h3>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:200px">Panel</th><th>What it shows</th></tr></thead>
+          <tbody>
+            <tr><td><b>Coverage</b> (heatmap)</td><td>One row per skill, one column per learner, bucketed None / Learning / Proficient / Strong. Skills are whatever the team&rsquo;s courses are actually tagged with, strongest first. <b>None</b> means no engaged courses for that skill &mdash; not a zero score.</td></tr>
+            <tr><td><b>Distribution</b></td><td>How many enrolled learners sit at each seniority level.</td></tr>
+            <tr><td><b>Application</b></td><td>A funnel of ideas raised by enrolled learners, using the board&rsquo;s own statuses. <b>On Hold</b> and <b>Declined</b> are excluded, as the board treats them as off-timeline. Below it, how many learners have raised at least one idea; click to expand a per-person breakdown.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Drilling into one person</h3>
+
+      <p>Clicking a roster row opens that learner&rsquo;s roadmap <b>read-only</b>. You cannot reorder it, and the <b>Wrap-up link is hidden entirely</b> &mdash; an admin cannot open someone else&rsquo;s quiz. It is scoped the way the learner&rsquo;s own view is: their tier and below, plus one tier of early access.</p>
+
+      <p>It is the roadmap table only, not their full dashboard. You will not see their quiz statistics or skill confidence here.</p>
+
+      <h3>The annual review date</h3>
+
+      <p>In the roster card&rsquo;s header sits a pill reading <b>Annual review</b> with a date. Click it to edit.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">This one reaches every learner</span>
+        <p>That date is the default <b>Complete by</b> value in every learner&rsquo;s Auto Schedule dialog. Change it and every learner picks up the new default the next time they open that dialog &mdash; live, with no deploy. It is the only admin setting in this app that changes what everyone else sees on their own page.</p>
+      </div>
+    </section>
+
 
     <section id="a9">
-      <p class="sec-num">Section 09</p>
+      <p class="sec-num">Section 10</p>
       <h2>Tasks</h2>
       <p class="lede">A shared to-do list for administrators.</p>
       <p>Unrelated to ideas — it is a plain checklist that every admin sees and can edit. Type an item and press <kbd>Enter</kbd> or <b>Add</b>. Tick it to complete it; completed items collect under a <b>Done</b> heading with a count. The <b>✕</b> removes an item outright.</p>
@@ -607,7 +698,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
     </section>
 
     <section id="a10">
-      <p class="sec-num">Section 10</p>
+      <p class="sec-num">Section 11</p>
       <h2>Activity log</h2>
       <p class="lede">Who did what, and when.</p>
 
@@ -654,7 +745,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
     </section>
 
     <section id="a11">
-      <p class="sec-num">Section 11</p>
+      <p class="sec-num">Section 12</p>
       <h2>Authority on any idea</h2>
       <p class="lede">An admin sees the Project Lead's controls on every idea, plus two of their own.</p>
 
@@ -712,7 +803,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
     </section>
 
     <section id="a12">
-      <p class="sec-num">Section 12</p>
+      <p class="sec-num">Section 13</p>
       <h2>Emails admins receive</h2>
       <p class="lede">On top of the emails you get for ideas you are on the team of, or following.</p>
       <div class="tw">
@@ -735,7 +826,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
     </section>
 
     <section id="a13">
-      <p class="sec-num">Section 13</p>
+      <p class="sec-num">Section 14</p>
       <h2>A suggested rhythm</h2>
       <p class="lede">Not enforced by the tool — a starting point the team can adjust.</p>
 

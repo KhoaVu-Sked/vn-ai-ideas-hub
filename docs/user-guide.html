@@ -308,6 +308,9 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <li><a href="#s9">If you lead an idea</a></li>
       <li><a href="#s10">Emails you will get</a></li>
       <li><a href="#s11">Your profile</a></li>
+      <li><a href="#s15">The Learning Hub</a></li>
+      <li><a href="#s16">Your Journey</a></li>
+      <li><a href="#s17">Your learning dashboard</a></li>
       <li><a href="#s13">Reference</a></li>
       <li><a href="#s14">Getting help</a></li>
     </ol>
@@ -423,6 +426,8 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
           <tbody>
             <tr><td><b>TS - AI Ideas Hub</b></td><td>Returns you to the board from anywhere.</td></tr>
             <tr><td><b>Board</b></td><td>All ideas as cards, grouped by status.</td></tr>
+            <tr><td><b>Learning Hub</b></td><td>Training tracks you can enrol in. See section 12.</td></tr>
+            <tr><td><b>My Dashboard</b></td><td>Your own learning progress. See section 14.</td></tr>
             <tr><td><b>Search</b></td><td>Filters the board by idea name as you type.</td></tr>
             <tr><td><b>+</b></td><td>Opens the Submit an idea form, from any page.</td></tr>
             <tr><td><b>Your avatar</b></td><td>My profile, and Sign out.</td></tr>
@@ -915,10 +920,163 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       change here and nothing that can be forgotten. If you need to change the password on the Google
       account itself, do that in your Google account settings.</p>
     </section>
+    <!-- 12 ──────────────────────────────────────────────────── -->
+    <section id="s15">
+      <p class="sec-num">Section 12</p>
+      <h2>The Learning Hub</h2>
+      <p class="lede">Training tracks you work through at your own pace, ordered by seniority level.</p>
+
+      <p>The Learning Hub is a second thing living in the same app as the ideas board. Where the board is about ideas, the Hub is about you: a set of <b>tracks</b>, each holding <b>courses</b> grouped by seniority level, that you enrol in and work through yourself.</p>
+
+      <p>Your seniority level is one of five, and an <b>admin sets it for you</b> &mdash; you cannot change your own:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:180px">Level</th><th>What it means for your roadmap</th></tr></thead>
+          <tbody>
+            <tr><td><b>Intern</b></td><td>The first tier of courses.</td></tr>
+            <tr><td><b>Junior</b></td><td>Everything Intern expects, plus its own tier.</td></tr>
+            <tr><td><b>Mid level</b></td><td>And so on up the ladder.</td></tr>
+            <tr><td><b>Senior</b></td><td></td></tr>
+            <tr><td><b>Principal</b></td><td>The full roadmap.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Your level decides which courses your roadmap <i>expects</i> of you, and it is what the locking rules in section 13 are built on. If your level looks wrong, ask an admin &mdash; it changes what you see.</p>
+
+      <h3>Enrolling in a track</h3>
+
+      <p>Open <b>Learning Hub</b> in the top bar. Every track appears under <b>Suggested tracks</b> with a course count and whether you are already on it. Click one to preview its whole roadmap before committing.</p>
+
+      <p>The <b>Enrol</b> button self-assigns you. There is <b>no approval step</b> &mdash; nobody has to let you in, and you can enrol in more than one track at once. Enrolled tracks move up into <b>Your tracks</b> with an <b>Enrolled</b> badge, which becomes <b>Completed</b> once every course in that track is complete for you.</p>
+
+      <div class="note note--good">
+        <span class="note__tag">Worth knowing</span>
+        <p>Completion is per person. Someone else finishing a track has no effect on your badge.</p>
+      </div>
+    </section>
+
+    <!-- 13 ──────────────────────────────────────────────────── -->
+    <section id="s16">
+      <p class="sec-num">Section 13</p>
+      <h2>Your Journey</h2>
+      <p class="lede">Your roadmap: what to take, in what order, and when you plan to finish it.</p>
+
+      <p>Every course on your roadmap sits in one of four states:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:180px">State</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><b>Not started</b></td><td>Available, untouched.</td></tr>
+            <tr><td><b>In progress</b></td><td>The one you are on. Usually set for you &mdash; see <b>Up next</b> below.</td></tr>
+            <tr><td><b>Complete</b></td><td>You finished its wrap-up quiz.</td></tr>
+            <tr><td><b>Skipped</b></td><td>Passed over via <b>Skip prerequisite</b>. Recorded, not hidden.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Locked courses, and skipping past them</h3>
+
+      <p>A course is <b>Locked</b> until every course in the tier <i>below</i> it is complete or skipped. The lock is per tier, not per course &mdash; the label tells you which tier is in the way, for example <i>&ldquo;Requires all Intern courses&rdquo;</i>. An empty tier blocks nothing.</p>
+
+      <p><b>Skip prerequisite</b> on a locked course unlocks <b>the whole tier at once</b>, not just the course you clicked. It marks everything in the tier below as skipped. You are asked to confirm first, and the wording is deliberate: the skip is recorded on your roadmap and is visible to your manager.</p>
+
+      <h3>Order, dates, and Up next</h3>
+
+      <p>You can <b>drag rows to reorder</b> them, but only within the same level &mdash; a course cannot be dragged into a different tier.</p>
+
+      <p>The <b>Up next</b> card shows the next two courses you have not finished, dated ones first. Three controls sit on it:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:180px">Control</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><b>Pencil</b></td><td>Sets your own target date for that course. Nothing is saved until you confirm with the green tick.</td></tr>
+            <tr><td><b>Sync</b></td><td>Re-checks which courses qualify, in case something changed elsewhere.</td></tr>
+            <tr><td><b>Magic wand</b></td><td>Opens <b>Auto Schedule</b> &mdash; see below.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>A target date is <b>a plan, not a deadline</b>. Nothing enforces it, nothing chases you, and you can change it whenever you like.</p>
+
+      <p>Whichever course is top of Up next flips itself from Not started to <b>In progress</b> automatically. It never overwrites real progress &mdash; a course already further along is left alone.</p>
+
+      <h3>Auto Schedule and Google Calendar</h3>
+
+      <p>Auto Schedule books actual study time on your Google Calendar. Pick a level range and a <b>Complete by</b> date, and it places one study block per unfinished course in that range.</p>
+
+      <p>The Complete by date defaults to the next <b>annual review date</b>, which an admin sets centrally. Quick-pick chips offer that date plus 3 and 6 months, or you can type any date.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:180px">Behaviour</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr><td><b>Block length</b></td><td>One session per course, capped at 4 hours however long the course estimate says.</td></tr>
+            <tr><td><b>Existing commitments</b></td><td>It reads your calendar's busy times and avoids them, and avoids double-booking its own blocks.</td></tr>
+            <tr><td><b>Running it again</b></td><td>Updates the blocks it already made rather than creating duplicates. If you deleted one yourself, it makes a new one.</td></tr>
+            <tr><td><b>Target dates</b></td><td>The dates it picks appear on Up next straight away &mdash; the same field the pencil writes to.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The first time, you will be asked to connect Google Calendar. This is a <b>separate permission from signing in</b> &mdash; connecting it lets the app write study blocks, and it is not part of your login. If the connection later expires or you revoke it, the app notices and asks you to reconnect rather than failing quietly.</p>
+
+      <h3>The wrap-up quiz</h3>
+
+      <p>Each course's expanded row has a <b>Wrap-up</b> link. The quiz is one question per card: click any option and it tells you immediately whether it was right. A wrong answer says so and stays clickable &mdash; there is <b>no attempt limit and no lock-out</b>. A right answer reveals the reasoning and unlocks <b>Next question</b>.</p>
+
+      <p>Finishing the last question marks the course <b>Complete</b> and records how many you got right <b>on the first click</b>. That first-try figure is what your accuracy percentage means, everywhere it appears.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">Not every course has one</span>
+        <p>Some courses have no quiz written yet. Those say so plainly rather than dead-ending. You can retake any quiz as often as you like; retaking simply overwrites the previous result.</p>
+      </div>
+
+      <p>The <b>Knowledge artifacts</b> card lists your three most recently completed courses with their question count, when you finished, and your first-try accuracy. Courses completed before this existed show &ldquo;No quiz data recorded&rdquo; rather than an invented number.</p>
+
+      <h3>Reset</h3>
+
+      <div class="note note--warn">
+        <span class="note__tag">Irreversible</span>
+        <p><b>Reset</b> clears your entire roadmap back to Not started &mdash; every completion, skip and target date. It also deletes the study blocks Auto Schedule put on your Google Calendar. There is no undo.</p>
+      </div>
+    </section>
+
+    <!-- 14 ──────────────────────────────────────────────────── -->
+    <section id="s17">
+      <p class="sec-num">Section 14</p>
+      <h2>Your learning dashboard</h2>
+      <p class="lede">The read-only view of how your learning is actually going.</p>
+
+      <p><b>My Dashboard</b> in the top bar shows your own progress. Nothing on it is editable &mdash; it reports, it does not configure. You will find:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:180px">Card</th><th>What it tells you</th></tr></thead>
+          <tbody>
+            <tr><td><b>Progress by level</b></td><td>How far through each tier of your roadmap you are.</td></tr>
+            <tr><td><b>My courses</b></td><td>The courses your own level expects, plus one tier of early access once yours is done.</td></tr>
+            <tr><td><b>Consistency</b></td><td>Whether you are working at a steady pace, including a weekly streak tied to the study blocks Auto Schedule booked.</td></tr>
+            <tr><td><b>Retention</b></td><td><b>Confidence by skill</b> &mdash; your quiz accuracy grouped by the skills courses are tagged with, rather than by course.</td></tr>
+            <tr><td><b>What&rsquo;s next</b></td><td>The suggested next step from where you are.</td></tr>
+            <tr><td><b>Application</b></td><td>Ideas you have raised on the board &mdash; the one place the two halves of this app meet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="note__tag">Not built yet</span>
+        <p>Two things people reasonably expect are genuinely absent: <b>AI-generated mind maps and course summaries</b>, and <b>reminders</b> before a booked study block. Auto Schedule puts time on your calendar; nothing nudges you when it arrives. If you were told to expect either, it is not hiding &mdash; it is not there.</p>
+      </div>
+    </section>
+
 
     <!-- 13 ──────────────────────────────────────────────────── -->
     <section id="s13">
-      <p class="sec-num">Section 12</p>
+      <p class="sec-num">Section 15</p>
       <h2>Reference</h2>
 
       <h3>Limits and timings</h3>
@@ -951,7 +1109,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
     <!-- 14 ──────────────────────────────────────────────────── -->
     <section id="s14">
-      <p class="sec-num">Section 13</p>
+      <p class="sec-num">Section 16</p>
       <h2>Getting help</h2>
 
       <p>A <b>Send feedback</b> button sits in the bottom-right corner of every page. Use it for anything — a bug, a confusing label, a missing feature. It records which page you were on, so you do not need to explain where you were.</p>
