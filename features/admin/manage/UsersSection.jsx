@@ -3,7 +3,17 @@
 // User accounts — create, edit, change role, delete.
 
 import { PASSWORD_LOGIN } from "@/features/auth/authMode";
+import { POSITIONS } from "@/features/accounts/constants";
 import { btn, field, primary } from "./styles";
+
+function PositionSelect({ value, onChange }) {
+  return (
+    <select value={value || ""} onChange={(e) => onChange(e.target.value)} style={{ ...field, minWidth: 100 }}>
+      <option value="">—</option>
+      {POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+    </select>
+  );
+}
 
 export default function UsersSection({ accounts, createAcct, creating, delAcct, dirty, resetPw, saveAllAccounts, setAcct, setCreating }) {
   return (
@@ -18,6 +28,7 @@ export default function UsersSection({ accounts, createAcct, creating, delAcct, 
                       <th style={{ padding: "6px 8px", fontWeight: 700 }}>Email</th>
                       <th style={{ padding: "6px 8px", fontWeight: 700 }}>Name</th>
                       <th style={{ padding: "6px 8px", fontWeight: 700 }}>Role</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 700 }}>Position</th>
                       <th style={{ padding: "6px 8px", fontWeight: 700 }}>Actions</th>
                     </tr>
                   </thead>
@@ -32,6 +43,9 @@ export default function UsersSection({ accounts, createAcct, creating, delAcct, 
                             <option value="member">member</option>
                             <option value="admin">admin</option>
                           </select>
+                        </td>
+                        <td style={{ padding: "6px 8px" }}>
+                          <PositionSelect value={a.position} onChange={(v) => setAcct(a.id, "position", v)} />
                         </td>
                         <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
                           {PASSWORD_LOGIN && <button onClick={() => resetPw(a)} style={{ ...btn, marginRight: 6 }}>Reset pw</button>}
@@ -62,6 +76,7 @@ export default function UsersSection({ accounts, createAcct, creating, delAcct, 
                     <option value="member">member</option>
                     <option value="admin">admin</option>
                   </select>
+                  <PositionSelect value={creating.position} onChange={(v) => setCreating({ ...creating, position: v })} />
                   <button onClick={createAcct} style={primary}>Create</button>
                 </div>
               </div>

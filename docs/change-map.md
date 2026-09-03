@@ -54,6 +54,17 @@ This is exactly how the board broke: it tested for `Initiator / Project Lead`,
 a role migration 012 had split in two. The check matched nobody, so only admins
 could move a card. The build was perfectly happy.
 
+**Renaming or removing an idea status also reaches AI Learning now.**
+`features/learning/LearnerDashboardPage.jsx` and `TeamPage.jsx` both import
+`STATUS_META`/`STATUS_ORDER` from `features/ideas/constants.js` (Application
+cards — "Ideas shipped," the status funnel), and `features/learning/
+queries.js`'s `getMyIdeas()`/`getTeamIdeas()` read `ideas.status` directly.
+`bun run check` does not know about this cross-feature usage — it only
+compares `features/ideas/constants.js` against SQL literals inside
+`features/ideas/*`/`/api/ideas/*`/`/api/projects/*`. Renaming `"Launched"`
+would silently zero out "Ideas shipped" everywhere in AI Learning with no
+error and no failing check.
+
 ### Anything a user sees
 
 | Also change | Why |

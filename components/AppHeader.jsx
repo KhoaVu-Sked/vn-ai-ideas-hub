@@ -53,6 +53,9 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
 
       <nav style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 8 }}>
         <Link href="/" className="hdr-nav">Board</Link>
+        <Link href="/learning-hub" className="hdr-nav">Learning Hub</Link>
+        <Link href="/learning-hub/dashboard" className="hdr-nav">My Dashboard</Link>
+        {admin && <Link href="/learning-hub/team" className="hdr-nav">Team</Link>}
         {admin && <Link href="/dashboard" className="hdr-nav">Dashboard</Link>}
         {admin && <Link href="/tasks" className="hdr-nav">Tasks</Link>}
         {admin && <Link href="/activity" className="hdr-nav">Activity</Link>}

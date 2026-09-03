@@ -2,6 +2,11 @@
 -- For a BRAND-NEW, EMPTY Neon database. Paste the whole file into the Neon SQL
 -- Editor and run once. Safe to re-run — every statement is IF NOT EXISTS or
 -- ON CONFLICT DO NOTHING. Creates no schemas, sets no owners, grants nothing.
+--
+-- Table design only — this gets you an app that runs with an empty AI
+-- Learning catalog (no tracks, no courses, no quiz questions). Paste
+-- ai-track-seed.sql afterward for the real AI Track content, same as
+-- seed.sql is a separate, optional step for sample ideas.
 
 create extension if not exists pgcrypto;
 
@@ -65,6 +70,106 @@ create table if not exists accounts (
 );
 -- (the accounts_email unique index is created in the migration block below, after
 --  ALTER ... ADD COLUMN email — so it works on both fresh and existing databases)
+
+-- Seniority level per account (junior..principal). Separate from accounts.role
+-- (workspace permission) and idea_members.roles (per-idea contribution role).
+create table if not exists user_role (
+  id          uuid primary key default gen_random_uuid(),
+  account_id  uuid not null unique references accounts(id) on delete cascade,
+  position    text not null
+                check (position in ('intern', 'junior', 'middle', 'senior', 'principal')),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+-- A track (AI Track, Core Competency) a course belongs to. One track per
+-- course, but an account can be assigned more than one track — see
+-- account_tracks below.
+create table if not exists tracks (
+  id         uuid primary key default gen_random_uuid(),
+  name       text unique not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists account_tracks (
+  account_id uuid not null references accounts(id) on delete cascade,
+  track_id   uuid not null references tracks(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (account_id, track_id)
+);
+
+-- Course catalog. target date and completion status are NOT here — they
+-- differ per learner taking the same course, so they live on
+-- course_assignments instead.
+create table if not exists courses (
+  id                    uuid primary key default gen_random_uuid(),
+  track_id              uuid references tracks(id) on delete set null,
+  stage                 text,
+  title                 text not null,
+  focus_area            text,
+  platform              text,
+  est_hours             numeric,
+  cost                  text,
+  outcome               text,
+  priority              text not null default 'optional'
+                          check (priority in ('core', 'optional')),
+  link                  text,
+  expected_by_position  text
+                          check (expected_by_position in ('intern', 'junior', 'middle', 'senior', 'principal')),
+  skills                text[] not null default '{}',  -- shared skill tags (migration 028)
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now(),
+  unique (track_id, title)
+);
+create index if not exists courses_track_id_idx on courses (track_id);
+
+-- One row per (account, course): a learner's target date and progress.
+create table if not exists course_assignments (
+  id          uuid primary key default gen_random_uuid(),
+  account_id  uuid not null references accounts(id) on delete cascade,
+  course_id   uuid not null references courses(id) on delete cascade,
+  target_date date,
+  status      text not null default 'not_started'
+                check (status in ('not_started', 'in_progress', 'complete', 'skipped')),
+  position    integer,  -- learner's own display order within a position tier
+  quiz_total_questions    integer,  -- snapshot at completion time (see migration 026)
+  quiz_correct_first_try  integer,  -- how many of those were right on the first click
+  calendar_event_id       text,     -- Google Calendar event Auto Schedule created for this course (see migration 027)
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (account_id, course_id)
+);
+create index if not exists course_assignments_account_id_idx on course_assignments (account_id);
+
+-- Quiz for a course: pure reference content (question/options/answer/
+-- rationale), no per-learner state. The front end shows all options and
+-- lets a learner click any of them to check against correct_answer --
+-- no locking, no scoring, so there is no attempts table.
+create table if not exists course_quiz_questions (
+  id             uuid primary key default gen_random_uuid(),
+  course_id      uuid not null references courses(id) on delete cascade,
+  position       smallint not null,          -- Q1, Q2, ... display order
+  question       text not null,
+  options        jsonb not null,             -- [{"label":"A","text":"..."}, ...]
+  correct_answer text not null,              -- one of options[].label
+  rationale      text,
+  created_at     timestamptz not null default now(),
+  unique (course_id, position)
+);
+create index if not exists course_quiz_questions_course_id_idx on course_quiz_questions (course_id);
+
+-- Google Calendar connection for Auto Schedule (migration 027). A separate,
+-- additional grant from Google Sign-in (accounts.auth_provider) — a signed-in
+-- learner opts into this from Up next; it's not a login method, and sign-in
+-- itself never stores a token. refresh_token is encrypted at rest (see
+-- lib/crypto.js) — nothing here can read it back without CALENDAR_TOKEN_KEY.
+create table if not exists calendar_connections (
+  account_id    uuid primary key references accounts(id) on delete cascade,
+  refresh_token text not null,
+  scope         text not null default '',
+  connected_at  timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
 
 -- Tags catalog — admin-managed list of allowed tags (with a display color).
 create table if not exists tags (
@@ -261,6 +366,8 @@ create index if not exists merge_requests_status_idx on merge_requests (status, 
 insert into time_frames (name, position) values
   ('1-2 weeks', 1), ('3-4 weeks', 2), ('4-8 weeks', 3), ('1 quarter', 4)
 on conflict (name) do nothing;
+
+-- AI Track content (tracks/courses/quiz questions) — see ai-track-seed.sql
 
 insert into tags (name, color) values
   ('Work', '#0070cc'), ('Personal Development', '#735dd0'), ('Family', '#e3761c'), ('Home', '#249387')

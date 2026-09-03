@@ -189,6 +189,35 @@ a {
   to   { opacity: 1; transform: none; }
 }
 
+/* ── Icon-only button hint ────────────────────────────────────────
+   For icon buttons with no visible label (e.g. Up next's edit/sync/
+   Auto Schedule). Content comes from data-tip so no extra markup is
+   needed; native `title` isn't used alongside this to avoid a second,
+   slower browser tooltip stacking on top. */
+.icon-tip { position: relative; }
+.icon-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 30;
+}
+.icon-tip:hover::after,
+.icon-tip:focus-visible::after {
+  opacity: 1;
+}
+
 /* ── Task drawer ──────────────────────────────────────────────────
    The panel comes in from the right edge it is anchored to, so the
    motion matches where it lives. The scrim only fades — sliding it
@@ -198,6 +227,42 @@ a {
 @keyframes scrimIn  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes drawerIn { from { transform: translateX(100%) } to { transform: none } }
 
+/* ── Wrap-up quiz completion celebration ────────────────────────────
+   Confetti pieces are plain <span>s positioned/colored/timed from JS
+   (features/learning/QuizPage.jsx) so every burst looks different — the
+   fall/spin/fade itself is this one shared animation, driven by CSS custom
+   properties set per piece. Pure transform/opacity (no layout properties),
+   same GPU-friendly approach as .fab-layer above. prefers-reduced-motion
+   already turns all of this off for anyone who's asked for that. */
+.confetti-piece {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  opacity: 0;
+  animation-name: confettiFall;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+  will-change: transform, opacity;
+}
+@keyframes confettiFall {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(var(--fall-y, 420px)) translateX(var(--drift-x, 0px)) rotate(var(--spin, 540deg)); opacity: 0; }
+}
+
+.celebrate-pop { animation: celebratePop 640ms cubic-bezier(0.22, 1.4, 0.36, 1) both; }
+@keyframes celebratePop {
+  0%   { opacity: 0; transform: scale(0.7) translateY(10px); }
+  60%  { opacity: 1; transform: scale(1.06) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.celebrate-icon { display: inline-block; animation: celebrateBounce 1000ms ease-in-out 250ms both; }
+@keyframes celebrateBounce {
+  0%   { transform: scale(0) rotate(-15deg); }
+  55%  { transform: scale(1.3) rotate(8deg); }
+  78%  { transform: scale(0.92) rotate(-4deg); }
+  100% { transform: scale(1) rotate(0deg); }
 /* ── Starred ideas ────────────────────────────────────────────────
    A starred idea is meant to catch your eye from across the board, so
    it gets a gold ring and a slow sheen that travels across the card.

@@ -1,0 +1,390 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Learning Dashboards — Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#002755; --blue:#0055FF; --slate:#425466; --cloud:#EEF4FA;
+    --green:#59B66E; --yellow:#FFC967; --scrub:#6DC7FF; --white:#fff;
+    --line:#E2E9F1; --muted:#7C8DA0;
+    --green-bg:#E9F5ED; --yellow-bg:#FFF4DD; --red:#D9534F; --red-bg:#FBEAEA;
+    --head:'Manrope',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
+    --shadow:0 6px 20px rgba(0,39,85,.06); --shadow2:0 10px 30px rgba(0,39,85,.10);
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--body);color:var(--navy);background:#F6F9FC;
+    -webkit-font-smoothing:antialiased;line-height:1.45}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 22px 60px}
+
+  /* top bar */
+  .topbar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    padding:14px 20px;background:var(--white);border:1px solid var(--line);
+    border-radius:var(--r);box-shadow:var(--shadow);position:sticky;top:12px;z-index:20}
+  .brand{font-family:var(--head);font-weight:800;font-size:20px;color:var(--navy);
+    display:flex;align-items:center;gap:10px;letter-spacing:-.01em}
+  .brand .dot{width:22px;height:12px;border-radius:20px;background:var(--blue);
+    box-shadow:8px 0 0 -3px var(--scrub)}
+  .titles{margin-right:auto}
+  .titles h1{font-family:var(--head);font-size:15px;margin:0;font-weight:700;letter-spacing:.01em}
+  .titles p{margin:1px 0 0;font-size:12px;color:var(--muted)}
+  .toggle{display:flex;background:var(--cloud);border-radius:999px;padding:4px;gap:2px}
+  .toggle button{font-family:var(--head);font-weight:700;font-size:13px;border:0;
+    background:transparent;color:var(--slate);padding:8px 16px;border-radius:999px;cursor:pointer;
+    transition:all .18s ease}
+  .toggle button.active{background:var(--navy);color:#fff;box-shadow:var(--shadow)}
+  .samplepill{font-family:var(--head);font-weight:700;font-size:10.5px;letter-spacing:.06em;
+    color:var(--blue);background:#EAF0FF;border:1px solid #D7E2FF;padding:6px 10px;border-radius:999px;
+    text-transform:uppercase}
+
+  .assume{font-size:12px;color:var(--slate);background:var(--white);border:1px dashed var(--line);
+    border-radius:12px;padding:10px 14px;margin:12px 0 4px}
+  .assume b{color:var(--navy);font-family:var(--head)}
+
+  .view{margin-top:16px;animation:fade .25s ease}
+  .view[hidden]{display:none}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* kpi cards */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .kpi{background:var(--white);border:1px solid var(--line);border-radius:var(--r);
+    padding:16px 18px;box-shadow:var(--shadow)}
+  .kpi .label{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+    font-family:var(--head);font-weight:700}
+  .kpi .val{font-family:var(--head);font-weight:800;font-size:30px;margin:6px 0 2px;letter-spacing:-.02em}
+  .kpi .sub{font-size:12px;color:var(--slate)}
+  .kpi .sub .up{color:var(--green);font-weight:600}
+  .kpi.accent{background:var(--navy)}
+  .kpi.accent .val,.kpi.accent .label{color:#fff}
+  .kpi.accent .sub{color:#B9C6D8}
+  .kpi.accent .label{color:#8FA6C2}
+
+  .grid{display:grid;gap:14px;margin-top:14px}
+  .g-2-1{grid-template-columns:1.6fr 1fr}
+  .g-1-1{grid-template-columns:1fr 1fr}
+  .card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);
+    padding:18px 18px 16px;box-shadow:var(--shadow)}
+  .card h2{font-family:var(--head);font-size:14px;margin:0 0 2px;font-weight:700}
+  .card .cap{font-size:12px;color:var(--muted);margin:0 0 14px}
+  .eyebrow{font-family:var(--head);font-weight:700;font-size:10.5px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--blue);margin:0 0 8px}
+
+  /* level bars */
+  .lvl{display:grid;grid-template-columns:120px 1fr 44px;align-items:center;gap:12px;margin:11px 0}
+  .lvl .name{font-size:13px;font-weight:600;color:var(--navy)}
+  .lvl .track{height:10px;background:var(--cloud);border-radius:999px;overflow:hidden}
+  .lvl .fill{height:100%;background:var(--blue);border-radius:999px}
+  .lvl .pct{font-family:var(--head);font-weight:700;font-size:12.5px;text-align:right;color:var(--slate)}
+
+  /* course table */
+  table{width:100%;border-collapse:collapse}
+  th{font-family:var(--head);font-weight:700;font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--muted);text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  td{font-size:13px;padding:11px 10px;border-bottom:1px solid #F0F4F9;vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  .rowlink:hover{background:#FAFCFE}
+  .chip{display:inline-block;font-family:var(--head);font-weight:700;font-size:11px;
+    padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .c-done{background:var(--green-bg);color:#2E7D46}
+  .c-prog{background:#E7F0FF;color:var(--blue)}
+  .c-not{background:#EFF2F6;color:var(--muted)}
+  .c-na{background:#F3EEFB;color:#7A5AA8}
+  .score{font-family:var(--head);font-weight:700}
+  .plat{font-size:11.5px;color:var(--muted)}
+
+  /* mini stat lists */
+  .mini{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #F0F4F9}
+  .mini:last-child{border-bottom:0}
+  .mini .k{font-size:12.5px;color:var(--slate)}
+  .mini .v{font-family:var(--head);font-weight:700;font-size:14px}
+  .conf{display:flex;gap:4px}
+  .conf i{width:14px;height:8px;border-radius:2px;background:var(--cloud);display:inline-block}
+  .conf i.on{background:var(--green)}
+
+  .nextrow{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #F0F4F9}
+  .nextrow:last-child{border-bottom:0}
+  .nextrow .ic{width:30px;height:30px;border-radius:8px;background:var(--cloud);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:15px}
+  .nextrow .t{font-size:13px;font-weight:600}
+  .nextrow .d{font-size:12px;color:var(--muted)}
+
+  /* idea cards */
+  .ideas{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:4px}
+  .idea{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:#FCFDFE}
+  .idea .nm{font-family:var(--head);font-weight:700;font-size:13.5px;margin-bottom:4px}
+  .idea .link{font-size:11.5px;color:var(--slate);margin-bottom:10px}
+  .idea .link b{color:var(--navy)}
+  .stage{font-family:var(--head);font-weight:700;font-size:10.5px;letter-spacing:.04em;
+    text-transform:uppercase;padding:3px 8px;border-radius:999px}
+  .s-ship{background:var(--green-bg);color:#2E7D46}
+  .s-prog{background:#E7F0FF;color:var(--blue)}
+  .s-back{background:#EFF2F6;color:var(--muted)}
+  .s-adopt{background:#FFF4DD;color:#946200}
+
+  /* support panel */
+  .support{background:linear-gradient(180deg,#fff, #FCFDFF);border:1px solid var(--line);
+    border-left:4px solid var(--yellow)}
+  .flag{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;
+    padding:12px 0;border-bottom:1px solid #F0F4F9}
+  .flag:last-child{border-bottom:0}
+  .flag .who{font-family:var(--head);font-weight:700;font-size:13.5px}
+  .flag .why{font-size:12.5px;color:var(--slate);margin-top:2px}
+  .flag .tag{font-family:var(--head);font-weight:700;font-size:10px;letter-spacing:.04em;
+    text-transform:uppercase;padding:3px 8px;border-radius:999px;margin-right:8px}
+  .t-stall{background:var(--red-bg);color:var(--red)}
+  .t-strug{background:var(--red-bg);color:var(--red)}
+  .t-stuck{background:var(--yellow-bg);color:#946200}
+  .action{font-family:var(--head);font-weight:700;font-size:12px;color:#fff;background:var(--blue);
+    border:0;padding:8px 12px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .action:hover{background:#0048d6}
+
+  /* team table pace */
+  .pace{font-family:var(--head);font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px}
+  .p-ok{background:var(--green-bg);color:#2E7D46}
+  .p-behind{background:var(--yellow-bg);color:#946200}
+  .p-stall{background:var(--red-bg);color:var(--red)}
+  .minibar{width:74px;height:8px;background:var(--cloud);border-radius:999px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:8px}
+  .minibar i{display:block;height:100%;background:var(--blue);border-radius:999px}
+
+  /* heatmap */
+  .heat{width:100%;border-collapse:separate;border-spacing:4px}
+  .heat th{font-size:10px;padding:4px 2px;text-align:center;color:var(--muted);border:0;
+    writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;height:70px}
+  .heat td.rl{font-size:12px;font-weight:600;color:var(--navy);text-align:left;padding:4px 6px 4px 0;width:120px;border:0}
+  .heat .cell{width:30px;height:26px;border-radius:6px}
+  .h0{background:#EFF2F6}      /* none */
+  .h1{background:#CFE0FF}      /* learning */
+  .h2{background:#6D9BFF}      /* proficient */
+  .h3{background:var(--blue)}  /* strong */
+  .legend{display:flex;gap:14px;margin-top:12px;font-size:11.5px;color:var(--slate);align-items:center;flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .legend i{width:14px;height:14px;border-radius:4px;display:inline-block}
+
+  /* funnel */
+  .fun{margin:6px 0}
+  .fun .row{display:grid;grid-template-columns:96px 1fr 34px;align-items:center;gap:10px;margin:9px 0}
+  .fun .row .lab{font-size:12.5px;font-weight:600;color:var(--navy)}
+  .fun .row .bar{height:26px;border-radius:8px;background:var(--blue);display:flex;align-items:center}
+  .fun .row .n{font-family:var(--head);font-weight:800;font-size:14px;text-align:right}
+  .conv{margin-top:12px;background:var(--cloud);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--navy)}
+  .conv b{font-family:var(--head)}
+
+  .dist{display:flex;align-items:flex-end;gap:14px;height:120px;margin-top:8px;padding-top:6px}
+  .dist .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%}
+  .dist .col .b{width:70%;background:var(--navy);border-radius:8px 8px 0 0}
+  .dist .col .n{font-family:var(--head);font-weight:800;font-size:13px}
+  .dist .col .l{font-size:11.5px;color:var(--muted);font-weight:600}
+
+  .foot{margin-top:26px;font-size:11.5px;color:var(--muted);text-align:center}
+
+  @media (max-width:900px){
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .g-2-1,.g-1-1{grid-template-columns:1fr}
+    .ideas{grid-template-columns:1fr}
+    .titles{order:3;width:100%}
+    .lvl{grid-template-columns:96px 1fr 40px}
+  }
+  @media (prefers-reduced-motion:reduce){.view{animation:none}.toggle button{transition:none}}
+</style>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>skedulo</div>
+    <div class="titles">
+      <h1>AI Learning Dashboards</h1>
+      <p>Roadmap progress + application in the AI Ideas Hub</p>
+    </div>
+    <div class="toggle" role="tablist">
+      <button id="tab-me" class="active" onclick="show('me')" role="tab">My Progress</button>
+      <button id="tab-team" onclick="show('team')" role="tab">Team View</button>
+    </div>
+    <div class="samplepill">Mockup · sample data</div>
+  </div>
+
+  <div class="assume">
+    <b>Working defaults</b> (change any of these): pacing target 3–5 hrs/wk · north-star = skills <i>applied</i> (ideas shipped), with completion &amp; consistency as leading signals · Ideas Hub stages Backlog → In progress → Shipped → Adopted · members see only their own view, you see everyone · weekly refresh.
+  </div>
+
+  <!-- ============================ MEMBER VIEW ============================ -->
+  <section id="view-me" class="view">
+    <div class="kpis">
+      <div class="kpi"><div class="label">Roadmap complete</div><div class="val">62%</div><div class="sub">Core track · <span class="up">+8% this month</span></div></div>
+      <div class="kpi"><div class="label">Level</div><div class="val">P2</div><div class="sub">Target: P3 · 2 levels left</div></div>
+      <div class="kpi"><div class="label">Weekly streak</div><div class="val">5<span style="font-size:16px;font-weight:700"> wks</span></div><div class="sub">5 of 6 sessions kept</div></div>
+      <div class="kpi accent"><div class="label">Skills applied</div><div class="val">3</div><div class="sub">ideas built from courses</div></div>
+    </div>
+
+    <div class="grid g-2-1">
+      <div class="card">
+        <p class="eyebrow">Learning</p>
+        <h2>Progress by level</h2>
+        <p class="cap">Everyone completes Foundations → Intermediate; Advanced is the Build &amp; Design track.</p>
+        <div class="lvl"><span class="name">Foundations</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="pct">100%</span></div>
+        <div class="lvl"><span class="name">Applied</span><span class="track"><span class="fill" style="width:75%"></span></span><span class="pct">75%</span></div>
+        <div class="lvl"><span class="name">Intermediate</span><span class="track"><span class="fill" style="width:40%"></span></span><span class="pct">40%</span></div>
+        <div class="lvl"><span class="name">Advanced</span><span class="track"><span class="fill" style="width:0%"></span></span><span class="pct">0%</span></div>
+
+        <h2 style="margin-top:18px">My courses</h2>
+        <table>
+          <thead><tr><th>Course</th><th>Platform</th><th>Status</th><th style="text-align:right">Exam</th></tr></thead>
+          <tbody>
+            <tr class="rowlink"><td>Intro to AI for Support</td><td class="plat">Anthropic Academy</td><td><span class="chip c-done">Complete</span></td><td class="score" style="text-align:right;color:#2E7D46">92%</td></tr>
+            <tr class="rowlink"><td>Prompting fundamentals</td><td class="plat">Anthropic Academy</td><td><span class="chip c-done">Complete</span></td><td class="score" style="text-align:right;color:#2E7D46">88%</td></tr>
+            <tr class="rowlink"><td>DevRev AI for support</td><td class="plat">DevRev University</td><td><span class="chip c-done">Complete</span></td><td class="score" style="text-align:right;color:#2E7D46">95%</td></tr>
+            <tr class="rowlink"><td>Summarizing tickets with Claude</td><td class="plat">Udemy Business</td><td><span class="chip c-prog">In progress</span></td><td style="text-align:right;color:var(--muted)">—</td></tr>
+            <tr class="rowlink"><td>Prompts for KB articles</td><td class="plat">Anthropic Academy</td><td><span class="chip c-not">Not started</span></td><td style="text-align:right;color:var(--muted)">—</td></tr>
+            <tr class="rowlink"><td>Agent foundations</td><td class="plat">Anthropic Academy</td><td><span class="chip c-not">Not started</span></td><td style="text-align:right;color:var(--muted)">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <div class="card">
+          <p class="eyebrow">Consistency</p>
+          <h2>This month</h2>
+          <div class="mini"><span class="k">Sessions scheduled</span><span class="v">6</span></div>
+          <div class="mini"><span class="k">Sessions completed</span><span class="v">5</span></div>
+          <div class="mini"><span class="k">Hours logged</span><span class="v">14.5</span></div>
+          <div class="mini"><span class="k">Current streak</span><span class="v">5 weeks</span></div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <p class="eyebrow">Retention</p>
+          <h2>Confidence by skill</h2>
+          <div class="mini"><span class="k">Prompting</span><span class="conf"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+          <div class="mini"><span class="k">Ticket summarizing</span><span class="conf"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+          <div class="mini"><span class="k">DevRev AI</span><span class="conf"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+          <div class="mini"><span class="k">Avg exam score</span><span class="v" style="color:#2E7D46">91%</span></div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <p class="eyebrow">What's next</p>
+          <h2>Keep the momentum</h2>
+          <div class="nextrow"><div class="ic">📘</div><div><div class="t">Finish "Summarizing tickets with Claude"</div><div class="d">~1.5 hrs left</div></div></div>
+          <div class="nextrow"><div class="ic">📅</div><div><div class="t">Next session: Thu 3:00 PM</div><div class="d">from your calendar</div></div></div>
+          <div class="nextrow"><div class="ic">💡</div><div><div class="t">Try: auto-draft a KB article from a solved ticket</div><div class="d">uses skills you just learned</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <p class="eyebrow">Application · AI Ideas Hub</p>
+      <h2>What I've built from what I learned</h2>
+      <p class="cap">Each idea links back to the course or skill it came from.</p>
+      <div class="ideas">
+        <div class="idea"><div class="nm">KB draft generator</div><div class="link">From <b>Prompting</b> + <b>Summarizing</b></div><span class="stage s-ship">Shipped</span></div>
+        <div class="idea"><div class="nm">Ticket triage helper</div><div class="link">From <b>DevRev AI for support</b></div><span class="stage s-prog">In progress</span></div>
+        <div class="idea"><div class="nm">Weekly ticket digest</div><div class="link">From <b>Ticket summarizing</b></div><span class="stage s-back">Backlog</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ MANAGER VIEW ============================ -->
+  <section id="view-team" class="view" hidden>
+    <div class="kpis">
+      <div class="kpi"><div class="label">Team completion</div><div class="val">48%</div><div class="sub">avg across 7 members · <span class="up">+6% MoM</span></div></div>
+      <div class="kpi"><div class="label">Active this week</div><div class="val">5<span style="font-size:16px;font-weight:700"> / 7</span></div><div class="sub">2 inactive 7+ days</div></div>
+      <div class="kpi"><div class="label">Avg exam score</div><div class="val">84%</div><div class="sub">1 course below 70% pass</div></div>
+      <div class="kpi accent"><div class="label">Ideas shipped</div><div class="val">4</div><div class="sub">16 submitted · 2 adopted</div></div>
+    </div>
+
+    <div class="card support" style="margin-top:14px">
+      <p class="eyebrow" style="color:#946200">Needs support</p>
+      <h2>Where you can help this week</h2>
+      <div class="flag">
+        <div><span class="tag t-stall">Stalled</span><span class="who">Sam T.</span><div class="why">No activity for 21 days · Applied level at 20%.</div></div>
+        <button class="action">Book a 1:1 · pair with buddy</button>
+      </div>
+      <div class="flag">
+        <div><span class="tag t-strug">Struggling</span><span class="who">Jordan K.</span><div class="why">Two exam scores below 70% on Prompting.</div></div>
+        <button class="action">Share resources · review together</button>
+      </div>
+      <div class="flag">
+        <div><span class="tag t-stuck">Stuck</span><span class="who">Priya M.</span><div class="why">"Agent foundations" In progress for 4 weeks.</div></div>
+        <button class="action">Unblock · check workload</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <p class="eyebrow">Team</p>
+      <h2>Progress across the team</h2>
+      <table>
+        <thead><tr><th>Member</th><th>Level → target</th><th>Complete</th><th>Pace</th><th>Last active</th><th style="text-align:right">Avg exam</th><th style="text-align:right">Ideas</th></tr></thead>
+        <tbody>
+          <tr class="rowlink"><td>Alex R.</td><td>P2 → P3</td><td><span class="minibar"><i style="width:62%"></i></span>62%</td><td><span class="pace p-ok">On track</span></td><td>1d ago</td><td style="text-align:right">91%</td><td style="text-align:right">3</td></tr>
+          <tr class="rowlink"><td>Sam T.</td><td>P1 → P2</td><td><span class="minibar"><i style="width:20%"></i></span>20%</td><td><span class="pace p-stall">Stalled</span></td><td>21d ago</td><td style="text-align:right">78%</td><td style="text-align:right">0</td></tr>
+          <tr class="rowlink"><td>Jordan K.</td><td>P2 → P3</td><td><span class="minibar"><i style="width:55%"></i></span>55%</td><td><span class="pace p-behind">Behind</span></td><td>5d ago</td><td style="text-align:right;color:var(--red)">68%</td><td style="text-align:right">1</td></tr>
+          <tr class="rowlink"><td>Priya M.</td><td>P3 → P4</td><td><span class="minibar"><i style="width:70%"></i></span>70%</td><td><span class="pace p-ok">On track</span></td><td>2d ago</td><td style="text-align:right">86%</td><td style="text-align:right">4</td></tr>
+          <tr class="rowlink"><td>Chris D.</td><td>P1 → P2</td><td><span class="minibar"><i style="width:45%"></i></span>45%</td><td><span class="pace p-ok">On track</span></td><td>1d ago</td><td style="text-align:right">82%</td><td style="text-align:right">1</td></tr>
+          <tr class="rowlink"><td>Robin H.</td><td>P4 → P5</td><td><span class="minibar"><i style="width:88%"></i></span>88%</td><td><span class="pace p-ok">On track</span></td><td>3d ago</td><td style="text-align:right">90%</td><td style="text-align:right">5</td></tr>
+          <tr class="rowlink"><td>Lee N.</td><td>P2 → P3</td><td><span class="minibar"><i style="width:33%"></i></span>33%</td><td><span class="pace p-behind">Behind</span></td><td>8d ago</td><td style="text-align:right">80%</td><td style="text-align:right">2</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid g-1-1">
+      <div class="card">
+        <p class="eyebrow">Coverage</p>
+        <h2>Skills across the team</h2>
+        <p class="cap">Spot gaps at a glance — darker means stronger.</p>
+        <table class="heat">
+          <thead><tr><td class="rl"></td>
+            <th>Alex</th><th>Sam</th><th>Jordan</th><th>Priya</th><th>Chris</th><th>Robin</th><th>Lee</th></tr></thead>
+          <tbody>
+            <tr><td class="rl">Prompting</td><td><div class="cell h3"></div></td><td><div class="cell h1"></div></td><td><div class="cell h1"></div></td><td><div class="cell h3"></div></td><td><div class="cell h2"></div></td><td><div class="cell h3"></div></td><td><div class="cell h2"></div></td></tr>
+            <tr><td class="rl">Ticket summarizing</td><td><div class="cell h2"></div></td><td><div class="cell h0"></div></td><td><div class="cell h2"></div></td><td><div class="cell h3"></div></td><td><div class="cell h1"></div></td><td><div class="cell h3"></div></td><td><div class="cell h1"></div></td></tr>
+            <tr><td class="rl">KB writing</td><td><div class="cell h2"></div></td><td><div class="cell h0"></div></td><td><div class="cell h1"></div></td><td><div class="cell h2"></div></td><td><div class="cell h1"></div></td><td><div class="cell h2"></div></td><td><div class="cell h0"></div></td></tr>
+            <tr><td class="rl">DevRev AI</td><td><div class="cell h3"></div></td><td><div class="cell h1"></div></td><td><div class="cell h2"></div></td><td><div class="cell h2"></div></td><td><div class="cell h2"></div></td><td><div class="cell h3"></div></td><td><div class="cell h2"></div></td></tr>
+            <tr><td class="rl">Issue analysis</td><td><div class="cell h1"></div></td><td><div class="cell h0"></div></td><td><div class="cell h1"></div></td><td><div class="cell h2"></div></td><td><div class="cell h1"></div></td><td><div class="cell h3"></div></td><td><div class="cell h1"></div></td></tr>
+            <tr><td class="rl">Agent building</td><td><div class="cell h0"></div></td><td><div class="cell h0"></div></td><td><div class="cell h0"></div></td><td><div class="cell h1"></div></td><td><div class="cell h0"></div></td><td><div class="cell h2"></div></td><td><div class="cell h0"></div></td></tr>
+          </tbody>
+        </table>
+        <div class="legend">
+          <span><i class="h0"></i>None</span><span><i class="h1"></i>Learning</span><span><i class="h2"></i>Proficient</span><span><i class="h3"></i>Strong</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <p class="eyebrow">Application · Ideas Hub</p>
+          <h2>From learning to impact</h2>
+          <div class="fun">
+            <div class="row"><span class="lab">Submitted</span><span class="bar" style="width:100%"></span><span class="n">16</span></div>
+            <div class="row"><span class="lab">In progress</span><span class="bar" style="width:60%"></span><span class="n">7</span></div>
+            <div class="row"><span class="lab">Shipped</span><span class="bar" style="width:34%;background:var(--green)"></span><span class="n">4</span></div>
+            <div class="row"><span class="lab">Adopted</span><span class="bar" style="width:18%;background:var(--yellow)"></span><span class="n">2</span></div>
+          </div>
+          <div class="conv">Learning → application: <b>62%</b> of members who finished the Applied level have shipped or started at least one idea.</div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <p class="eyebrow">Distribution</p>
+          <h2>Where the team sits</h2>
+          <div class="dist">
+            <div class="col"><div class="n">2</div><div class="b" style="height:50%"></div><div class="l">P1</div></div>
+            <div class="col"><div class="n">3</div><div class="b" style="height:75%"></div><div class="l">P2</div></div>
+            <div class="col"><div class="n">1</div><div class="b" style="height:28%"></div><div class="l">P3</div></div>
+            <div class="col"><div class="n">1</div><div class="b" style="height:28%"></div><div class="l">P4</div></div>
+            <div class="col"><div class="n">0</div><div class="b" style="height:4%"></div><div class="l">P5</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">Illustrative mockup · names and figures are sample data · Skedulo brand colours &amp; type</div>
+</div>
+
+<script>
+  function show(v){
+    var me = v==='me';
+    document.getElementById('view-me').hidden = !me;
+    document.getElementById('view-team').hidden = me;
+    document.getElementById('tab-me').classList.toggle('active', me);
+    document.getElementById('tab-team').classList.toggle('active', !me);
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+</script>
+</body>
+</html>

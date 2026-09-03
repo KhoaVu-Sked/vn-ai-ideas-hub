@@ -1,0 +1,72 @@
+# Feature: Your Journey (the learner's roadmap view)
+
+Part of [ai-learning-requirements](00-overview.md) — read that first for the status-tag legend and how these files relate.
+
+Lives at `/learning-hub/journey`. Originally conceived as replacing a planned "Learner Dashboard" section — a real Learner Dashboard now exists too ([04-learner-dashboard.md](04-learner-dashboard.md)), at a separate URL, covering a different slice: this page is the roadmap itself (the **List** view only, as of this pass — see 4.4), the dashboard is progress-at-a-glance plus the **Mind map**, which used to live here.
+
+### 4.1 Empty states — ✅ Built
+- Zero enrolled tracks: "Nothing here yet — enroll in a track from the Learning Hub to start your journey," profile strip shows only name + position (no track tags), progress shows **N/A** instead of a bar.
+- Enrolled, but the selected track filter has no courses: "No courses in this track."
+
+### 4.2 Profile strip — ✅ Built
+- Avatar, name, a position badge (`user_role.position` — Intern/Junior/Mid level/Senior/Principal), and one tag per enrolled track (or just the selected one, if the dropdown isn't on "All tracks").
+- Progress: **"N of M core courses complete"** + bar, `priority = 'core'` only, scoped to whatever the track dropdown currently shows, cumulative "through" the account's own officially-assigned position (never blended with early access — see 4.4).
+- **Early-access selector** — once early access is earned (4.4), a second, small dropdown appears next to the progress line (own local state, unrelated to the track filter in 4.3): "{my level}" (the same cumulative number above, unchanged) or "{next level} · early access" (that tier's own core courses only, not accumulated with the tier below it — it's already done, since finishing it is what earned the early access, so folding it back in would just show ~100% again). Nothing appears here until early access is actually earned — there's nothing meaningful to switch to before then.
+
+### 4.3 Track filter — ✅ Built
+A dropdown next to the "Your Journey" title: "All tracks" or one specific enrolled track. Filters the List view and the profile strip's progress count (the Mind map has its own, independent copy of this same filter now — [04-learner-dashboard.md](04-learner-dashboard.md)). Falls back to "All tracks" automatically if the selected track is un-enrolled out from under it (e.g. after a Reset).
+
+### 4.4 Roadmap view — ✅ Built, List only
+**List**: table (`#`, Course, Track, Platform, Est. hrs, Target, Status), ordered Intern → Principal then by the learner's own custom order within a tier (see 4.6), scrollable after ~7 rows with a pinned header. A row expands to show the course link, its "after this course" outcome, and a real **Wrap-up** link into that course's quiz (see 4.9).
+
+**Scope — "through your tier, plus early access":** the List only shows courses at or below the account's current position (`isExpectedByNow`, `shared.js`) — an Intern sees the Intern tier, a Junior sees Intern + Junior, and so on. Once every course in the account's own tier is `complete`/`skipped`, they automatically earn **one stage of early access** (`effectivePosition`, `shared.js`, capped "max +1 stage" — Intern → Junior, never Intern → Middle) — no action needed from the learner or an admin; it's a pure function of course status, re-derived on every load. The newly-visible tier's courses show up already unlocked, not "Locked." This is purely a *visibility* change — the account's own officially-assigned `user_role.position` never changes from it (still admin-only, see [08-data-model.md](08-data-model.md)); it only grows once an admin actually reassigns the position. The page's own subtext names this explicitly: *"Showing Intern through Junior — you've finished Intern and unlocked early access to the next stage."* The full roadmap beyond that (every tier, not just +1) stays visible on the Mind map regardless (04-learner-dashboard.md) — that view is meant to show the road ahead; this one shows what's actually on your plate right now, plus whatever's just been earned.
+
+**Milestone banners** — two, mutually exclusive (only the more-advanced one shows once both would apply), both a standing message re-derived from course status on every load, not a one-time dismissible toast (there's no "acknowledged" flag anywhere in this app's schema, and a condition already fully derivable from data doesn't need one):
+- **Tier complete** (`tierJustFinished`): fires the moment the account's own official tier alone is fully done — the real annual-review milestone. Names the account's own `app_settings.annual_review_date` (the same date Auto Schedule's "Complete by" field defaults to — [07-scheduler-auto-schedule.md](07-scheduler-auto-schedule.md)) and reassures on the one thing that could otherwise read as a gotcha: early access opens automatically, and it never touches this tier's own completion rate (which stays scoped to the raw position, per the profile strip above — that number doesn't move just because bonus material unlocked). Reads differently once there's no next tier to unlock (already at Principal): drops the early-access sentence, keeps the congratulations.
+- **At ceiling** (`atCeiling`, pre-existing): fires once the +1 early-access tier is *also* fully done — nothing more unlocks automatically past that (the cap is flat, not recursive) until an admin reassigns the position. This supersedes "Tier complete" rather than stacking with it, since reaching it implies "Tier complete" already fired.
+
+This page used to also render a **Mind map** as a second, toggleable view. That toggle is gone — the Mind map moved wholesale to the Learner Dashboard ([04-learner-dashboard.md](04-learner-dashboard.md)), and this page now shows the List unconditionally. A "See the Mind map →" link in the page's own subtext points there, so the option isn't just silently gone. `features/learning/JourneyTable`/`JourneyRow` (the List) and the Mind map's components (`computeLocks`, `MindMapNode`, `NodeRail`, `JourneyMindMap`, `SkipConfirmModal`) live in separate files — `JourneyPage.jsx` and `MindMap.jsx` — so both this page and the dashboard can use the List/Mind map independently without duplicating either. **`JourneyTable` is also reused as-is on the Learner Dashboard's "My courses"** (04-learner-dashboard.md) and on Team view's read-only drill-down ([05-team-view.md](05-team-view.md)) — it's the one shared list-row component for this whole feature, not three separate implementations.
+
+### 4.5 Locking and Skip prerequisite — ✅ Built (Mind map now lives on the Learner Dashboard — [04-learner-dashboard.md](04-learner-dashboard.md))
+- A course is **Locked** (Mind map only) until every course in the tier below it is `complete`/`skipped`. An empty or missing lower tier can't block anything.
+- **Skip prerequisite** on a locked course: marks every course in the tier *below* it `skipped`, and every course in *its own* tier `not_started` — unlocking the whole tier at once, not just the clicked course. Confirms first, with the exact wording: *"Previous courses are required before "{title}". Skipping lets you move on now. The skip is recorded on your roadmap and visible to your manager."* (No manager view reads this yet — the data is recorded correctly, just nothing surfaces it to a manager today.)
+- **Difference from the original plan:** the original Map view described per-course prerequisite arrows (course A requires specifically course B). That data doesn't exist — there's no `course_prerequisites` table, only the position ladder. What's built instead is a **tier gate**: a course is Locked until every course in the tier below it is `complete` or `skipped`, and the connector between columns names the tier requirement ("Requires all Intern courses") rather than a specific course.
+- **Reset**: clears all `course_assignments` rows for the account, reverting everything to `not_started` — same effect as never having touched the journey. Also deletes any Auto Schedule events on the account's connected Google Calendar (best-effort — see [07-scheduler-auto-schedule.md](07-scheduler-auto-schedule.md), 8.5), so a demo account resets cleanly on both sides, not just this app's own data. (Reset itself is still a Your Journey control, not a Learner Dashboard one.)
+
+### 4.6 Reordering — ✅ Built
+Rows in the **List** view are drag-reorderable, persisted per-account (`course_assignments.position`) — a drop only lands on a row in the same position tier, so a course can never be dragged into a different stage. The Mind map view is read-only display of whatever order the query returns; there's only one place reordering happens.
+
+### 4.7 Up next — ✅ Built (sidebar card)
+Shows the next 2 courses that aren't complete/skipped: dated ones first (soonest `target_date`), then undated ones filling remaining slots in the roadmap's own order — a date is no longer required to appear here. Nothing under this card is a placeholder anymore:
+
+- The learner can set their own `target_date` on the courses shown here — a **pencil** icon reveals a date input per course (native picker, past dates greyed out via `min=today`), edits are staged locally and only sent to the server when the **green tick** confirms them. This is a genuine write to `course_assignments.target_date` — a suggestion, never an enforced deadline, editable anytime.
+- The moment a course becomes the #1 pick, it **automatically flips from `not_started` to `in_progress`** — "this is the one you're on now" needs no click. Never reverts real progress (a guard skips the write if the course is already anything other than `not_started`).
+- A **sync** icon next to the title re-fetches, in case editing elsewhere changed which courses qualify.
+- The **Auto Schedule** icon (magic wand) opens a modal asking for a position range and a **"Complete by" date** (not a number-of-months timeline anymore — see [07-scheduler-auto-schedule.md](07-scheduler-auto-schedule.md), 8.5), then books real Google Calendar events for every not-yet-done course in that range. Empty state when nothing qualifies: *"Nothing left to plan — every course is complete or skipped."*
+
+### 4.8 Knowledge artifacts — ✅ Built (sidebar card, different shape than planned)
+Re-scoped from "NotebookLM-generated mind map/summary/exam" ([06-planner-knowledge-builder.md](06-planner-knowledge-builder.md), still not started) to something real and much simpler: **the learner's own wrap-up quiz results.**
+
+- The 3 most recently completed courses, each showing `question count · time completed (relative) · first-try accuracy%` — e.g. "Claude 101 · 10 questions · 2 days ago · 90% accuracy." Sourced from `course_assignments.quiz_total_questions` / `quiz_correct_first_try`, a snapshot taken once at completion (4.9), not a live join — so a course whose quiz changes later still shows what was actually answered.
+- A course completed before this existed (or with no stats sent) shows honestly as "No quiz data recorded" rather than a fabricated number.
+- One more row below those: the account's current `in_progress` course (if any), labelled "In progress — waiting on the wrap-up quiz for more information," with a direct link to that course's quiz.
+- Empty state when nothing's complete and nothing's in progress: "Complete a course's wrap-up quiz to see your results here."
+- **Not surfaced elsewhere:** Team view's read-only drill-down into a learner's roadmap ([05-team-view.md](05-team-view.md)) doesn't show this card — an admin sees the roadmap table, not quiz stats, for someone else's account. It's also not shown on the Learner Dashboard's own "My courses" list — see [08-data-model.md](08-data-model.md)'s `course_assignments` entry for the current state of that gap.
+
+### 4.9 Wrap-up — ✅ Built
+Lives at `/learning-hub/journey/[courseId]/quiz`. The **Wrap-up** link in a List-row's expanded panel opens it.
+
+- One question per card, Trailhead/Salesforce-module style: click any option to check it against `course_quiz_questions.correct_answer`. Wrong just says "Incorrect — try another option" and stays clickable; right reveals the rationale and unlocks **Next question**. Every option stays clickable even after the right one's found — no locking, no attempt limit, matching how the quiz data itself was scoped (no attempts/answers table anywhere).
+- Finishing the last question calls a real write: the course is marked `complete`, and how many questions were answered right on the *first* click (not any click after) is recorded as the accuracy snapshot 4.8 reads.
+- A course with no quiz seeded (5 of the 20 — see [01-course-catalog.md](01-course-catalog.md), 2.1) shows "No quiz for this course yet" instead of a dead end.
+- Already-completed courses can be retaken freely; retaking just re-writes the same snapshot.
+
+**Acceptance criteria (this page):**
+- [x] A learner with zero enrolled tracks sees the empty state, never a broken roadmap
+- [x] Skipped and not-started are visibly distinct from Complete/In progress
+- [x] Reordering never crosses a stage boundary
+- [x] Knowledge artifacts show real quiz results for completed courses, plus a nudge for what's in progress
+- [x] Wrap-up is a real quiz that marks a course complete, not a placeholder button
+- [x] Up next reflects a real scheduled plan *(Auto Schedule writes real `target_date`s from real Google Calendar events — [07-scheduler-auto-schedule.md](07-scheduler-auto-schedule.md))*
+
+Locking/Skip-prerequisite and the Mind map's own acceptance criteria now live with the Mind map on the Learner Dashboard — see [04-learner-dashboard.md](04-learner-dashboard.md).
