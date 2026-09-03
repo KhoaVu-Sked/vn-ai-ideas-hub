@@ -27,6 +27,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import Avatar from "@/components/Avatar";
 import Loading from "@/components/Loading";
@@ -346,7 +347,7 @@ function AutoScheduleModal({ currentPosition, annualReviewDate, onClose, onSched
 // the learner can monitor the bonus material on its own terms, not folded
 // into a number that's already sitting near 100% because the tier below it
 // is what earned the early access in the first place.
-function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, coreComplete, coreTotal, nextTierCoreComplete, nextTierCoreTotal }) {
+function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, coreComplete, coreTotal, nextTierCoreComplete, nextTierCoreTotal, calendarConnected }) {
   const [scope, setScope] = useState("mine");
   const earlyAccess = Boolean(visiblePosition) && visiblePosition !== position;
   const showingNext = earlyAccess && scope === "next";
@@ -371,6 +372,21 @@ function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, cor
               ))}
             </div>
           )}
+          {/* Permanent home for Calendar-connect — Get Started's own
+              Calendar step is skippable, so this is where "do it later"
+              actually happens. Same /api/calendar/connect route Auto
+              Schedule's own connect flow uses; no backend change. */}
+          <div style={{ marginTop: 8 }}>
+            {calendarConnected ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #bfe3c9", background: "#e6f4ea", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#1f7a3c" }}>
+                ✓ Google Calendar connected
+              </span>
+            ) : (
+              <a href="/api/calendar/connect" style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
+                📅 Connect Google Calendar
+              </a>
+            )}
+          </div>
         </div>
       </div>
       <div style={{ minWidth: 220, textAlign: "right" }}>
@@ -488,7 +504,7 @@ function UpNextMenu({ onRefresh, syncing, onEdit }) {
 // — "this is the one you're on now" — the moment it becomes the top pick,
 // not on any click. Guarded by a ref so the same course only gets the
 // start call once per mount, not on every re-render.
-function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, onAutoSchedule }) {
+function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, onAutoSchedule, calendarConnected }) {
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState({}); // courseId -> date string, staged until confirmed
   const today = new Date().toISOString().slice(0, 10);
@@ -532,7 +548,21 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, on
           <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: 0 }}>Up next</h2>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={onAutoSchedule} aria-label="Auto Schedule — book study time on your calendar" style={pillBtnAccent}>
+          {/* Greyed out (not just left to fail on click) once Calendar isn't
+              connected — connecting is skippable during Get Started, and
+              this is the one thing that stops being available afterward
+              until it's done, from the profile strip above or here.
+              AutoScheduleModal's own 409 `needsConnect` screen stays as a
+              defensive fallback for a connection that dies between this
+              page's load and the click. */}
+          <button
+            onClick={calendarConnected ? onAutoSchedule : undefined}
+            disabled={!calendarConnected}
+            aria-label={calendarConnected ? "Auto Schedule — book study time on your calendar" : "Auto Schedule — connect Google Calendar first, above"}
+            className={calendarConnected ? undefined : "icon-tip"}
+            data-tip={calendarConnected ? undefined : "Connect Google Calendar first — see your profile above"}
+            style={calendarConnected ? pillBtnAccent : { ...pillBtnAccent, background: "var(--bg)", border: "1px solid var(--line)", color: "var(--faint)", cursor: "not-allowed" }}
+          >
             🪄 Auto Schedule
           </button>
           {editing ? (
@@ -637,6 +667,7 @@ function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
 
 export default function JourneyPage() {
   const { user: me } = useSession();
+  const router = useRouter();
   const [journey, setJourney] = useState([]);
   const [recentCompletions, setRecentCompletions] = useState([]);
   const [err, setErr] = useState("");
@@ -647,6 +678,7 @@ export default function JourneyPage() {
   const [syncingUpNext, setSyncingUpNext] = useState(false);
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false);
   const [annualReviewDate, setAnnualReviewDate] = useState(DEFAULT_ANNUAL_REVIEW_MONTH_DAY);
+  const [calendarConnected, setCalendarConnected] = useState(false);
 
   // The admin-editable annual review date (Team view's header — TeamPage.jsx)
   // that Auto Schedule defaults its "Complete by" field to. Fetched once on
@@ -667,21 +699,33 @@ export default function JourneyPage() {
   // Any other value is a real failure, shown as the page's own error banner.
   // Read via window.location rather than next/navigation's useSearchParams so
   // this client component doesn't need a Suspense boundary just for this.
+  //
+  // A not-yet-onboarded visitor can reach this same callback from the Get
+  // Started wizard's Calendar step (LearningHubPage.jsx) — the connect/
+  // callback routes are shared with Auto Schedule's own entry point and
+  // always redirect here, never back to the wizard. Bounce that case
+  // straight back to /learning-hub with the same param so the wizard (not
+  // this page) is what reopens and resumes — gated on `me` actually having
+  // loaded, so a not-yet-resolved session can't misread as "not onboarded"
+  // and bounce someone who's really done with setup.
   useEffect(() => {
+    if (me === undefined) return;
     const cal = new URLSearchParams(window.location.search).get("calendar");
     if (!cal) return;
+    if (!me.onboarded) { router.replace(`/learning-hub?calendar=${encodeURIComponent(cal)}`); return; }
     if (cal === "connected") setAutoScheduleOpen(true);
     else if (cal !== "cancelled") setErr("Couldn't connect Google Calendar — try again from the Auto Schedule button.");
     window.history.replaceState({}, "", window.location.pathname);
-  }, []);
+  }, [me]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async () => {
     setErr("");
     try {
-      const { courses, position: pos, recentCompletions: completions } = await api("/api/journey");
+      const { courses, position: pos, recentCompletions: completions, calendarConnected: cc } = await api("/api/journey");
       setJourney(courses);
       setPosition(pos);
       setRecentCompletions(completions || []);
+      setCalendarConnected(Boolean(cc));
     } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
 
@@ -830,6 +874,7 @@ export default function JourneyPage() {
               coreTotal={coreCourses.length}
               nextTierCoreComplete={nextTierCoreComplete}
               nextTierCoreTotal={nextTierCoreCourses.length}
+              calendarConnected={calendarConnected}
             />
             <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
             <section style={{ ...card, flex: "2 1 480px", minWidth: 0 }}>
@@ -911,7 +956,7 @@ export default function JourneyPage() {
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
-            <UpNextCard courses={visibleJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} onAutoStart={autoStartCourse} onAutoSchedule={() => setAutoScheduleOpen(true)} />
+            <UpNextCard courses={visibleJourney} onSetTargetDate={setCourseTarget} onSync={syncUpNext} syncing={syncingUpNext} onAutoStart={autoStartCourse} onAutoSchedule={() => setAutoScheduleOpen(true)} calendarConnected={calendarConnected} />
             <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourse={inProgressCourse} />
           </div>
           </div>

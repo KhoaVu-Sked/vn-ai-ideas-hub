@@ -199,6 +199,8 @@ export async function getTrackWithCourses(trackId, accountId) {
 // within that tier (course_assignments.position, if they've ever reordered
 // it), then track/stage/created_at as the fallback before that. target_date
 // is only ever non-null once something actually writes course_assignments.
+// calendar_connected (another scalar subquery, same round trip) is what
+// Your Journey greys out the Auto Schedule button on until true.
 // One round trip: position is a scalar subquery, courses is json_agg — same
 // aggregate-with-no-GROUP-BY shape as getTrackWithCourses above, so this
 // always returns exactly one row even when account_tracks has none for this
@@ -212,6 +214,7 @@ export async function getJourney(accountId) {
   const rows = await sql`
     select
       (select position from user_role where account_id = ${accountId}) as position,
+      exists(select 1 from calendar_connections where account_id = ${accountId}) as calendar_connected,
       coalesce(json_agg(
         json_build_object(
           'id', c.id, 'title', c.title, 'stage', c.stage, 'platform', c.platform,

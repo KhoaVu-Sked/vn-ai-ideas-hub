@@ -17,6 +17,14 @@ export async function GET() {
       name: profile?.name || null,
       avatar_color: profile?.avatar_color || null,
       avatar_url: profile?.avatar_url || null,
+      position: profile?.position || null,
+      calendar_connected: Boolean(profile?.calendar_connected),
+      // AI Learning's "get started" gate (features/learning) — fails OPEN
+      // (true) when profile is null, i.e. getProfile() itself threw above:
+      // a transient fetch failure should never flash the onboarding gate
+      // and hide "My Dashboard" for someone who's actually already deep
+      // into the feature.
+      onboarded: profile ? Boolean(profile.has_tracks) : true,
     },
   });
 }

@@ -2,21 +2,30 @@
 
 // Learning Hub: pick a track, preview its roadmap, get enrolled. The
 // cross-track roadmap list lives on its own page — see JourneyPage.
+//
+// Two states, gated on me.onboarded (features/accounts/queries.js's
+// getProfile — has this account enrolled in at least one track, ever):
+//   - not onboarded: a first-time gateway (GetStartedGateway) replaces the
+//     browse UI below and opens OnboardingWizard on "Start Your Journey."
+//   - onboarded: today's "Your tracks"/"Suggested tracks" browse UI, for
+//     enrolling in additional tracks later — unchanged.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, STATUS_META, statusPill, POSITION_LABEL } from "@/features/learning/shared";
+import { card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER } from "@/features/learning/shared";
 
 // "Completed" replaces "Enrolled" once every course in the track is done
 // for THIS account (complete_count === course_count, and there's at least
 // one course — an empty track never reads as "completed"). Same badge,
 // just a different label, so it shows wherever this card does: both "Your
-// tracks" and "Suggested tracks" use the same component.
+// tracks" and "Suggested tracks" use the same component — and so does the
+// onboarding wizard's track-picker (TracksStep, below).
 function TrackCard({ track, onPreview }) {
   const completed = track.course_count > 0 && track.complete_count === track.course_count;
   return (
@@ -164,12 +173,162 @@ function TrackPreview({ trackId, onClose, onAssignedChange }) {
   );
 }
 
+// ── Get Started gateway + onboarding wizard ──────────────────────────
+
+const wizardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 19, color: "var(--ink)", margin: "0 0 6px" };
+const wizardSubtext = { fontSize: 13, color: "var(--muted)", margin: "0 0 18px", lineHeight: 1.5 };
+const wizardBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, color: "var(--body)", cursor: "pointer", textDecoration: "none", display: "inline-block" };
+const wizardBtnPrimary = (busy) => ({ border: "none", background: "var(--blue)", color: "#fff", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, textDecoration: "none", display: "inline-block" });
+const roleOption = { textAlign: "left", border: "1px solid var(--line)", background: "var(--card)", borderRadius: 10, padding: "12px 16px", fontSize: 14, fontWeight: 700, color: "var(--ink)", cursor: "pointer" };
+const successBanner = { background: "#e6f4ea", border: "1px solid #bfe3c9", color: "#1f7a3c", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 14 };
+
+// First-time-only replacement for "Your tracks"/"Suggested tracks" (the
+// user's explicit ask: remove the browse UI, add one animated button).
+// .start-journey-btn's keyframes live in app/globals.css, next to every
+// other animation this app defines.
+function GetStartedGateway({ onStart }) {
+  return (
+    <section style={{ ...card, textAlign: "center", padding: "64px 32px", display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
+      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)" }}>Welcome to AI Learning</div>
+      <p style={{ fontSize: 14, color: "var(--muted)", maxWidth: 440, margin: 0, lineHeight: 1.6 }}>
+        Set your role, optionally connect Google Calendar, and enroll in a track to build your roadmap.
+      </p>
+      <button className="start-journey-btn" onClick={onStart}>🚀 Start Your Journey</button>
+    </section>
+  );
+}
+
+function RoleStep({ onPicked }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const pick = async (position) => {
+    setBusy(true);
+    setErr("");
+    try {
+      await api("/api/onboarding/position", { method: "POST", body: JSON.stringify({ position }) });
+      onPicked();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div style={wizardTitle}>What's your current role?</div>
+      <p style={wizardSubtext}>This sets which courses show up on your roadmap first — an admin can change it later.</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+        {POSITION_ORDER.map((p) => (
+          <button key={p} onClick={() => pick(p)} disabled={busy} style={{ ...roleOption, opacity: busy ? 0.6 : 1, cursor: busy ? "wait" : "pointer" }}>
+            {POSITION_LABEL[p]}
+          </button>
+        ))}
+      </div>
+      {err && <div style={errBanner}>{err}</div>}
+    </>
+  );
+}
+
+function CalendarStep({ onSkip }) {
+  return (
+    <>
+      <div style={wizardTitle}>Connect Google Calendar</div>
+      <p style={wizardSubtext}>
+        Optional. Auto Schedule (on Your Journey) uses this to book real study time around your existing
+        meetings — you can connect later from your profile if you'd rather skip it for now.
+      </p>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <button onClick={onSkip} style={wizardBtn}>Skip for now</button>
+        <a href="/api/calendar/connect" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
+      </div>
+    </>
+  );
+}
+
+function TracksStep({ tracks, onPreview, onFinish, finishing }) {
+  const enrolledCount = tracks.filter((t) => t.assigned).length;
+  return (
+    <>
+      <div style={wizardTitle}>Browse tracks &amp; enroll</div>
+      <p style={wizardSubtext}>Pick at least one track to build your roadmap — click a card to preview it, then enroll. You can add more anytime.</p>
+      {tracks.length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>No tracks yet.</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16, maxHeight: 320, overflowY: "auto", paddingRight: 2 }}>
+          {tracks.map((t) => <TrackCard key={t.id} track={t} onPreview={onPreview} />)}
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "var(--muted)" }}>
+          {enrolledCount === 0 ? "Enroll in at least one track to finish." : `Enrolled in ${enrolledCount} track${enrolledCount === 1 ? "" : "s"}.`}
+        </span>
+        <button onClick={onFinish} disabled={enrolledCount === 0 || finishing} style={wizardBtnPrimary(finishing)}>
+          {finishing ? "Finishing…" : "Go to My Journey →"}
+        </button>
+      </div>
+    </>
+  );
+}
+
+// Resumes at whichever step is actually left to do, re-derived from server
+// state every time it opens (no client- or server-side "current step"
+// flag to desync): role is skipped once me.position is set; calendar is
+// skipped once already connected OR once a `?calendar=` outcome is present
+// (JourneyPage bounces a not-yet-onboarded visitor back here with that
+// param after the OAuth round trip — see JourneyPage.jsx's `?calendar=`
+// effect — since the connect/callback routes themselves always redirect to
+// /learning-hub/journey and are shared with Auto Schedule's own connect
+// entry point, not worth special-casing there). "Skip for now" writes
+// nothing — there's no "declined" flag, matching this codebase's existing
+// derive-don't-flag pattern (JourneyPage's milestone banners).
+function OnboardingWizard({ me, tracks, onPreview, onClose, onFinish }) {
+  const calOutcome = useMemo(() => new URLSearchParams(window.location.search).get("calendar"), []);
+  const [step, setStep] = useState(() => {
+    if (!me.position) return "role";
+    if (me.calendar_connected || calOutcome) return "tracks";
+    return "calendar";
+  });
+  const [finishing, setFinishing] = useState(false);
+
+  useEffect(() => {
+    if (calOutcome) window.history.replaceState({}, "", window.location.pathname);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const finish = async () => {
+    setFinishing(true);
+    await onFinish();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.5)", zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: "var(--card)", borderRadius: 14, padding: 26, width: 480, maxWidth: "100%", boxShadow: "0 20px 60px rgba(10,22,44,0.35)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--faint)", letterSpacing: 0.5, textTransform: "uppercase" }}>
+            Get started · step {step === "role" ? 1 : step === "calendar" ? 2 : 3} of 3
+          </span>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--muted)", lineHeight: 1, padding: 2 }} aria-label="Close">×</button>
+        </div>
+        {step === "tracks" && calOutcome === "connected" && <div style={successBanner}>✓ Google Calendar connected.</div>}
+        {step === "tracks" && calOutcome && calOutcome !== "connected" && calOutcome !== "cancelled" && (
+          <div style={{ ...errBanner, marginBottom: 14 }}>Couldn't connect Google Calendar — you can try again later from your profile.</div>
+        )}
+        {step === "role" && <RoleStep onPicked={() => setStep(me.calendar_connected ? "tracks" : "calendar")} />}
+        {step === "calendar" && <CalendarStep onSkip={() => setStep("tracks")} />}
+        {step === "tracks" && <TracksStep tracks={tracks} onPreview={onPreview} onFinish={finish} finishing={finishing} />}
+      </div>
+    </div>
+  );
+}
+
 export default function LearningHubPage() {
-  const { user: me } = useSession();
+  const { user: me, refresh } = useSession();
+  const router = useRouter();
   const [tracks, setTracks] = useState([]);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
   const [previewId, setPreviewId] = useState(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const load = useCallback(async () => {
     setErr("");
@@ -179,6 +338,23 @@ export default function LearningHubPage() {
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
 
+  // Landing back here from JourneyPage's bounce (?calendar=<outcome>,
+  // fired only for a not-yet-onboarded visitor — see JourneyPage.jsx)
+  // reopens the wizard so OnboardingWizard's own step logic can resume it
+  // on "tracks". A wizard the learner already finished has nothing left to
+  // resume — me.onboarded stays the source of truth, not this param alone.
+  useEffect(() => {
+    if (!me || me.onboarded) return;
+    if (new URLSearchParams(window.location.search).get("calendar")) setWizardOpen(true);
+  }, [me]);
+
+  const onAssignedChange = (id, assigned) => setTracks((ts) => ts.map((t) => (t.id === id ? { ...t, assigned } : t)));
+
+  const finishOnboarding = async () => {
+    await refresh(); // so AppHeader/this page see onboarded:true right away
+    router.push("/learning-hub/journey");
+  };
+
   const enrolledTracks = tracks.filter((t) => t.assigned);
 
   return (
@@ -187,6 +363,8 @@ export default function LearningHubPage() {
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 22px 0" }}>
         {me === undefined || (me && !ready) ? (
           <Loading label="Loading tracks" />
+        ) : !me.onboarded ? (
+          <GetStartedGateway onStart={() => setWizardOpen(true)} />
         ) : (
           <>
             <section style={{ ...card, marginBottom: 18 }}>
@@ -222,11 +400,21 @@ export default function LearningHubPage() {
         )}
       </main>
 
+      {wizardOpen && me && (
+        <OnboardingWizard
+          me={me}
+          tracks={tracks}
+          onPreview={setPreviewId}
+          onClose={() => setWizardOpen(false)}
+          onFinish={finishOnboarding}
+        />
+      )}
+
       {previewId && (
         <TrackPreview
           trackId={previewId}
           onClose={() => setPreviewId(null)}
-          onAssignedChange={(id, assigned) => setTracks((ts) => ts.map((t) => (t.id === id ? { ...t, assigned } : t)))}
+          onAssignedChange={onAssignedChange}
         />
       )}
     </div>
