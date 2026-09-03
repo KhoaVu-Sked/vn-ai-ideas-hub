@@ -410,7 +410,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <div class="ui">
           <div class="ui-bar">
             <span class="ui-logo"><span class="ui-mark"><svg viewBox="0 0 701 499" width="17" height="12" fill="none" aria-hidden="true"><path d="M589.851 0.367H289.886c-29.512 0-57.814 11.648-78.682 32.382C190.337 53.483 178.613 81.604 178.613 110.926s11.724 57.443 32.591 78.176c20.868 20.734 49.17 32.382 78.682 32.382h299.965c29.511 0 57.814-11.648 78.681-32.382 20.868-20.733 32.591-48.854 32.591-78.176s-11.723-57.443-32.591-78.177C647.665 12.015 619.362.367 589.851.367z" fill="#fff"/><path d="M409.331 277.321h-300c-29.174.515-56.977 12.391-77.425 33.072C11.457 331.074 0 358.906 0 387.897c0 28.992 11.457 56.824 31.906 77.505 20.448 20.681 48.251 32.557 77.425 33.071h300c29.174-.514 56.978-12.39 77.426-33.071 20.449-20.681 31.906-48.513 31.906-77.505 0-28.991-11.457-56.823-31.906-77.504-20.448-20.681-48.252-32.557-77.426-33.072z" fill="#fff"/></svg></span>TS - AI Ideas Hub</span>
-            <span class="ui-nav"><span class="on">Board</span></span>
+            <span class="ui-nav"><span class="on">Board</span><span>Learning Hub</span><span>My Dashboard</span></span>
             <span class="ui-search">⌕ Search ideas</span>
             <span class="ui-plus">+</span>
             <span class="ui-av">KV</span>
@@ -951,6 +951,31 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <p>The <b>Enrol</b> button self-assigns you. There is <b>no approval step</b> &mdash; nobody has to let you in, and you can enrol in more than one track at once. Enrolled tracks move up into <b>Your tracks</b> with an <b>Enrolled</b> badge, which becomes <b>Completed</b> once every course in that track is complete for you.</p>
 
+
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <p class="ui-label" style="margin:0 0 7px">Your tracks</p>
+            <div class="ui-panel ui-row" style="justify-content:space-between;margin-bottom:11px">
+              <span>
+                <span class="ui-h" style="font-size:13.5px">AI Track</span>
+                <span class="ui-meta" style="display:block;margin-top:2px">20 courses · Intern → Principal</span>
+              </span>
+              <span class="ui-pill" style="background:#d9f2df;color:#2b8a3e">Enrolled</span>
+            </div>
+            <p class="ui-label" style="margin:0 0 7px">Suggested tracks</p>
+            <div class="ui-panel ui-row" style="justify-content:space-between">
+              <span>
+                <span class="ui-h" style="font-size:13.5px">Core Competency</span>
+                <span class="ui-meta" style="display:block;margin-top:2px">8 courses</span>
+              </span>
+              <span class="ui-btn ui-btn--pri">Enrol</span>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Learning Hub</b> — enrolling needs nobody's approval</figcaption>
+      </figure>
+
       <div class="note note--good">
         <span class="note__tag">Worth knowing</span>
         <p>Completion is per person. Someone else finishing a track has no effect on your badge.</p>
@@ -1003,6 +1028,56 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <p>A target date is <b>a plan, not a deadline</b>. Nothing enforces it, nothing chases you, and you can change it whenever you like.</p>
 
       <p>Whichever course is top of Up next flips itself from Not started to <b>In progress</b> automatically. It never overwrites real progress &mdash; a course already further along is left alone.</p>
+
+
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <div class="ui-panel" style="padding:0;overflow:hidden">
+              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--u-line)">
+                <span style="font-size:12px">Claude 101</span>
+                <span class="ui-pill" style="background:#d9f2df;color:#2b8a3e">Complete</span>
+              </div>
+              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--u-line)">
+                <span style="font-size:12px">Prompting patterns</span>
+                <span class="ui-pill" style="background:#fdf1dd;color:#b7791f">In progress</span>
+              </div>
+              <div class="ui-row" style="justify-content:space-between;padding:10px 13px;background:#fafbfd">
+                <span class="ui-faint" style="font-size:12px">🔒 Agentic workflows</span>
+                <span class="ui-row" style="gap:7px">
+                  <span class="ui-meta" style="font-size:10px">Requires all Intern courses</span>
+                  <span class="ui-btn">Skip prerequisite</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Your Journey</b> — the lock names the tier in the way, not one course</figcaption>
+      </figure>
+
+      <figure>
+        <div class="ui">
+          <div class="ui-body">
+            <div class="ui-panel">
+              <div class="ui-row" style="justify-content:space-between;margin-bottom:10px">
+                <span class="ui-label" style="margin:0">Up next</span>
+                <span class="ui-row ui-faint" style="gap:9px;font-size:12px">
+                  <span title="Set a target date">✎</span><span title="Re-check">⟳</span><span title="Auto Schedule">✨</span>
+                </span>
+              </div>
+              <div class="ui-row" style="justify-content:space-between;margin-bottom:7px">
+                <span style="font-size:12px">Prompting patterns</span>
+                <span class="ui-tag">Oct 13</span>
+              </div>
+              <div class="ui-row" style="justify-content:space-between">
+                <span style="font-size:12px">Agentic workflows</span>
+                <span class="ui-tag ui-faint">No date</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>Up next</b> — pencil sets a date, wand opens Auto Schedule</figcaption>
+      </figure>
 
       <h3>Auto Schedule and Google Calendar</h3>
 
