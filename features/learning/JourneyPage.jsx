@@ -436,6 +436,11 @@ const pillBtnDone = { display: "inline-flex", alignItems: "center", gap: 5, bord
 // is navy/blue; it has no green in it, so a green "success" banner would
 // be the one thing on this page that isn't actually on-brand.
 const milestoneBanner = { background: "#e8f0ff", border: "1px solid #cddcff", color: "var(--navy)", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 };
+// Up next's "Calendar not connected" notice — a heads-up, not an error, so
+// it reuses STATUS_META's own "skipped" amber (shared.js) rather than
+// errBanner's red or milestoneBanner's blue: this app's one existing
+// "attention, not alarming" color, not a new one invented for this.
+const calendarWarnBanner = { background: "#fff4e0", border: "1px solid #ffdf9e", color: "#a15c00", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14, lineHeight: 1.5 };
 const ellipsisBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, width: 28, height: 28, fontSize: 15, lineHeight: 1, color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 const menuPopover = { position: "absolute", top: "calc(100% + 6px)", right: 0, background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 8px 24px rgba(10,22,44,0.16)", padding: 6, display: "flex", flexDirection: "column", gap: 2, minWidth: 170, zIndex: 30 };
 const menuItem = { display: "flex", alignItems: "center", gap: 8, border: "none", background: "none", borderRadius: 6, padding: "8px 10px", fontSize: 12.5, fontWeight: 600, color: "var(--body)", cursor: "pointer", textAlign: "left", width: "100%" };
@@ -576,6 +581,11 @@ function UpNextCard({ courses, onSetTargetDate, onSync, syncing, onAutoStart, on
           )}
         </div>
       </div>
+      {!calendarConnected && (
+        <div style={calendarWarnBanner}>
+          📅 Google Calendar isn't connected, so Auto Schedule can't book study time or set target dates for you. You can still set a target date yourself with the pencil icon below — connect from your profile above to turn Auto Schedule back on.
+        </div>
+      )}
       {upcoming.length === 0 ? (
         <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0, lineHeight: 1.5 }}>
           Nothing left to plan — every course is complete or skipped.
@@ -817,16 +827,15 @@ export default function JourneyPage() {
   // "All tracks" shows a tag per enrolled track; one specific track shows just that one.
   const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
-  // A full account reset, not just course progress — clears
-  // course_assignments, un-enrolls from every track (account_tracks — the
-  // Get Started gateway's own "onboarded" check reads this), clears the
-  // assigned role (user_role), and disconnects Google Calendar
-  // (calendar_connections). Lands back on /learning-hub afterward, since
-  // that's now the same gateway a genuinely new account sees — the whole
-  // point of resetting this much is being able to re-test Get Started
-  // itself, not just re-run the roadmap with the same setup still in place.
+  // Resets everything AI Learning itself owns, not just course progress —
+  // course_assignments, account_tracks (the Get Started gateway's own
+  // "onboarded" check reads this), and calendar_connections. Deliberately
+  // leaves user_role alone: that's general account data set on Manage ->
+  // Users, not this feature's to erase (see resetJourney()'s own comment,
+  // features/learning/queries.js). Lands back on /learning-hub afterward,
+  // since that's now the same gateway a genuinely new account sees.
   const resetJourney = async () => {
-    if (!confirm("Reset your account completely? This clears all course progress (skips, custom order, target dates), un-enrolls you from every track, clears your assigned role, and disconnects Google Calendar — deleting any Auto Schedule events booked there too. You'll land back on the Get Started gateway, exactly like a brand-new account.")) return;
+    if (!confirm("Reset everything AI Learning knows about you? This clears all course progress (skips, custom order, target dates), un-enrolls you from every track, and disconnects Google Calendar — deleting any Auto Schedule events booked there too. Your assigned role is untouched (that's set on Manage → Users, not here). You'll land back on the Get Started gateway.")) return;
     setResetting(true);
     setErr("");
     try {
@@ -924,12 +933,12 @@ export default function JourneyPage() {
                   {" "}Drag a row to reorder it within its stage.
                 </p>
               </div>
-              {(journey.length > 0 || position || calendarConnected) && (
+              {(journey.length > 0 || calendarConnected) && (
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, maxWidth: "100%" }}>
                   <button
                     onClick={resetJourney}
                     disabled={resetting}
-                    title="Clear course progress, tracks, role, and Google Calendar — back to a brand-new account"
+                    title="Clear course progress, tracks, and Google Calendar — your assigned role is untouched"
                     style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 14px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--muted)", cursor: resetting ? "wait" : "pointer", whiteSpace: "nowrap" }}
                   >
                     {resetting ? "Resetting…" : "Reset everything"}

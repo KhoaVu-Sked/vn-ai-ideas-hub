@@ -358,18 +358,27 @@ export async function skipPrerequisiteFor(courseId, accountId) {
   return { updated: rows.length };
 }
 
-// Reset EVERYTHING for this account, not just course progress — so the
-// whole Get Started flow (role -> optional Calendar connect -> browse/
-// enroll) can be re-tested from a genuinely fresh-account state, not just
-// a re-run of the roadmap with the same setup still in place:
+// Reset every table AI Learning itself owns for this account, not just
+// course progress — but deliberately NOT user_role: that table is general
+// account data, administered on Manage -> Users (features/admin/manage/
+// UsersSection.jsx) alongside username/email/workspace role, not from
+// anywhere in the Learning Hub's own UI. AI Learning is the main reader of
+// it (tier-gating, Auto Schedule's From/To defaults), but reading it isn't
+// owning it — an admin may have set an account's seniority for reasons
+// that have nothing to do with this feature, before that person ever
+// touched it, and a "reset my learning account" button has no business
+// erasing that. So the Get Started wizard's Role step is skippable via
+// Reset only up to the first time it's ever set; after that, changing it
+// again means Manage -> Users, same as any other admin-set account field.
+//
+// What IS cleared, all of it exclusively AI Learning's own data:
 //   - course_assignments: every course reverts to 'not_started' (coalesce
 //     in the reads above) — only the Intern tier's gate is open, exactly
 //     the track's original state.
 //   - account_tracks: un-enrolled from every track — this is what flips
 //     the Get Started gateway's own "onboarded" check back to false.
-//   - user_role: seniority cleared, same as an account an admin has never
-//     assigned a position to.
-//   - calendar_connections: Google Calendar disconnected.
+//   - calendar_connections: Google Calendar disconnected (Auto Schedule's
+//     own table, migration 027 — nothing outside this feature reads it).
 // One round trip, same CTE idiom as features/accounts/queries.js's
 // createAccount/updateAccount. Returns the calendar_event_ids the
 // course_assignments delete just orphaned, so the route can also clean
@@ -385,16 +394,12 @@ export async function resetJourney(accountId) {
     at as (
       delete from account_tracks where account_id = ${accountId} returning 1
     ),
-    ur as (
-      delete from user_role where account_id = ${accountId} returning 1
-    ),
     cc as (
       delete from calendar_connections where account_id = ${accountId} returning 1
     )
     select
       (select coalesce(json_agg(json_build_object('course_id', course_id, 'calendar_event_id', calendar_event_id)), '[]') from ca) as courses,
       (select count(*)::int from at) as tracks_cleared,
-      (select count(*)::int from ur) as role_cleared,
       (select count(*)::int from cc) as calendar_connection_cleared
   `;
   const r = rows[0];
@@ -402,7 +407,6 @@ export async function resetJourney(accountId) {
     reset: r.courses.length,
     eventIds: r.courses.map((c) => c.calendar_event_id).filter(Boolean),
     tracksCleared: r.tracks_cleared,
-    roleCleared: r.role_cleared > 0,
     calendarConnectionCleared: r.calendar_connection_cleared > 0,
   };
 }
