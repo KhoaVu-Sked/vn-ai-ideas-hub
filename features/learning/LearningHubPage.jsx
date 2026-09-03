@@ -18,6 +18,7 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
+import ConfirmModal from "@/features/learning/ConfirmModal";
 import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, DEFAULT_ANNUAL_REVIEW_MONTH_DAY,
   todayStr, nextAnnualReviewDateStr, addMonthsDateStr, monthsUntilDateStr, formatMonthDay,
@@ -249,42 +250,11 @@ function RoleStep({ onPicked, refresh }) {
   );
 }
 
-// Skedulo-themed stand-in for a native confirm() — same gate (Continue
-// without connecting stays blocked until this is dismissed one way or the
-// other), styled to match the rest of this wizard instead of the browser's
-// own unstyled dialog. Amber accent — STATUS_META's own "skipped" tone
-// (shared.js), the same register JourneyPage's "Calendar not connected" Up
-// next banner already uses: a caution, not an error (errBanner's red) or a
-// milestone (successBanner's blue). z-index above the wizard's own 150,
-// same idea as TrackPreview(200)/AutoScheduleModal(220) stacking above it.
-const skipWarnIcon = { width: 40, height: 40, borderRadius: "50%", background: "#fff4e0", color: "#a15c00", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, flexShrink: 0 };
-function CalendarSkipWarningModal({ onCancel, onConfirm }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.5)", zIndex: 250, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
-      <div style={{ background: "var(--card)", borderRadius: 14, padding: 24, width: 420, maxWidth: "100%", boxShadow: "0 20px 60px rgba(10,22,44,0.35)" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 18 }}>
-          <span aria-hidden="true" style={skipWarnIcon}>⚠️</span>
-          <div>
-            <div style={{ ...wizardTitle, margin: "0 0 4px" }}>Continue without Google Calendar?</div>
-            <p style={{ fontSize: 13, color: "var(--body)", margin: 0, lineHeight: 1.5 }}>
-              Auto Schedule won't be available, and your dashboard — including what your leadership team sees — may look incomplete until you connect it. You can always connect later from your profile.
-            </p>
-          </div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button onClick={onCancel} style={wizardBtn}>Cancel</button>
-          <button onClick={onConfirm} style={wizardBtnPrimary(false)}>Continue anyway</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // calendarConnected can be true here even on a FIRST visit to this step
 // (reached via the wizard's own Back button after already connecting from
 // a later step, or if it connected between renders) — that state skips
-// CalendarSkipWarningModal entirely, since there's nothing left to warn
-// about.
+// the warning entirely (ConfirmModal, below), since there's nothing left
+// to warn about.
 function CalendarStep({ calendarConnected, onContinue }) {
   const [warnOpen, setWarnOpen] = useState(false);
 
@@ -313,7 +283,10 @@ function CalendarStep({ calendarConnected, onContinue }) {
         </>
       )}
       {warnOpen && (
-        <CalendarSkipWarningModal
+        <ConfirmModal
+          title="Continue without Google Calendar?"
+          body="Auto Schedule won't be available, and your dashboard — including what your leadership team sees — may look incomplete until you connect it. You can always connect later from your profile."
+          confirmLabel="Continue anyway"
           onCancel={() => setWarnOpen(false)}
           onConfirm={() => { setWarnOpen(false); onContinue(); }}
         />
