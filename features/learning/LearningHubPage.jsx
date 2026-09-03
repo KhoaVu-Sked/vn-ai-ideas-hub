@@ -249,18 +249,48 @@ function RoleStep({ onPicked, refresh }) {
   );
 }
 
-function CalendarStep({ onSkip }) {
+// Continuing without connecting isn't a silent skip anymore — it's a real
+// choice with a real cost (no Auto Schedule, an incomplete-looking
+// dashboard for whoever's leadership team looks at it), so it gets a
+// confirm() gate with that spelled out, same idiom Reset's own "are you
+// sure" already uses (JourneyPage.jsx) rather than a custom dialog for
+// one moment. calendarConnected can be true here even on a FIRST visit to
+// this step (reached via the wizard's own Back button after already
+// connecting from a later step, or if it connected between renders) — that
+// state skips the warning entirely, since there's nothing left to warn
+// about.
+const CALENDAR_SKIP_WARNING = "Continue without connecting Google Calendar? Auto Schedule won't be available, and your dashboard — including what your leadership team sees — may look incomplete until you connect it. You can always connect later from your profile. Continue anyway?";
+
+function CalendarStep({ calendarConnected, onContinue }) {
+  const handleContinue = () => {
+    if (!calendarConnected && !confirm(CALENDAR_SKIP_WARNING)) return;
+    onContinue();
+  };
+
   return (
     <>
       <div style={wizardTitle}>Connect Google Calendar</div>
-      <p style={wizardSubtext}>
-        Optional. Auto Schedule (on Your Journey) uses this to book real study time around your existing
-        meetings — you can connect later from your profile if you'd rather skip it for now.
-      </p>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <button onClick={onSkip} style={wizardBtn}>Skip for now</button>
-        <a href="/api/calendar/connect?returnTo=/learning-hub" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
-      </div>
+      {calendarConnected ? (
+        <>
+          <p style={wizardSubtext}>
+            <span style={{ color: "#1f7a3c", fontWeight: 700 }}>✓ Connected.</span> Auto Schedule can book real study time around your existing meetings.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button onClick={onContinue} style={wizardBtnPrimary(false)}>Continue →</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p style={wizardSubtext}>
+            Optional. Auto Schedule (on Your Journey) uses this to book real study time around your existing
+            meetings — you can connect later from your profile if you'd rather continue without it for now.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button onClick={handleContinue} style={wizardBtn}>Continue</button>
+            <a href="/api/calendar/connect?returnTo=/learning-hub" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -465,6 +495,16 @@ function DoneStep({ scheduled, onGoToJourney, finishing }) {
 // the same adaptive-count idea the step sequence itself already uses for
 // skipping the Calendar step.
 const STEP_NUM = { role: 1, calendar: 2, tracks: 3, autoschedule: 4 };
+// Back always goes to the fixed previous step in the sequence, not
+// whatever step this particular run happened to visit last — so Back from
+// "tracks" reaches "calendar" even when it was auto-skipped going forward
+// (already connected, or a `?calendar=` outcome). That's deliberate: it's
+// the only way to ever revisit Calendar once it's been skipped, and
+// CalendarStep itself already renders correctly either way (a real
+// "connect" prompt, or a plain "✓ Connected" readout) off calendarConnected
+// — see that component. No entry for "role" (nothing before it) or "done"
+// (finished is finished).
+const PREV_STEP = { calendar: "role", tracks: "calendar", autoschedule: "tracks" };
 function OnboardingWizard({ me, tracks, onPreview, onEnrollMany, annualReviewDate, onClose, onFinish, refresh }) {
   const calOutcome = useMemo(() => new URLSearchParams(window.location.search).get("calendar"), []);
   const [step, setStep] = useState(() => {
@@ -480,6 +520,7 @@ function OnboardingWizard({ me, tracks, onPreview, onEnrollMany, annualReviewDat
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const goDone = (result) => { setScheduled(result || null); setStep("done"); };
+  const goBack = () => { if (PREV_STEP[step]) setStep(PREV_STEP[step]); };
 
   const finish = async () => {
     setFinishing(true);
@@ -493,9 +534,16 @@ function OnboardingWizard({ me, tracks, onPreview, onEnrollMany, annualReviewDat
       <div style={{ background: "var(--card)", borderRadius: 14, padding: 26, width: 480, maxWidth: "100%", boxShadow: "0 20px 60px rgba(10,22,44,0.35)" }}>
         {step !== "done" && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--faint)", letterSpacing: 0.5, textTransform: "uppercase" }}>
-              Get started · step {STEP_NUM[step]} of {totalSteps}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {PREV_STEP[step] && (
+                <button onClick={goBack} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "var(--muted)", padding: 0 }}>
+                  ← Back
+                </button>
+              )}
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--faint)", letterSpacing: 0.5, textTransform: "uppercase" }}>
+                Get started · step {STEP_NUM[step]} of {totalSteps}
+              </span>
+            </div>
             <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--muted)", lineHeight: 1, padding: 2 }} aria-label="Close">×</button>
           </div>
         )}
@@ -504,7 +552,7 @@ function OnboardingWizard({ me, tracks, onPreview, onEnrollMany, annualReviewDat
           <div style={{ ...errBanner, marginBottom: 14 }}>Couldn't connect Google Calendar — you can try again later from your profile.</div>
         )}
         {step === "role" && <RoleStep refresh={refresh} onPicked={() => setStep(me.calendar_connected ? "tracks" : "calendar")} />}
-        {step === "calendar" && <CalendarStep onSkip={() => setStep("tracks")} />}
+        {step === "calendar" && <CalendarStep calendarConnected={me.calendar_connected} onContinue={() => setStep("tracks")} />}
         {step === "tracks" && (
           <TracksStep
             tracks={tracks}
