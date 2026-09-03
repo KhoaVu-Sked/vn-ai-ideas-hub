@@ -263,6 +263,8 @@ a {
   55%  { transform: scale(1.3) rotate(8deg); }
   78%  { transform: scale(0.92) rotate(-4deg); }
   100% { transform: scale(1) rotate(0deg); }
+}
+
 /* ── Starred ideas ────────────────────────────────────────────────
    A starred idea is meant to catch your eye from across the board, so
    it gets a gold ring and a slow sheen that travels across the card.
