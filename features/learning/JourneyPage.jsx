@@ -87,7 +87,7 @@ function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true,
                   itself handles a course with no quiz content yet. */}
               {ownRoadmap && (
                 <Link
-                  href={`/learning-hub/journey/${course.id}/quiz`}
+                  href={`/learning/journey/${course.id}/quiz`}
                   style={{ alignSelf: "flex-start", border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12.5, fontWeight: 700, color: "var(--body)", cursor: "pointer", textDecoration: "none" }}
                 >
                   Wrap-up
@@ -626,7 +626,7 @@ function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
           <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
             In progress — waiting on the wrap-up quiz for more information
           </div>
-          <Link href={`/learning-hub/journey/${inProgressCourse.id}/quiz`} style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
+          <Link href={`/learning/journey/${inProgressCourse.id}/quiz`} style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
             Take the quiz →
           </Link>
         </div>

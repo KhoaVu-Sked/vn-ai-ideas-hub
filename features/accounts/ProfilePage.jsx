@@ -120,7 +120,7 @@ export default function ProfilePage() {
           <Loading label="Loading profile" />
         ) : !me ? (
           <div style={{ ...card, color: "#c92a2a", background: "#fff4f4", borderColor: "#ffc9c9" }}>
-            {err || "Could not load your profile."} <Link href="/" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link>
+            {err || "Could not load your profile."} <Link href="/ideas" style={{ color: "#c92a2a", fontWeight: 700 }}>Back to board</Link>
           </div>
         ) : (
           <>

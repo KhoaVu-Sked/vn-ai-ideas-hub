@@ -16,7 +16,7 @@ import useFittedPageSize from "@/features/ideas/useFittedPageSize";
 import { STAR_GOLD } from "@/features/ideas/constants";
 
 // ─────────────────────────────────────────────────────────────
-// TS - AI Ideas Hub — board
+// TS Hub — the ideas board
 // Fetch scoping:
 //   • Refresh → light project LIST only.
 //   • "Preview" on a card → that ONE project's light detail (drawer), cached.

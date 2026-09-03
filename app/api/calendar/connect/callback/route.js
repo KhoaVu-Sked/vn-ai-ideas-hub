@@ -17,7 +17,7 @@ export async function GET(request) {
   const url = new URL(request.url);
   const origin = url.origin;
   const fail = (reason) => {
-    const res = NextResponse.redirect(`${origin}/learning-hub/journey?calendar=${reason}`);
+    const res = NextResponse.redirect(`${origin}/learning/journey?calendar=${reason}`);
     res.cookies.set(STATE_COOKIE, "", { path: "/", maxAge: 0 });
     return res;
   };
@@ -50,7 +50,7 @@ export async function GET(request) {
       entity: "account", entityId: user.uid,
     }));
 
-    const res = NextResponse.redirect(`${origin}/learning-hub/journey?calendar=connected`);
+    const res = NextResponse.redirect(`${origin}/learning/journey?calendar=connected`);
     res.cookies.set(STATE_COOKIE, "", { path: "/", maxAge: 0 });
     return res;
   } catch (e) {

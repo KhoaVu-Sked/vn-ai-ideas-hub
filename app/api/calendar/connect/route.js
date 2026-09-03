@@ -19,7 +19,7 @@ export async function GET(request) {
   }
 
   if (!calendarConfigured()) {
-    return NextResponse.redirect(`${origin}/learning-hub/journey?calendar=unconfigured`);
+    return NextResponse.redirect(`${origin}/learning/journey?calendar=unconfigured`);
   }
 
   // CSRF: same pattern as /api/auth/google — a random value in a short-lived

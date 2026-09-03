@@ -195,7 +195,7 @@ export default function LearningHubPage() {
                   <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Your tracks</h1>
                   <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 18px" }}>Tracks you're enrolled in.</p>
                 </div>
-                <Link href="/learning-hub/journey" style={{ fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>View your journey →</Link>
+                <Link href="/learning/journey" style={{ fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>View your journey →</Link>
               </div>
               {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
               {enrolledTracks.length === 0 ? (
