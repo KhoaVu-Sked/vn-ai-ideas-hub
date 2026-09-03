@@ -411,20 +411,19 @@ export async function resetJourney(accountId) {
   };
 }
 
-// Toggle "I'm on this track" — same delete-first-else-insert idiom as
-// toggleFollow in features/ideas/queries.js.
-export async function toggleTrackAssignment(trackId, accountId) {
-  const rows = await sql`
-    with del as (
-      delete from account_tracks where track_id = ${trackId} and account_id = ${accountId} returning 1
-    ), ins as (
-      insert into account_tracks (track_id, account_id)
-      select ${trackId}::uuid, ${accountId}::uuid where not exists (select 1 from del)
-      returning 1
-    )
-    select (select count(*) from ins)::int as inserted
+// Enroll in a track — ONE-DIRECTIONAL, not a toggle: account_tracks feeds
+// the performance-review record, so a track can never be removed once
+// added (the UI backs this too — TrackPreview's "Enrolled" state isn't a
+// button once true; the learner-facing copy just says a track can't be
+// removed from their inventory, not why). Calling this again for an
+// already-enrolled track is a harmless no-op, not an error.
+export async function enrollInTrack(trackId, accountId) {
+  await sql`
+    insert into account_tracks (track_id, account_id)
+    values (${trackId}::uuid, ${accountId}::uuid)
+    on conflict (track_id, account_id) do nothing
   `;
-  return { assigned: rows[0].inserted > 0 };
+  return { assigned: true };
 }
 
 // Wrap-up quiz for one course: title/link plus every course_quiz_questions

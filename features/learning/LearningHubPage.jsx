@@ -18,7 +18,8 @@ import Loading from "@/components/Loading";
 import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
-import { card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER } from "@/features/learning/shared";
+import AutoScheduleModal from "@/features/learning/AutoScheduleModal";
+import { card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, DEFAULT_ANNUAL_REVIEW_MONTH_DAY } from "@/features/learning/shared";
 
 // "Completed" replaces "Enrolled" once every course in the track is done
 // for THIS account (complete_count === course_count, and there's at least
@@ -98,7 +99,11 @@ function TrackPreview({ trackId, onClose, onAssignedChange }) {
     return () => { live = false; };
   }, [trackId]);
 
-  const toggleAssign = async () => {
+  // One-directional — enrolling is a real commitment, not a toggle (see
+  // enrollInTrack(), features/learning/queries.js, for why), so this is
+  // only ever called while !track.assigned; the button itself becomes a
+  // plain non-interactive "Enrolled ✓" once it's true, below.
+  const enroll = async () => {
     setAssigning(true);
     try {
       const { assigned } = await api(`/api/tracks/${trackId}/assignment`, { method: "POST" });
@@ -129,19 +134,23 @@ function TrackPreview({ trackId, onClose, onAssignedChange }) {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             {track && (
-              <button
-                onClick={toggleAssign}
-                disabled={assigning}
-                title={track.assigned ? "Click to unenroll from this track" : "Enroll yourself in this track"}
-                style={{
-                  border: track.assigned ? "1px solid #bfe3c9" : "none", borderRadius: 8, padding: "8px 16px",
-                  fontSize: 13, fontWeight: 700, cursor: assigning ? "wait" : "pointer",
-                  background: track.assigned ? "#e6f4ea" : "var(--blue)", color: track.assigned ? "#1f7a3c" : "#fff",
-                  opacity: assigning ? 0.7 : 1, whiteSpace: "nowrap",
-                }}
-              >
-                {assigning ? "…" : track.assigned ? "Enrolled ✓" : "Enroll"}
-              </button>
+              track.assigned ? (
+                <span
+                  title="You can't remove a track from your inventory once you've enrolled."
+                  style={{ border: "1px solid #bfe3c9", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, background: "#e6f4ea", color: "#1f7a3c", whiteSpace: "nowrap", cursor: "default" }}
+                >
+                  Enrolled ✓
+                </span>
+              ) : (
+                <button
+                  onClick={enroll}
+                  disabled={assigning}
+                  title="Enroll yourself in this track — this can't be undone later"
+                  style={{ border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: assigning ? "wait" : "pointer", background: "var(--blue)", color: "#fff", opacity: assigning ? 0.7 : 1, whiteSpace: "nowrap" }}
+                >
+                  {assigning ? "…" : "Enroll"}
+                </button>
+              )
             )}
             <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--muted)", lineHeight: 1, padding: 4 }} aria-label="Close">×</button>
           </div>
@@ -188,8 +197,8 @@ const successBanner = { background: "#e6f4ea", border: "1px solid #bfe3c9", colo
 // other animation this app defines.
 function GetStartedGateway({ onStart }) {
   return (
-    <section style={{ ...card, textAlign: "center", padding: "64px 32px", display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
-      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)" }}>Welcome to AI Learning</div>
+    <section style={{ ...card, textAlign: "center", minHeight: "60vh", padding: "64px 32px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18 }}>
+      <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 26, color: "var(--ink)" }}>Welcome to AI Learning Hub</div>
       <p style={{ fontSize: 14, color: "var(--muted)", maxWidth: 440, margin: 0, lineHeight: 1.6 }}>
         Set your role, optionally connect Google Calendar, and enroll in a track to build your roadmap.
       </p>
@@ -246,27 +255,93 @@ function CalendarStep({ onSkip }) {
   );
 }
 
-function TracksStep({ tracks, onPreview, onFinish, finishing }) {
+// Radio selector (one track at a time) + a bottom Enroll button, rather
+// than a grid of independently-clickable cards — enrolling is a real,
+// one-directional commitment now (enrollInTrack(), features/learning/
+// queries.js: once a track is added it can't be removed from a learner's
+// inventory), so picking one deliberately and confirming with a single
+// button reads more honestly than a card that quietly enrolls on click.
+// Already-enrolled tracks show as a plain, non-selectable row instead of a
+// radio option — there's nothing left to pick there. "Enroll in another"
+// is the same select-then-click cycle, repeated.
+function TracksStep({ tracks, onPreview, onEnroll, onFinish, finishing, calendarConnected, currentPosition, annualReviewDate }) {
+  const [selectedId, setSelectedId] = useState(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollErr, setEnrollErr] = useState("");
+  const [autoScheduleOpen, setAutoScheduleOpen] = useState(false);
   const enrolledCount = tracks.filter((t) => t.assigned).length;
+
+  // If Calendar's already connected, offer Auto Schedule right here instead
+  // of making them go find the wand on Your Journey afterward. If it isn't,
+  // this step's own "Go to My Journey" stays the way out once they're done.
+  const enroll = async () => {
+    if (!selectedId) return;
+    setEnrolling(true);
+    setEnrollErr("");
+    try {
+      await onEnroll(selectedId);
+      setSelectedId(null);
+      if (calendarConnected) setAutoScheduleOpen(true);
+    } catch (e) {
+      setEnrollErr(e.message);
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
   return (
     <>
       <div style={wizardTitle}>Browse tracks &amp; enroll</div>
-      <p style={wizardSubtext}>Pick at least one track to build your roadmap — click a card to preview it, then enroll. You can add more anytime.</p>
+      <p style={wizardSubtext}>Pick a track and enroll — a track can't be removed from your inventory once it's added, so choose the ones you actually mean to start. You can enroll in more the same way, anytime.</p>
       {tracks.length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>No tracks yet.</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16, maxHeight: 320, overflowY: "auto", paddingRight: 2 }}>
-          {tracks.map((t) => <TrackCard key={t.id} track={t} onPreview={onPreview} />)}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16, maxHeight: 280, overflowY: "auto", paddingRight: 2 }}>
+          {tracks.map((t) => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px", background: t.assigned ? "var(--bg)" : "var(--card)" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, cursor: t.assigned ? "default" : "pointer" }}>
+                {t.assigned ? (
+                  <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: "50%", background: "#1f7a3c", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10 }}>✓</span>
+                ) : (
+                  <input type="radio" name="onboarding-track" checked={selectedId === t.id} onChange={() => setSelectedId(t.id)} style={{ flexShrink: 0, width: 16, height: 16 }} />
+                )}
+                <span style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{t.name}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{t.course_count} course{t.course_count === 1 ? "" : "s"}</div>
+                </span>
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                <button type="button" onClick={() => onPreview(t.id)} style={{ background: "none", border: "none", color: "var(--blue)", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}>Preview →</button>
+                {t.assigned && <span style={{ fontSize: 11, fontWeight: 700, color: "#1f7a3c", whiteSpace: "nowrap" }}>Enrolled ✓</span>}
+              </div>
+            </div>
+          ))}
         </div>
       )}
+      {enrollErr && <div style={{ ...errBanner, marginBottom: 14 }}>{enrollErr}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <span style={{ fontSize: 12, color: "var(--muted)" }}>
           {enrolledCount === 0 ? "Enroll in at least one track to finish." : `Enrolled in ${enrolledCount} track${enrolledCount === 1 ? "" : "s"}.`}
         </span>
-        <button onClick={onFinish} disabled={enrolledCount === 0 || finishing} style={wizardBtnPrimary(finishing)}>
-          {finishing ? "Finishing…" : "Go to My Journey →"}
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={enroll} disabled={!selectedId || enrolling} style={wizardBtnPrimary(enrolling)}>
+            {enrolling ? "Enrolling…" : "Enroll"}
+          </button>
+          <button onClick={onFinish} disabled={enrolledCount === 0 || finishing} style={wizardBtnPrimary(finishing)}>
+            {finishing ? "Finishing…" : "Go to My Journey →"}
+          </button>
+        </div>
       </div>
+      {autoScheduleOpen && (
+        <AutoScheduleModal
+          currentPosition={currentPosition}
+          annualReviewDate={annualReviewDate}
+          connectReturnTo="/learning-hub"
+          onClose={() => setAutoScheduleOpen(false)}
+          onScheduled={() => {}}
+          onGoToJourney={() => { setAutoScheduleOpen(false); onFinish(); }}
+        />
+      )}
     </>
   );
 }
@@ -285,7 +360,7 @@ function TracksStep({ tracks, onPreview, onFinish, finishing }) {
 // "Skip for now" writes nothing — there's no "declined" flag, matching
 // this codebase's existing derive-don't-flag pattern (JourneyPage's
 // milestone banners).
-function OnboardingWizard({ me, tracks, onPreview, onClose, onFinish }) {
+function OnboardingWizard({ me, tracks, onPreview, onEnroll, annualReviewDate, onClose, onFinish }) {
   const calOutcome = useMemo(() => new URLSearchParams(window.location.search).get("calendar"), []);
   const [step, setStep] = useState(() => {
     if (!me.position) return "role";
@@ -318,7 +393,18 @@ function OnboardingWizard({ me, tracks, onPreview, onClose, onFinish }) {
         )}
         {step === "role" && <RoleStep onPicked={() => setStep(me.calendar_connected ? "tracks" : "calendar")} />}
         {step === "calendar" && <CalendarStep onSkip={() => setStep("tracks")} />}
-        {step === "tracks" && <TracksStep tracks={tracks} onPreview={onPreview} onFinish={finish} finishing={finishing} />}
+        {step === "tracks" && (
+          <TracksStep
+            tracks={tracks}
+            onPreview={onPreview}
+            onEnroll={onEnroll}
+            onFinish={finish}
+            finishing={finishing}
+            calendarConnected={me.calendar_connected}
+            currentPosition={me.position}
+            annualReviewDate={annualReviewDate}
+          />
+        )}
       </div>
     </div>
   );
@@ -332,6 +418,7 @@ export default function LearningHubPage() {
   const [ready, setReady] = useState(false);
   const [previewId, setPreviewId] = useState(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [annualReviewDate, setAnnualReviewDate] = useState(DEFAULT_ANNUAL_REVIEW_MONTH_DAY);
 
   const load = useCallback(async () => {
     setErr("");
@@ -340,6 +427,15 @@ export default function LearningHubPage() {
 
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
+
+  // Needed only for the wizard's own Auto Schedule prompt (step 3, right
+  // after enrolling while Calendar's connected) — same fetch JourneyPage
+  // already does for its own Auto Schedule modal, see that file's own
+  // comment for why it's independent of load() above.
+  useEffect(() => {
+    if (!me) return;
+    api("/api/settings").then(({ settings }) => setAnnualReviewDate(settings.annual_review_date)).catch(() => {});
+  }, [me]);
 
   // Landing back here from JourneyPage's bounce (?calendar=<outcome>,
   // fired only for a not-yet-onboarded visitor — see JourneyPage.jsx)
@@ -352,6 +448,13 @@ export default function LearningHubPage() {
   }, [me]);
 
   const onAssignedChange = (id, assigned) => setTracks((ts) => ts.map((t) => (t.id === id ? { ...t, assigned } : t)));
+
+  // The wizard's own Tracks step enroll action — same endpoint TrackPreview's
+  // enroll button calls, just without opening the preview modal first.
+  const enrollTrack = async (trackId) => {
+    const { assigned } = await api(`/api/tracks/${trackId}/assignment`, { method: "POST" });
+    onAssignedChange(trackId, assigned);
+  };
 
   const finishOnboarding = async () => {
     await refresh(); // so AppHeader/this page see onboarded:true right away
@@ -408,6 +511,8 @@ export default function LearningHubPage() {
           me={me}
           tracks={tracks}
           onPreview={setPreviewId}
+          onEnroll={enrollTrack}
+          annualReviewDate={annualReviewDate}
           onClose={() => setWizardOpen(false)}
           onFinish={finishOnboarding}
         />
