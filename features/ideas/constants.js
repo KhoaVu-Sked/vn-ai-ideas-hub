@@ -52,3 +52,28 @@ export function canMoveTask({ from, to, isLead, isAdmin, isAssignee }) {
   if (GATED.has(from) || GATED.has(to)) return false;
   return isAssignee;
 }
+
+// Who may act as the idea's lead.
+//
+// Project Lead carries every permission on an idea: editing content, changing
+// status, triaging requests, moving cards in and out of the gated columns. The
+// creator is now the Initiator, so without this rule they could not touch their
+// own idea until an admin appointed a lead.
+//
+// So: whoever holds Project Lead — and while nobody does, the Initiator. The
+// moment someone takes Project Lead, the Initiator's authority ends.
+export function actsAsLead(myRoles, members) {
+  const mine = myRoles || [];
+  if (mine.includes(LEAD_ROLE)) return true;
+  if (!mine.includes(INITIATOR_ROLE)) return false;
+  // No member list means we cannot know whether the seat is taken. Defaulting it
+  // to [] would have answered "vacant" and handed the Initiator full authority
+  // on an idea that already has a lead. Fail closed instead.
+  if (!Array.isArray(members)) return false;
+  return !members.some((m) => (m.roles || []).includes(LEAD_ROLE));
+}
+
+// One gold, used by the idea page, the board card and anywhere a star appears.
+// Chosen to read as gold rather than as the amber the app already uses for
+// warnings, and dark enough to stay legible on white at 13px.
+export const STAR_GOLD = "#e8a913";

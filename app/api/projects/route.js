@@ -3,6 +3,7 @@ import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
 import { after } from "next/server";
 import { adminEvent } from "@/features/notifications/notify";
+import { publishBoard } from "@/features/realtime/publish";
 
 // GET /api/projects → light board list (with a per-user `mine` flag)
 export async function GET() {
@@ -35,6 +36,9 @@ export async function POST(request) {
       rows: [["Idea", project.name], ["Submitted by", who], ["Tags", (project.tags || []).join(", ") || "—"]],
       ctaPath: `/idea/${project.id}`, base,
     }));
+    // publish.js defers this itself, so it lands after the commit —
+    // do not wrap it in after() here or the callback is dropped.
+    publishBoard("created");
     return Response.json({ project }, { status: 201 });
   } catch (e) {
     return jsonError(e, "Could not create the idea.");

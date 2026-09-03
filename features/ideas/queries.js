@@ -7,7 +7,7 @@ import { INITIATOR_ROLE, LEAD_ROLE, ROLES, STATUSES, TASK_STATES } from "./const
 // ── board ─────────────────────────────────────────────────────
 export async function listProjects(accountId) {
   const rows = await sql`
-    select i.id, i.name, i.status, i.tags,
+    select i.id, i.name, i.status, i.tags, i.seq, i.starred,
       left(coalesce(i.context, ''), 180) as context,
       (select count(*) from likes l where l.idea_id = i.id)::int as like_count,
       (select count(*) from requests rq where rq.idea_id = i.id)::int as request_count,
@@ -18,7 +18,10 @@ export async function listProjects(accountId) {
                 where m.idea_id = i.id and exists (select 1 from unnest(m.roles) r where r <> 'Observer')), '[]'::json) as members,
       (exists(select 1 from idea_members m where m.idea_id = i.id and m.account_id = ${accountId})
        or exists(select 1 from follows f where f.idea_id = i.id and f.account_id = ${accountId})) as mine
-    from ideas i order by i.updated_at desc limit 50
+    -- A merged idea is kept for its URL to redirect from, but it is no longer
+    -- an idea in its own right, so it leaves the board.
+    from ideas i where i.merged_into is null
+    order by i.starred desc, i.updated_at desc limit 50
   `;
   return rows.map((r) => ({
     ...lightProject(r),
@@ -39,11 +42,13 @@ export async function createProject({ name, tags, context, pain_points, expected
     returning id, name, status, tags
   `;
   const idea = rows[0];
-  // The creator becomes the idea's lead.
+  // The creator is the Initiator. Project Lead is left open for someone to
+  // take — until they do, the Initiator acts with the lead's permissions
+  // (see actsAsLead in ./constants), so a new idea is never stuck waiting.
   if (initiatorAccountId) {
     await sql`
       insert into idea_members (idea_id, account_id, roles)
-      values (${idea.id}, ${initiatorAccountId}, array['Project Lead'])
+      values (${idea.id}, ${initiatorAccountId}, array['Initiator'])
       on conflict (idea_id, account_id) do nothing
     `;
   }
@@ -109,6 +114,27 @@ export async function updateContent(id, { context, pain_points, expected_benefit
 // ── idea deletion ─────────────────────────────────────────────
 // Hard delete (admin). Returns attachment blob URLs so the route can clean them.
 export async function deleteIdea(id) {
+  // Deleting an idea caught up in a merge does damage that is invisible until
+  // much later:
+  //   · it is the one others were merged into → their merged_into is set null by
+  //     the FK, and ideas that have been gutted (content copied away, files
+  //     moved, team and comments deleted) reappear on the board as if live
+  //   · it is named by a merge request → that row cascades away, taking with it
+  //     the only record of why other ideas disappeared
+  const tangled = await sql`
+    select
+      (select count(*) from ideas where merged_into = ${id})::int as absorbed,
+      (select count(*) from merge_requests
+        where main_idea_id = ${id} or ${id} = any(source_ids))::int as requests
+  `;
+  const t = tangled[0] || {};
+  if (t.absorbed > 0) {
+    throw err(409, `${t.absorbed} idea(s) were merged into this one. Deleting it would bring them back as empty ideas.`);
+  }
+  if (t.requests > 0) {
+    throw err(409, "This idea is part of a merge request. Deleting it would erase the record of that merge.");
+  }
+
   const urls = (await sql`select url from attachments where idea_id = ${id}`).map((r) => r.url);
   const rows = await sql`delete from ideas where id = ${id} returning id`;
   if (rows.length === 0) throw err(404, "This idea no longer exists.");
@@ -178,6 +204,7 @@ export async function getIdea(id, accountId) {
     select i.id, i.name, i.status, i.tags, i.target_date, i.created_at,
       'IDEA-' || lpad(coalesce(i.seq, 0)::text, 3, '0') as number,
       i.context, i.pain_points, i.expected_benefit, i.extra, i.delete_requested, i.delete_reason,
+      i.starred, i.merged_into,
       ini.name as initiator_name, ini.username as initiator_username,
       (select count(*) from likes l where l.idea_id = i.id)::int as like_count,
       exists(select 1 from likes l where l.idea_id = i.id and l.account_id = ${accountId}) as liked_by_me,
@@ -208,7 +235,8 @@ export async function getIdea(id, accountId) {
                 order by c.created_at)
                 from comments c join accounts ca on ca.id = c.account_id
                 where c.idea_id = i.id and c.request_id is null), '[]'::json) as comments,
-      coalesce((select json_agg(json_build_object('id', at.id, 'filename', at.filename, 'url', at.url, 'size', at.size,
+      coalesce((select json_agg(json_build_object('id', at.id, 'kind', at.kind, 'label', at.label,
+                  'filename', at.filename, 'url', at.url, 'size', at.size,
                   'uploader', coalesce(ua.name, ua.username), 'uploader_id', at.account_id) order by at.created_at)
                 from attachments at join accounts ua on ua.id = at.account_id where at.idea_id = i.id), '[]'::json) as attachments
     from ideas i
@@ -232,12 +260,15 @@ export async function getIdea(id, accountId) {
       pain_points: r.pain_points || "",
       expected_benefit: r.expected_benefit || "",
       extra: typeof r.extra === "string" ? JSON.parse(r.extra) : (r.extra || {}),
+      starred: toBool(r.starred),
+      merged_into: r.merged_into || null,
     },
     members: toJsonArray(r.members).map((m) => ({ ...m, roles: toArray(m.roles) })),
     tasks: toJsonArray(r.tasks).map((x) => shapeTask(x, accountId)),
     comments: toJsonArray(r.comments).map((x) => shapeComment(x, accountId)),
     attachments: toJsonArray(r.attachments).map((x) => ({
-      id: x.id, filename: x.filename, url: x.url, size: Number(x.size),
+      id: x.id, kind: x.kind || "file", label: x.label || null,
+      filename: x.filename, url: x.url, size: Number(x.size),
       uploader: x.uploader, mine: x.uploader_id === accountId,
     })),
     likeCount: r.like_count,
@@ -249,23 +280,67 @@ export async function getIdea(id, accountId) {
   };
 }
 
-export async function addAttachment(ideaId, accountId, { filename, url, size, content_type }) {
+// Documentation on an idea: an uploaded file, or a link. One table, one set of
+// permissions — anyone may add, and only the uploader, the acting lead or an
+// admin may remove. `label` is what people call it; for a file we fall back to
+// the filename.
+export async function addAttachment(ideaId, accountId, { kind = "file", label, filename, url, size, content_type }) {
+  const k = kind === "link" ? "link" : "file";
+  const name = (label || "").trim().slice(0, 200) || null;
+  if (k === "link") {
+    const href = (url || "").trim();
+    // Only http(s). A javascript: or data: URL here would be stored and then
+    // handed to everyone who opens the idea.
+    if (!/^https?:\/\//i.test(href)) throw err(400, "A link must start with http:// or https://");
+    if (!name) throw err(400, "Give the link a name.");
+  }
   const rows = await sql`
     with ins as (
-      insert into attachments (idea_id, account_id, filename, url, size, content_type)
-      values (${ideaId}, ${accountId}, ${filename}, ${url}, ${size || 0}, ${content_type || null})
-      returning id, account_id, filename, url, size
+      insert into attachments (idea_id, account_id, kind, label, filename, url, size, content_type)
+      values (${ideaId}, ${accountId}, ${k}, ${name},
+              ${k === "link" ? (name || "link") : filename}, ${url},
+              ${k === "link" ? 0 : (size || 0)}, ${k === "link" ? null : (content_type || null)})
+      returning id, account_id, kind, label, filename, url, size
     )
-    select ins.id, ins.filename, ins.url, ins.size, coalesce(a.name, a.username) as uploader
+    select ins.id, ins.kind, ins.label, ins.filename, ins.url, ins.size,
+           coalesce(a.name, a.username) as uploader
     from ins join accounts a on a.id = ins.account_id
   `;
   const r = rows[0];
-  return { id: r.id, filename: r.filename, url: r.url, size: Number(r.size), uploader: r.uploader };
+  return {
+    id: r.id, kind: r.kind, label: r.label, filename: r.filename,
+    url: r.url, size: Number(r.size), uploader: r.uploader, mine: true,
+  };
 }
 
 export async function getAttachment(attId) {
-  const rows = await sql`select id, idea_id, url, filename, content_type from attachments where id = ${attId}`;
+  const rows = await sql`select id, idea_id, kind, url, filename, content_type from attachments where id = ${attId}`;
   return rows[0] || null;
+}
+
+// Rename: the requirement is "edit or remove", and only remove existed. Editing
+// is limited to the label — changing a file's bytes or a link's target would be
+// a different document under the same name, which is worse than adding a new one.
+export async function renameAttachment(attId, accountId, isAdmin, label) {
+  const name = (label || "").trim().slice(0, 200);
+  if (!name) throw err(400, "Give it a name.");
+  const rows = await sql`
+    update attachments at set label = ${name}
+    where at.id = ${attId}
+      and ( at.account_id = ${accountId}
+         or ${isAdmin}
+         or exists (select 1 from idea_members m
+                    where m.idea_id = at.idea_id and m.account_id = ${accountId}
+                      and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
+    returning id, kind, label, filename, url, size
+  `;
+  if (rows.length === 0) throw err(403, "You can't rename this.");
+  const r = rows[0];
+  return { id: r.id, kind: r.kind, label: r.label, filename: r.filename, url: r.url, size: Number(r.size) };
 }
 
 // Author, or a moderator (idea lead / admin), can delete. Returns the blob URL.
@@ -275,17 +350,28 @@ export async function deleteAttachment(attId, accountId, isAdmin) {
     where at.id = ${attId}
       and ( at.account_id = ${accountId}
          or ${isAdmin}
-         or exists (select 1 from idea_members m where m.idea_id = at.idea_id and m.account_id = ${accountId} and m.roles @> array['Project Lead']) )
+         or exists (select 1 from idea_members m where m.idea_id = at.idea_id and m.account_id = ${accountId} and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
     returning url
   `;
   if (rows.length === 0) throw err(403, "You can't remove this file.");
   return { url: rows[0].url };
 }
 
+// "Acts as lead": holds Project Lead, or holds Initiator while that seat is
+// empty. The name is kept for its callers; the rule is the wider one.
 export async function isProjectLead(ideaId, accountId) {
   const rows = await sql`
-    select 1 from idea_members
-    where idea_id = ${ideaId} and account_id = ${accountId} and roles @> array['Project Lead']
+    select 1 from idea_members m
+    where m.idea_id = ${ideaId} and m.account_id = ${accountId}
+      and ( m.roles @> array['Project Lead']
+         or ( m.roles @> array['Initiator']
+              and not exists (select 1 from idea_members l
+                              where l.idea_id = m.idea_id
+                                and l.roles @> array['Project Lead']) ) )
   `;
   return rows.length > 0;
 }
@@ -333,8 +419,32 @@ function cleanRoles(roles) {
   return [...new Set(list)];
 }
 
-export async function joinTeam(ideaId, accountId, roles) {
+// Joining a team. The working roles are self-service; the two singular ones are
+// not, and that distinction is load-bearing.
+//
+// Project Lead carries every permission on an idea. Until the creator became the
+// Initiator, the creator held Project Lead, so the seat was always occupied and
+// the partial unique index quietly stopped anyone else taking it. Now the seat
+// starts empty, so without this check any signed-in person could POST
+// {"roles":["Project Lead"]} at somebody else's idea and take control of it —
+// rewriting the content, changing status, deleting the author's comments.
+//
+// So Project Lead may only be taken by an admin or by the person who raised the
+// idea, and Initiator is never self-service: it records who raised it.
+export async function joinTeam(ideaId, accountId, roles, { isAdmin = false } = {}) {
   const list = cleanRoles(roles);
+
+  if (list.includes(INITIATOR_ROLE)) {
+    throw err(403, `${INITIATOR_ROLE} records who raised the idea — it can't be taken.`);
+  }
+  if (list.includes(LEAD_ROLE) && !isAdmin) {
+    const own = await sql`
+      select 1 from ideas where id = ${ideaId} and initiator_account_id = ${accountId}
+    `;
+    if (own.length === 0) {
+      throw err(403, `Only an admin or the person who raised this idea can take ${LEAD_ROLE}.`);
+    }
+  }
   try {
     const rows = await sql`
       with ins as (
@@ -479,7 +589,11 @@ export async function updateIdeaTask(taskId, accountId, isAdmin, patch) {
          or ${isAdmin}
          or exists (select 1 from idea_members m
                     where m.idea_id = t.idea_id and m.account_id = ${accountId}
-                      and m.roles @> array['Project Lead']) )
+                      and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
     returning t.id
   `;
   if (rows.length === 0) throw err(403, "You can't edit this task.");
@@ -497,7 +611,11 @@ export async function moveIdeaTask(taskId, state, accountId, isAdmin) {
       select r.id, r.idea_id, r.state as from_state, r.assignee_id,
         (${isAdmin} or exists (select 1 from idea_members m
              where m.idea_id = r.idea_id and m.account_id = ${accountId}
-               and m.roles @> array['Project Lead'])) as is_lead
+               and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) ))) as is_lead
       from requests r where r.id = ${taskId}
     )
     update requests r set
@@ -527,7 +645,11 @@ export async function deleteIdeaTask(taskId, accountId, isAdmin) {
          or ${isAdmin}
          or exists (select 1 from idea_members m
                     where m.idea_id = r.idea_id and m.account_id = ${accountId}
-                      and m.roles @> array['Project Lead']) )
+                      and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
     returning id
   `;
   if (rows.length === 0) throw err(403, "You can't remove this task.");
@@ -588,9 +710,42 @@ export async function deleteComment(commentId, accountId, isAdmin) {
          or ${isAdmin}
          or exists (select 1 from idea_members m
                     where m.idea_id = c.idea_id and m.account_id = ${accountId}
-                      and m.roles @> array['Project Lead']) )
+                      and ( m.roles @> array['Project Lead']
+                         or ( m.roles @> array['Initiator']
+                              and not exists (select 1 from idea_members l
+                                              where l.idea_id = m.idea_id
+                                                and l.roles @> array['Project Lead']) ) )) )
     returning id
   `;
   if (rows.length === 0) throw err(403, "You can't remove this comment.");
   return { ok: true };
+}
+
+// ── stars ─────────────────────────────────────────────────────────
+// A star marks an idea as important: it pins to the top of the board and
+// weights its contributors' scores. Admin-only — the API enforces that; this
+// just records who and when, so the audit log and the UI can say.
+export async function setStar(ideaId, on, adminId) {
+  const rows = await sql`
+    update ideas set
+      starred = ${!!on},
+      starred_by = ${on ? adminId : null}::uuid,
+      starred_at = ${on ? new Date().toISOString() : null}::timestamptz
+    where id = ${ideaId}
+    returning id, name, starred
+  `;
+  if (rows.length === 0) throw err(404, "Idea not found.");
+  return { id: rows[0].id, name: rows[0].name, starred: rows[0].starred };
+}
+
+// A merged idea is kept only so its URL can redirect. Writing to one is always a
+// mistake: the comment or like would be invisible for ever — the idea is off the
+// board, excluded from the dashboard, and nobody will open it again. The browser
+// redirects, but a stale tab, a queued request or a direct call would not.
+export async function assertNotMerged(ideaId) {
+  const rows = await sql`select merged_into from ideas where id = ${ideaId}`;
+  if (rows.length === 0) throw err(404, "Idea not found.");
+  if (rows[0].merged_into) {
+    throw err(409, "This idea was merged into another one — open that idea instead.");
+  }
 }

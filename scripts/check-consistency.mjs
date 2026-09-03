@@ -126,12 +126,123 @@ const fail = (check, detail, why) => problems.push({ check, detail, why });
 {
   const consts = read("features/ideas/constants.js");
   const live = new Set([...consts.matchAll(/label:\s*"([^"]+)"/g)].map((m) => m[1]));
-  const retired = ["Accepted by idea lead", "Under discussion", "Requests &amp; input", "Forgot password"];
+  const retired = [
+    "Accepted by idea lead", "Under discussion", "Requests &amp; input", "Forgot password",
+    // The creator is the Initiator now; saying otherwise contradicts the
+    // release note the same deploy shows every user.
+    "you become its <b>Project Lead</b>",
+  ];
   for (const doc of ["docs/user-guide.html", "docs/admin-guide.html"]) {
     const src = read(doc);
     for (const phrase of retired) {
       if (src.includes(phrase) && !live.has(phrase)) {
         fail("stale-doc", `${doc}: "${phrase}"`, "describes something the app no longer has");
+      }
+    }
+  }
+}
+
+// ── 5. Identifiers used but never imported ────────────────────────
+// `next build` resolves imports; it does not notice that a file calls useRef
+// without importing it. That is a clean build and a crash on first render, and
+// it has happened four times here.
+{
+  const HOOKS = ["useState", "useEffect", "useCallback", "useRef", "useMemo",
+                 "useContext", "useReducer", "useLayoutEffect"];
+  for (const file of sqlBearingFiles()) {
+    if (!/\.jsx?$/.test(file)) continue;
+    const src = read(file);
+    const imported = new Set();
+    for (const m of src.matchAll(/^import \{([^}]*)\} from/gm)) {
+      for (const n of m[1].split(",")) imported.add(n.trim().split(" as ")[0]);
+    }
+    for (const m of src.matchAll(/^import (\w+)(?:\s*,\s*\{[^}]*\})? from/gm)) imported.add(m[1]);
+    // declared locally is fine too
+    for (const m of src.matchAll(/(?:const|let|function)\s+(\w+)/g)) imported.add(m[1]);
+
+    for (const hook of HOOKS) {
+      if (new RegExp(`\\b${hook}\\s*\\(`).test(src) && !imported.has(hook)) {
+        fail("missing-import", `${file}: ${hook}()`, "used but never imported — builds fine, crashes at runtime");
+      }
+    }
+  }
+}
+
+// ── 6. publish calls must name a variable their handler declares ───
+// `publishIdea(id, "task")` shipped in a handler that destructured only
+// { taskId }. It is a ReferenceError thrown while evaluating the argument, so
+// publish.js's own try/catch never sees it — the route's catch turns it into a
+// 500 on a write that had already committed. Check 5 missed it: that one only
+// knows React hook names.
+{
+  const routes = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) walk(p);
+      else if (e.name === "route.js") routes.push(p);
+    }
+  };
+  if (existsSync("app/api")) walk("app/api");
+
+  for (const file of routes) {
+    const src = read(file);
+    if (!/publish(Idea|Board)\(/.test(src)) continue;
+    for (const part of src.split(/(?=^export async function )/m)) {
+      const verb = part.match(/^export async function (\w+)/);
+      if (!verb) continue;
+      // Names this handler has in scope: its own declarations plus module-level ones.
+      const scope = new Set();
+      for (const m of part.matchAll(/const \{([^}]*)\}\s*=/g)) {
+        for (const n of m[1].split(",")) scope.add(n.trim().split(":").pop().trim());
+      }
+      for (const m of part.matchAll(/(?:const|let|var)\s+(\w+)\s*=/g)) scope.add(m[1]);
+      // for (const x of …) and .map((x) => …) bind a name without an `=`.
+      for (const m of part.matchAll(/for\s*\(\s*(?:const|let|var)\s+(\w+)\s+of\b/g)) scope.add(m[1]);
+      for (const m of part.matchAll(/\(\s*\(?(\w+)\)?\s*=>/g)) scope.add(m[1]);
+      for (const m of src.matchAll(/^(?:const|let|function)\s+(\w+)/gm)) scope.add(m[1]);
+      for (const m of src.matchAll(/^import[^;]*?\{([^}]*)\}/gm)) {
+        for (const n of m[1].split(",")) scope.add(n.trim().split(" as ").pop().trim());
+      }
+      for (const m of part.matchAll(/publish(?:Idea|Board)\(\s*([A-Za-z_$][\w$]*)/g)) {
+        const name = m[1];
+        if (!scope.has(name)) {
+          fail("undeclared-arg", `${file}: publish…(${name}) in ${verb[1]}`,
+            "not declared in this handler — a ReferenceError that becomes a 500 on a committed write");
+        }
+      }
+    }
+  }
+}
+
+// ── 7. Every Manage section must have somewhere to render ─────────
+// sections.js drives both the header menu and the page selector. A key with no
+// matching branch is a menu entry that opens a blank panel — and nothing else
+// would tell you.
+{
+  const list = read("features/admin/sections.js");
+  const page = read("features/admin/ManagePage.jsx");
+  for (const m of list.matchAll(/\["(\w+)",\s*"[^"]*"\]/g)) {
+    const key = m[1];
+    if (!page.includes(`view === '${key}'`) && !page.includes(`view === "${key}"`)) {
+      fail("orphan-section", `sections.js: "${key}"`, "no render branch in ManagePage — the menu entry would show nothing");
+    }
+  }
+}
+
+// ── 8. The release note must be bumped when its content changes ────
+// last_seen_release is compared against RELEASE. Editing NEWS without changing
+// RELEASE means nobody who dismissed the previous note ever sees the new one.
+{
+  const src = read("features/announcements/release.js");
+  if (src) {
+    const rel = (src.match(/export const RELEASE = "([^"]+)"/) || [])[1];
+    if (!rel) fail("release", "features/announcements/release.js", "no RELEASE constant");
+    else {
+      // The key is a date plus a slug; a stale one is the common mistake.
+      const dated = /^\d{4}-\d{2}-\d{2}/.test(rel);
+      if (!dated) {
+        fail("release", `RELEASE = "${rel}"`, "start it with a date so a stale key is obvious at a glance");
       }
     }
   }
@@ -147,7 +258,7 @@ function sqlBearingFiles() {
       else if (/\.(js|jsx)$/.test(e.name)) out.push(p);
     }
   };
-  for (const d of ["features", "app", "lib"]) if (existsSync(d)) walk(d);
+  for (const d of ["features", "app", "lib", "components"]) if (existsSync(d)) walk(d);
   return out;
 }
 

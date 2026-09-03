@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { TASK_META, TASK_ORDER, TASK_DECLINED, canMoveTask } from "@/features/ideas/constants";
 import Avatar from "@/components/Avatar";
 import { longAge, stageTone } from "@/features/ideas/elapsed";
 import { api } from "@/lib/apiClient";
+import { onEnter } from "@/lib/onEnter";
 
 const btn = { border: "1px solid #d5dce6", borderRadius: 8, padding: "7px 13px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", background: "#fff", color: "#3a4a63" };
 const label = { fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 4 };
@@ -13,6 +14,7 @@ const label = { fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpac
 // where the detail, dates, assignee and discussion live.
 export default function TaskDrawer({ ideaId, task, canModerate, isAdmin, onClose, onEdit, onMove, onDelete }) {
   const [comments, setComments] = useState(null);
+  const posting = useRef(false);
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
   const meta = TASK_META[task.state] || TASK_META.pending_approval;
@@ -25,13 +27,22 @@ export default function TaskDrawer({ ideaId, task, canModerate, isAdmin, onClose
   useEffect(() => { load(); }, [load]);
 
   const post = async () => {
+    // Same re-entry guard as the idea page: this closes over `text` from its
+    // render, so two triggers in one tick both post the same thing.
+    if (posting.current) return;
     const body = text.trim();
     if (!body) return;
+    posting.current = true;
     setText(""); setErr("");
     try {
       const { comment } = await api(`/api/ideas/${ideaId}/tasks/${task.id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
-      setComments((cs) => [...(cs || []), comment]);
+      // Insert-or-replace rather than append, so a comment can never show twice.
+      setComments((cs) => {
+        const list = cs || [];
+        return list.some((c) => c.id === comment.id) ? list.map((c) => (c.id === comment.id ? comment : c)) : [...list, comment];
+      });
     } catch (e) { setErr(e.message); setText(body); }
+    finally { posting.current = false; }
   };
 
   const removeComment = async (cid) => {
@@ -123,7 +134,7 @@ export default function TaskDrawer({ ideaId, task, canModerate, isAdmin, onClose
 
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <input
-            value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && post()}
+            value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onEnter(post)}
             placeholder="Add a comment"
             style={{ flex: 1, border: "1px solid #dde3ec", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, outline: "none" }}
           />

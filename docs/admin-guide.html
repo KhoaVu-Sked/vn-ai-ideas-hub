@@ -322,6 +322,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <li><a href="#a6">Manage — User accounts</a></li>
       <li><a href="#a7">Manage — Feedback</a></li>
       <li><a href="#a8">Manage — Delete requests</a></li>
+      <li><a href="#a8b">Manage — Merge requests</a></li>
       <li><a href="#a9">Tasks</a></li>
       <li><a href="#a10">Activity log</a></li>
       <li><a href="#a11">Authority on any idea</a></li>
@@ -557,6 +558,46 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <p>A dismissed request leaves the lead with full use of the idea — dismissing does not restrict them in any way.</p>
     </section>
 
+    <section id="a8b">
+      <p class="sec-num">Section 08b</p>
+      <h2>Manage — Merge requests</h2>
+      <p class="lede">Duplicate ideas waiting to be folded together. Nothing merges without you.</p>
+
+      <p>When two people raise the same idea, the lead of one can ask for them to be merged. That request lands here. Each entry shows the idea being <b>kept</b>, the ideas to be <b>merged in</b>, and who asked.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:26%">Choice</th><th>What happens</th></tr></thead>
+          <tbody>
+            <tr><td><b>Approve &amp; merge</b></td><td>Carries the merge out. You are asked to confirm first, naming the ideas involved.</td></tr>
+            <tr><td><b>Reject</b></td><td>Leaves every idea untouched. You can give a reason, which is recorded.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>What approving actually does</h3>
+      <p>For each idea being merged in:</p>
+      <ul>
+        <li>Its whole write-up — context, pain points, expected benefit, category, time frame and any custom fields — becomes <b>one comment</b> on the idea being kept, attributed to the person who raised it.</li>
+        <li>Its <b>documentation moves across</b>: files and links both.</li>
+        <li>Its <b>requests, likes, follows, team and comments are removed.</b></li>
+        <li>The idea itself stays, marked as merged. Its link redirects to the idea it became part of, so nothing anyone has shared in Slack breaks.</li>
+      </ul>
+      <p>Members and followers of both ideas are emailed, including the people who followed the idea that disappeared.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">Irreversible</span>
+        <p>There is no unmerge. The requests, likes and team of the absorbed ideas are gone. Open both ideas and read them before approving — the request tells you what someone wants, not whether they are right.</p>
+      </div>
+
+      <div class="note">
+        <span class="note__tag">Admins queue too</span>
+        <p>Your own merges appear in this queue as well, and you may approve them yourself. The point is not a second pair of eyes — it is the record. The request stores who asked and who decided as separate names, so a merge you approved for yourself is plainly visible in the activity log.</p>
+      </div>
+
+      <p>If part of a merge fails — an idea already merged by someone else a moment earlier, for instance — you are told how many went through and how many were left untouched. The ones that failed are unchanged.</p>
+    </section>
+
     <section id="a9">
       <p class="sec-num">Section 09</p>
       <h2>Tasks</h2>
@@ -620,6 +661,15 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <p>Open any idea and you can edit its content, change its status and triage its requests, exactly as its lead can. Two further controls are yours alone.</p>
 
       <h3>Editing the team</h3>
+      <h3>Stars</h3>
+      <p>Only you can star an idea. The <b>★</b> beside the title is a control for administrators and a plain marker for everyone else. Clicking it asks you to confirm, and the change is written to the activity log.</p>
+      <p>A starred idea sits at the top of the board, and every contribution to it counts <b>1.2×</b> on the dashboard's contributors list. Use it sparingly — starring everything scores the same as starring nothing.</p>
+
+      <h3>Appointing a Project Lead</h3>
+      <p>Whoever raises an idea is now its <b>Initiator</b>, and Project Lead is left open. Until somebody holds the lead, the Initiator has the lead's permissions, so a new idea is never stuck waiting for you.</p>
+      <p>Only you or the Initiator can put someone in the Project Lead seat — it is not a role people can claim for themselves, because it carries authority over someone else's idea. Set it from the Team &amp; roles sidebar.</p>
+      <p>Ideas created before this change are untouched: their creator still holds Project Lead.</p>
+
       <p>In the <b>Team &amp; roles</b> sidebar each member's roles become clickable chips. Tick and untick to change them, and <b>✕</b> removes the person from the team.</p>
       <figure>
         <div class="ui">

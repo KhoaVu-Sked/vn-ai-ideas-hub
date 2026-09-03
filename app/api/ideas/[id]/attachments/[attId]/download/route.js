@@ -11,6 +11,11 @@ export async function GET(_request, { params }) {
     const { attId } = await params;
     const att = await getAttachment(attId);
     if (!att) return Response.json({ error: "File not found." }, { status: 404 });
+    // A link has no blob behind it. Handing an external URL to the blob client
+    // fails in a way that reads like a missing file rather than a wrong request.
+    if (att.kind === "link") {
+      return Response.json({ error: "That's a link, not a file — open it directly." }, { status: 400 });
+    }
 
     const result = await get(att.url, { access: "private" });
     if (!result || !result.stream) return Response.json({ error: "File not found." }, { status: 404 });

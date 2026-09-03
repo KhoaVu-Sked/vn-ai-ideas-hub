@@ -68,15 +68,18 @@ export default function TaskBoard({ tasks, canModerate, isAdmin, onOpen, onMove 
               {cards.map((t) => (
                 <div
                   key={t.id}
-                  draggable
+                  draggable={!t.pending}
                   onDragStart={() => setDragId(t.id)}
                   onDragEnd={() => { setDragId(null); setOverCol(null); }}
-                  onClick={() => onOpen(t)}
+                  onClick={() => !t.pending && onOpen(t)}
                   style={{
                     background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10,
                     padding: "10px 12px", cursor: "pointer",
                     boxShadow: "0 1px 3px rgba(16,42,67,0.06)",
-                    opacity: dragId === t.id ? 0.4 : 1,
+                    // A card the server hasn't confirmed yet: visible immediately,
+                    // but clearly not settled, and not draggable until it has a
+                    // real id to move.
+                    opacity: dragId === t.id ? 0.4 : t.pending ? 0.55 : 1,
                   }}
                 >
                   <div className="breakable" style={{
