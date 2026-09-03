@@ -46,7 +46,7 @@ import ProgressBar from "@/features/learning/ProgressBar";
 // Draggable row (native HTML5 DnD, no library) — drop is only accepted onto
 // a row in the SAME position tier (checked in JourneyTable.handleDrop), so a
 // drag can never move a course into a different stage.
-function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true, ownRoadmap = true }) {
+function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
   return (
     <>
@@ -82,20 +82,6 @@ function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true,
                 </a>
               )}
               {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
-              {/* Own roadmap only — an admin viewing someone else's read-only
-                  drill-down shouldn't see an action button for someone else's
-                  wrap-up. Independent of `draggable`: filtering the List view
-                  to one track disables reordering but is still your own
-                  roadmap, so Wrap-up should stay visible there. The quiz page
-                  itself handles a course with no quiz content yet. */}
-              {ownRoadmap && (
-                <Link
-                  href={`/learning-hub/journey/${course.id}/quiz`}
-                  style={{ alignSelf: "flex-start", border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "6px 14px", fontSize: 12.5, fontWeight: 700, color: "var(--body)", cursor: "pointer", textDecoration: "none" }}
-                >
-                  Wrap-up
-                </Link>
-              )}
             </div>
           </td>
         </tr>
@@ -109,7 +95,7 @@ function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true,
 // the drop target share the same expected_by_position — the ordering this
 // table already has (tier first) puts same-tier rows in one contiguous
 // block, so reordering can only ever happen within a stage.
-export function JourneyTable({ courses, onReorder, readOnly = false, ownRoadmap = true }) {
+export function JourneyTable({ courses, onReorder, readOnly = false }) {
   const [order, setOrder] = useState(courses.map((c) => c.id));
   const [dragId, setDragId] = useState(null);
   const [overId, setOverId] = useState(null);
@@ -170,7 +156,6 @@ export function JourneyTable({ courses, onReorder, readOnly = false, ownRoadmap 
               expanded={expandedId === c.id}
               onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))}
               draggable={!readOnly}
-              ownRoadmap={ownRoadmap}
               drag={{
                 dragging: !readOnly && dragId === c.id,
                 dropTarget: !readOnly && overId === c.id && dragId && dragId !== c.id && draggingCourse?.expected_by_position === c.expected_by_position,

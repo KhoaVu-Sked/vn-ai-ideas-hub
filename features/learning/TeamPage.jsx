@@ -648,7 +648,7 @@ function MemberDrilldown({ member, onClose }) {
       ) : visibleJourney.length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing expected yet for this person's stage.</div>
       ) : (
-        <JourneyTable courses={visibleJourney} readOnly ownRoadmap={false} />
+        <JourneyTable courses={visibleJourney} readOnly />
       ))}
     </section>
   );
