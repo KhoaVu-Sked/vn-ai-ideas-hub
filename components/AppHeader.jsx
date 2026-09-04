@@ -41,6 +41,9 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
   }, []);
 
   const admin = me?.role === "admin";
+  const inIdeas = hub === "ideas";
+  const inLearning = hub === "learning";
+  const hubAdmin = Boolean(hub) && admin; // Tasks/Activity/Manage: shared by both hubs, admin only
   const signOut = async () => { try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; } };
 
   const runSearch = (v) => {
@@ -62,18 +65,18 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
       {crumb && <span className="app-header__crumb">› {crumb}</span>}
 
       <nav style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 8 }}>
-        {hub === "ideas" && <Link href="/ideas" className="hdr-nav">Board</Link>}
-        {hub === "ideas" && admin && <Link href="/dashboard" className="hdr-nav">Dashboard</Link>}
+        {inIdeas && <Link href="/ideas" className="hdr-nav">Board</Link>}
+        {inIdeas && admin && <Link href="/dashboard" className="hdr-nav">Dashboard</Link>}
         {/* Pre-onboarding (no enrolled track yet — me.onboarded, from
             /api/auth/me), Learning Hub itself IS the "get started" gateway,
             and My Dashboard has nothing to show yet, so it stays hidden
             rather than opening to an empty state. */}
-        {hub === "learning" && <Link href={me?.onboarded ? "/learning/journey" : "/learning"} className="hdr-nav">Learning Hub</Link>}
-        {hub === "learning" && me?.onboarded && <Link href="/learning/dashboard" className="hdr-nav">My Dashboard</Link>}
-        {hub === "learning" && admin && <Link href="/learning/team" className="hdr-nav">Team</Link>}
-        {hub && admin && <Link href="/tasks" className="hdr-nav">Tasks</Link>}
-        {hub && admin && <Link href="/activity" className="hdr-nav">Activity</Link>}
-        {hub && admin && (
+        {inLearning && <Link href={me?.onboarded ? "/learning/journey" : "/learning"} className="hdr-nav">Learning Hub</Link>}
+        {inLearning && me?.onboarded && <Link href="/learning/dashboard" className="hdr-nav">My Dashboard</Link>}
+        {inLearning && admin && <Link href="/learning/team" className="hdr-nav">Team</Link>}
+        {hubAdmin && <Link href="/tasks" className="hdr-nav">Tasks</Link>}
+        {hubAdmin && <Link href="/activity" className="hdr-nav">Activity</Link>}
+        {hubAdmin && (
           <div style={{ position: "relative" }} onMouseEnter={() => setOpenMenu("manage")} onMouseLeave={() => setOpenMenu((m) => (m === "manage" ? null : m))}>
             <Link href="/manage" className="hdr-nav">Manage <span className="hdr-nav__caret">▼</span></Link>
             {openMenu === "manage" && (
@@ -87,11 +90,11 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
 
       <span className="app-header__spacer" />
 
-      {hub === "learning" && (
+      {inLearning && (
         <Link href="/ideas" className="hdr-cross hdr-cross--hot">💡 Go to the Ideas Hub</Link>
       )}
 
-      {hub === "ideas" && (
+      {inIdeas && (
       <form className="hdr-search" onSubmit={submitSearch}>
         <span className="hdr-search__icon" aria-hidden="true">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
@@ -105,11 +108,11 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
 
       {/* Sits between the search box and "+", so the two ideas-only controls
           stay adjacent and the way out of the hub reads as part of the row. */}
-      {hub === "ideas" && (
+      {inIdeas && (
         <Link href="/learning" className="hdr-cross">🎓 Learning Hub</Link>
       )}
 
-      {hub === "ideas" && (
+      {inIdeas && (
         <button
           className="hdr-plus"
           title="Submit a new idea"
