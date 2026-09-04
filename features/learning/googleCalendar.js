@@ -28,6 +28,20 @@ const CALENDAR_SCOPES = "https://www.googleapis.com/auth/calendar.freebusy https
 
 export const calendarConfigured = () => Boolean(clientId() && clientSecret());
 
+// Where a completed (or failed) connect attempt sends the browser back to.
+// This flow is reachable from three places that don't all want the same
+// landing spot: Auto Schedule's own inline "connect" prompt wants to reopen
+// right back where it was (/learning-hub/journey, the default below), while
+// the Get Started wizard's Calendar step and Your Journey's profile-strip
+// button both want the Learning Hub landing page instead. The initial
+// /api/calendar/connect request picks via ?returnTo; the callback
+// re-validates whatever it stored against this same allowlist rather than
+// trusting a value round-tripped through a cookie, so this can only ever
+// redirect somewhere this app already serves — never an open redirect.
+export const DEFAULT_CALENDAR_RETURN = "/learning-hub/journey";
+const CALENDAR_RETURN_PATHS = new Set([DEFAULT_CALENDAR_RETURN, "/learning-hub"]);
+export const resolveReturnPath = (value) => (CALENDAR_RETURN_PATHS.has(value) ? value : DEFAULT_CALENDAR_RETURN);
+
 export const connectCallbackUrl = (origin) => `${origin}/api/calendar/connect/callback`;
 
 export function connectUrl({ origin, state }) {
@@ -114,20 +128,6 @@ export async function createEvent(accessToken, event) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error?.message || "Could not create the calendar event.");
   return body; // { id, htmlLink, ... }
-}
-
-// Used to re-schedule a course that already has a calendar_event_id, instead
-// of creating a duplicate. A 404 (the learner deleted the event themselves)
-// carries status on the thrown error so the caller can fall back to createEvent.
-export async function updateEvent(accessToken, eventId, event) {
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
-    method: "PATCH",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(event),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(body.error?.message || "Could not update the calendar event."), { status: res.status });
-  return body;
 }
 
 // Used by Reset (Your Journey) to clean up whatever Auto Schedule booked, so

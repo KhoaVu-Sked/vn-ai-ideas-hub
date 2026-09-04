@@ -1,0 +1,14 @@
+-- Migration 029 — multiple study sessions per course
+--
+-- Auto Schedule now splits a course's estimated hours into several
+-- sessions of the learner's own chosen length (15/30/60 min — Auto
+-- Schedule's own form, features/learning/AutoScheduleModal.jsx /
+-- LearningHubPage.jsx) rather than one long sitting, so one course can now
+-- have more than one Google Calendar event. calendar_event_id (singular,
+-- migration 027) stays exactly as it was for whatever it already points
+-- at from before this — new bookings write to this new column instead and
+-- clear that one, so a row that's ever been re-scheduled since this
+-- shipped has one or the other, not both indefinitely. Readers (Reset's
+-- calendar cleanup, the Weekly streak KPI) check both columns, unioned,
+-- for exactly that transition period.
+alter table course_assignments add column if not exists calendar_event_ids text[] not null default '{}';

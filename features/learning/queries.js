@@ -8,9 +8,19 @@ import { POSITIONS } from "@/features/accounts/constants";
 // is the one place this list is spelled out.
 const POSITION_ORDER = POSITIONS;
 
-// Team view (admin only): one row per account enrolled in at least one
-// track, with enough to render the roster table and the KPI row/Needs
-// support card without a second query. "Stalled" = an in_progress course
+// Team view (admin only): one row per account in the whole app, not just
+// those enrolled in a track — the roster needs to show a not-yet-onboarded
+// account too (position/tracks/core_total/etc. all come back null for one,
+// via the left joins below), so an admin can see who hasn't started
+// without that person silently corrupting any team-wide stat computed from
+// this data. Distinguishing the two is exactly `tracks === null` (or
+// equivalently `core_total === null` — both null together, always, since
+// both depend on the same account_tracks row existing) — TeamPage.jsx's own
+// `enrolledMembers` filter is the one place that split actually happens;
+// every stat (KPI tiles, Needs support, the heatmap, distribution,
+// team-average benchmarks) is computed off that filtered list, never this
+// raw one. Enough to render the roster table and the KPI row/Needs support
+// card without a second query. "Stalled" = an in_progress course
 // whose status hasn't moved in 28+ days (course_assignments.updated_at);
 // stalled_course names the oldest such course, for the Needs support
 // card's per-person line and the roster's Pace column. Drill-down reuses
@@ -91,15 +101,11 @@ export async function getTeamOverview() {
     )
     select a.id, a.name, a.username, a.avatar_color, a.avatar_url,
       ur.position, tn.tracks,
-      coalesce(p.core_total, 0) as core_total,
-      coalesce(p.core_complete, 0) as core_complete,
-      coalesce(p.in_progress_count, 0) as in_progress_count,
-      p.last_activity,
+      p.core_total, p.core_complete, p.in_progress_count,
+      p.last_activity, p.stalled_course,
       coalesce(p.stalled, false) as stalled,
-      p.stalled_course,
       coalesce(p.courses, '[]') as courses
-    from (select distinct account_id from account_tracks) e
-    join accounts a on a.id = e.account_id
+    from accounts a
     left join user_role ur on ur.account_id = a.id
     left join track_names tn on tn.account_id = a.id
     left join progress p on p.account_id = a.id
@@ -199,6 +205,8 @@ export async function getTrackWithCourses(trackId, accountId) {
 // within that tier (course_assignments.position, if they've ever reordered
 // it), then track/stage/created_at as the fallback before that. target_date
 // is only ever non-null once something actually writes course_assignments.
+// calendar_connected (another scalar subquery, same round trip) is what
+// Your Journey greys out the Auto Schedule button on until true.
 // One round trip: position is a scalar subquery, courses is json_agg — same
 // aggregate-with-no-GROUP-BY shape as getTrackWithCourses above, so this
 // always returns exactly one row even when account_tracks has none for this
@@ -212,6 +220,7 @@ export async function getJourney(accountId) {
   const rows = await sql`
     select
       (select position from user_role where account_id = ${accountId}) as position,
+      exists(select 1 from calendar_connections where account_id = ${accountId}) as calendar_connected,
       coalesce(json_agg(
         json_build_object(
           'id', c.id, 'title', c.title, 'stage', c.stage, 'platform', c.platform,
@@ -220,7 +229,8 @@ export async function getJourney(accountId) {
           'skills', c.skills, 'track_id', t.id, 'track_name', t.name,
           'status', coalesce(ca.status, 'not_started'), 'target_date', ca.target_date,
           'quiz_total_questions', ca.quiz_total_questions, 'quiz_correct_first_try', ca.quiz_correct_first_try,
-          'calendar_event_id', ca.calendar_event_id, 'updated_at', ca.updated_at
+          'has_scheduled_session', (ca.calendar_event_id is not null or coalesce(array_length(ca.calendar_event_ids, 1), 0) > 0),
+          'updated_at', ca.updated_at
         ) order by
           coalesce(array_position(${POSITION_ORDER}::text[], c.expected_by_position), 999),
           coalesce(ca.position, 2147483647), t.name asc, c.stage asc, c.created_at asc
@@ -285,20 +295,6 @@ export async function reorderStage(accountId, position, courseIds) {
   return { reordered: rows.length };
 }
 
-// Set (or clear, with target_date = null) a learner's own suggested target
-// date for a course — a suggestion, not an enforced deadline, so nothing
-// here checks status or locking. Past-date rejection happens in the route
-// (server's own "today"), not here.
-export async function setTargetDate(accountId, courseId, targetDate) {
-  const rows = await sql`
-    insert into course_assignments (account_id, course_id, target_date)
-    values (${accountId}, ${courseId}, ${targetDate})
-    on conflict (account_id, course_id) do update set target_date = excluded.target_date, updated_at = now()
-    returning target_date
-  `;
-  return { target_date: rows[0].target_date };
-}
-
 // Auto-signal "this is the course you're on now": flips a course from
 // not_started to in_progress. Only from not_started — the `where` guard on
 // the conflict update means calling this against a course that's already
@@ -355,34 +351,80 @@ export async function skipPrerequisiteFor(courseId, accountId) {
   return { updated: rows.length };
 }
 
-// Reset a journey: deletes every course_assignments row for this account, so
-// every course reverts to its default 'not_started' (coalesce in the reads
-// above). With nothing recorded, only the Intern tier's gate is open — that
-// tier has no tier below it — so everything past it shows Locked again,
-// exactly the track's original state.
-// Returns the calendar_event_ids being orphaned by the delete, so the route
-// can also clean those up on the learner's actual Google Calendar — Reset
-// otherwise clears this app's own data while leaving Auto Schedule's events
-// sitting on their calendar with nothing here pointing at them anymore.
+// Reset every table AI Learning itself owns for this account, not just
+// course progress — but deliberately NOT user_role: that table is general
+// account data, administered on Manage -> Users (features/admin/manage/
+// UsersSection.jsx) alongside username/email/workspace role, not from
+// anywhere in the Learning Hub's own UI. AI Learning is the main reader of
+// it (tier-gating, Auto Schedule's From/To defaults), but reading it isn't
+// owning it — an admin may have set an account's seniority for reasons
+// that have nothing to do with this feature, before that person ever
+// touched it, and a "reset my learning account" button has no business
+// erasing that. So the Get Started wizard's Role step is skippable via
+// Reset only up to the first time it's ever set; after that, changing it
+// again means Manage -> Users, same as any other admin-set account field.
+//
+// What IS cleared, all of it exclusively AI Learning's own data:
+//   - course_assignments: every course reverts to 'not_started' (coalesce
+//     in the reads above) — only the Intern tier's gate is open, exactly
+//     the track's original state.
+//   - account_tracks: un-enrolled from every track — this is what flips
+//     the Get Started gateway's own "onboarded" check back to false.
+//   - calendar_connections: Google Calendar disconnected (Auto Schedule's
+//     own table, migration 027 — nothing outside this feature reads it).
+// One round trip, same CTE idiom as features/accounts/queries.js's
+// createAccount/updateAccount. Returns the calendar_event_ids the
+// course_assignments delete just orphaned, so the route can also clean
+// those up on the learner's actual Google Calendar — the refresh token
+// needed to do that has to be read by the caller BEFORE this runs (see
+// app/api/journey/reset/route.js), since by the time this returns,
+// calendar_connections is already gone.
 export async function resetJourney(accountId) {
-  const rows = await sql`delete from course_assignments where account_id = ${accountId} returning course_id, calendar_event_id`;
-  return { reset: rows.length, eventIds: rows.map((r) => r.calendar_event_id).filter(Boolean) };
+  const rows = await sql`
+    with ca as (
+      delete from course_assignments where account_id = ${accountId}
+      returning course_id, calendar_event_id, calendar_event_ids
+    ),
+    at as (
+      delete from account_tracks where account_id = ${accountId} returning 1
+    ),
+    cc as (
+      delete from calendar_connections where account_id = ${accountId} returning 1
+    )
+    select
+      (select coalesce(json_agg(json_build_object(
+        'course_id', course_id, 'calendar_event_id', calendar_event_id, 'calendar_event_ids', calendar_event_ids
+      )), '[]') from ca) as courses,
+      (select count(*)::int from at) as tracks_cleared,
+      (select count(*)::int from cc) as calendar_connection_cleared
+  `;
+  const r = rows[0];
+  return {
+    reset: r.courses.length,
+    // Legacy single events (calendar_event_id, migration 027) union'd with
+    // the new one-per-session array (calendar_event_ids, migration 029) —
+    // a row touched by Auto Schedule since 029 shipped has one or the
+    // other, not both, but this covers whichever it is without needing to
+    // know which.
+    eventIds: r.courses.flatMap((c) => [c.calendar_event_id, ...(c.calendar_event_ids || [])]).filter(Boolean),
+    tracksCleared: r.tracks_cleared,
+    calendarConnectionCleared: r.calendar_connection_cleared > 0,
+  };
 }
 
-// Toggle "I'm on this track" — same delete-first-else-insert idiom as
-// toggleFollow in features/ideas/queries.js.
-export async function toggleTrackAssignment(trackId, accountId) {
-  const rows = await sql`
-    with del as (
-      delete from account_tracks where track_id = ${trackId} and account_id = ${accountId} returning 1
-    ), ins as (
-      insert into account_tracks (track_id, account_id)
-      select ${trackId}::uuid, ${accountId}::uuid where not exists (select 1 from del)
-      returning 1
-    )
-    select (select count(*) from ins)::int as inserted
+// Enroll in a track — ONE-DIRECTIONAL, not a toggle: account_tracks feeds
+// the performance-review record, so a track can never be removed once
+// added (the UI backs this too — TrackPreview's "Enrolled" state isn't a
+// button once true; the learner-facing copy just says a track can't be
+// removed from their inventory, not why). Calling this again for an
+// already-enrolled track is a harmless no-op, not an error.
+export async function enrollInTrack(trackId, accountId) {
+  await sql`
+    insert into account_tracks (track_id, account_id)
+    values (${trackId}::uuid, ${accountId}::uuid)
+    on conflict (track_id, account_id) do nothing
   `;
-  return { assigned: rows[0].inserted > 0 };
+  return { assigned: true };
 }
 
 // Wrap-up quiz for one course: title/link plus every course_quiz_questions
@@ -478,12 +520,17 @@ export async function getAccountSchedulingInfo(accountId) {
 // Every not-yet-done course between fromPosition and toPosition (inclusive),
 // across the account's own enrolled tracks — same tier-then-custom-order
 // shape as getJourney, so Auto Schedule proposes courses in the same order
-// the learner already sees them in. calendar_event_id comes along so the
-// caller can update an existing event instead of creating a duplicate.
+// the learner already sees them in. existing_event_ids flattens the legacy
+// single event (calendar_event_id, migration 027) and the current
+// one-per-session array (calendar_event_ids, migration 029) into one list
+// per course, so the caller can delete whatever's already booked before
+// placing this run's fresh sessions — see app/api/courses/auto-schedule/
+// route.js for why delete-then-recreate, not an in-place update, is what
+// a re-run does now that a course can have more than one session.
 export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosition) {
-  return sql`
+  const rows = await sql`
     select c.id, c.title, c.est_hours, c.link, c.outcome, c.expected_by_position,
-      ca.calendar_event_id
+      ca.calendar_event_id, ca.calendar_event_ids
     from account_tracks acct
     join courses c on c.track_id = acct.track_id
     left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
@@ -496,19 +543,27 @@ export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosit
       array_position(${POSITION_ORDER}::text[], c.expected_by_position),
       coalesce(ca.position, 2147483647), c.created_at asc
   `;
+  return rows.map((r) => ({
+    ...r,
+    existing_event_ids: [r.calendar_event_id, ...(r.calendar_event_ids || [])].filter(Boolean),
+  }));
 }
 
 // Writes what Auto Schedule decided for one course: the target_date Up next
-// already reads (ai-learning-requirements/03-your-journey.md, 4.7) plus the
-// Google event id, so a re-run knows to update that event rather than create
-// a second one.
-export async function saveScheduledEvent(accountId, courseId, { targetDate, eventId }) {
+// already reads (ai-learning-requirements/03-your-journey.md, 4.7) plus
+// every session's Google event id. Always writes calendar_event_ids and
+// clears the legacy singular calendar_event_id (migration 027) — a row
+// touched by this since migration 029 shipped has one or the other, not
+// both, which is what lets readers eventually stop checking the legacy
+// column at all once nothing old is left pointing at it.
+export async function saveScheduledSessions(accountId, courseId, { targetDate, eventIds }) {
   const rows = await sql`
-    insert into course_assignments (account_id, course_id, target_date, calendar_event_id)
-    values (${accountId}, ${courseId}, ${targetDate}, ${eventId})
+    insert into course_assignments (account_id, course_id, target_date, calendar_event_ids, calendar_event_id)
+    values (${accountId}, ${courseId}, ${targetDate}, ${eventIds}, null)
     on conflict (account_id, course_id) do update set
-      target_date = excluded.target_date, calendar_event_id = excluded.calendar_event_id, updated_at = now()
-    returning target_date, calendar_event_id
+      target_date = excluded.target_date, calendar_event_ids = excluded.calendar_event_ids,
+      calendar_event_id = null, updated_at = now()
+    returning target_date, calendar_event_ids
   `;
   return rows[0];
 }

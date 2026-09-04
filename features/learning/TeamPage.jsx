@@ -197,7 +197,42 @@ function PacePill({ pace }) {
   );
 }
 
+// A not-yet-onboarded account (never enrolled in a track — tracks/
+// core_total/etc. all null, see getTeamOverview()'s own comment) gets its
+// own row shape: real name/avatar/level (position can genuinely be set
+// before enrollment — see the Reset scoping decision, features/learning/
+// queries.js's resetJourney()), N/A everywhere progress requires a track to
+// measure against, and no click-through — there's no roadmap yet to drill
+// into.
+function NotStartedRow({ member }) {
+  const na = <span style={{ color: "var(--faint)" }}>N/A</span>;
+  return (
+    <tr style={{ borderTop: "1px solid var(--line)" }}>
+      <td style={td}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Avatar person={member} size={28} />
+          <span style={{ fontWeight: 700, color: "var(--ink)" }}>{member.name || member.username}</span>
+        </div>
+      </td>
+      <td style={td}>{levelTarget(member.position)}</td>
+      <td style={td}>{na}</td>
+      <td style={td}>{na}</td>
+      <td style={td}>{na}</td>
+      <td style={td}>
+        <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap", background: "var(--bg)", color: "var(--faint)" }}>
+          Not started
+        </span>
+      </td>
+      <td style={{ ...td, textAlign: "right" }}>{na}</td>
+      <td style={td}>{na}</td>
+      <td style={{ ...td, textAlign: "right" }}>{na}</td>
+      <td style={td} />
+    </tr>
+  );
+}
+
 function MemberRow({ member, teamAvgPct, ideasCount, onOpen }) {
+  if (!member.tracks || member.tracks.length === 0) return <NotStartedRow member={member} />;
   const pct = pctOf(member);
   const exam = avgExamAccuracy(member.courses || []);
   return (
@@ -613,7 +648,7 @@ function MemberDrilldown({ member, onClose }) {
       ) : visibleJourney.length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing expected yet for this person's stage.</div>
       ) : (
-        <JourneyTable courses={visibleJourney} readOnly ownRoadmap={false} />
+        <JourneyTable courses={visibleJourney} readOnly />
       ))}
     </section>
   );
@@ -660,7 +695,15 @@ export default function TeamPage() {
     setAnnualReviewDate(settings.annual_review_date);
   };
 
-  const trackOptions = Array.from(new Set(members.flatMap((m) => m.tracks || []))).sort();
+  // Every account shows up now (getTeamOverview()), including one that's
+  // never enrolled in a track — the roster itself needs that so it can
+  // show them as "Not started" (MemberRow/NotStartedRow above), but no
+  // stat below should. enrolledMembers is what every KPI, benchmark, and
+  // card on this page is computed off instead of the raw `members` —
+  // `rows` (the roster table) is the one deliberate exception.
+  const enrolledMembers = members.filter((m) => m.tracks && m.tracks.length > 0);
+
+  const trackOptions = Array.from(new Set(enrolledMembers.flatMap((m) => m.tracks))).sort();
 
   let rows = trackFilter === "all" ? members : members.filter((m) => (m.tracks || []).includes(trackFilter));
   if (sortBy === "pct_desc") rows = [...rows].sort((a, b) => pctOf(b) - pctOf(a));
@@ -672,8 +715,8 @@ export default function TeamPage() {
   // its own KPI tile, so the KPI row can match the mockup's 4-tile set
   // exactly (Team completion/Active this week/Avg exam accuracy/Ideas shipped).
   const comboCounts = new Map();
-  members.forEach((m) => {
-    const key = trackLabel((m.tracks || []).slice().sort());
+  enrolledMembers.forEach((m) => {
+    const key = trackLabel(m.tracks.slice().sort());
     comboCounts.set(key, (comboCounts.get(key) || 0) + 1);
   });
   const comboSummary = [...comboCounts.entries()].map(([label, count]) => `${count} on ${label}`).join(" · ");
@@ -691,26 +734,30 @@ export default function TeamPage() {
   // as every KPI/card on this page. No "+X% MoM" trend, on purpose — same
   // reasoning as the Learner Dashboard's "Roadmap complete" KPI: no
   // snapshot history exists, and a fabricated delta would be worse than
-  // none.
-  const avgPct = members.length ? Math.round(members.reduce((s, m) => s + pctOf(m), 0) / members.length) : 0;
+  // none. Scoped to enrolledMembers — a not-yet-onboarded account has no %
+  // to average in, not a 0% that would drag this down.
+  const avgPct = enrolledMembers.length ? Math.round(enrolledMembers.reduce((s, m) => s + pctOf(m), 0) / enrolledMembers.length) : 0;
 
   // KPI: "Active this week" — plain 7-day activity window (withinDays,
   // above). A member who's never touched a course (last_activity null)
-  // counts as inactive, not excluded.
-  const activeCount = members.filter((m) => withinDays(m.last_activity, 7)).length;
-  const inactiveCount = members.length - activeCount;
+  // counts as inactive, not excluded. Scoped to enrolledMembers, same
+  // reasoning as avgPct above.
+  const activeCount = enrolledMembers.filter((m) => withinDays(m.last_activity, 7)).length;
+  const inactiveCount = enrolledMembers.length - activeCount;
 
   // KPI: "Avg exam accuracy" — avgExamAccuracy (shared.js) over every
   // member's courses flattened into one list, so this is one team-wide
   // average rather than an average-of-per-member-averages (a member with
   // more quiz-graded completions naturally weighs more, same as if this
   // were one big list of completions to begin with rather than one list
-  // per person).
-  const teamAvgExamAccuracy = avgExamAccuracy(members.flatMap((m) => m.courses || []));
+  // per person). enrolledMembers only — a not-yet-onboarded account has no
+  // courses array to contribute (null, not empty-and-counted).
+  const teamAvgExamAccuracy = avgExamAccuracy(enrolledMembers.flatMap((m) => m.courses || []));
 
   // KPI: "Ideas shipped" — count of enrolled-learner ideas that reached
   // Launched (getTeamIdeas, features/learning/queries.js — owner + status
-  // only, see the file header comment).
+  // only, see the file header comment). Already scoped server-side to
+  // account_tracks-having accounts, so nothing to filter here.
   const shippedCount = ideas.filter((i) => i.status === "Launched").length;
 
   // Roster's "Ideas" column — how many Ideas Hub submissions each member
@@ -735,19 +782,22 @@ export default function TeamPage() {
 
             {members.length === 0 ? (
               <div style={card}>
-                <div style={{ fontSize: 13, color: "var(--muted)" }}>No one enrolled in a track yet.</div>
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>No accounts to show.</div>
               </div>
             ) : (
               <>
-                {/* ── KPI row — all four wired to real data. ── */}
+                {/* ── KPI row — all four wired to real data, scoped to
+                    enrolledMembers so a not-yet-onboarded account (shown
+                    further down in the roster as "Not started") never
+                    drags a percentage or average toward zero. ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
-                  <KpiTile label="Team completion" value={`${avgPct}%`} hint={`avg across ${members.length} learner${members.length === 1 ? "" : "s"}`} />
-                  <KpiTile label="Active this week" value={`${activeCount} / ${members.length}`} hint={inactiveCount === 0 ? "Everyone's active" : `${inactiveCount} inactive 7+ days`} />
+                  <KpiTile label="Team completion" value={`${avgPct}%`} hint={`avg across ${enrolledMembers.length} learner${enrolledMembers.length === 1 ? "" : "s"}`} />
+                  <KpiTile label="Active this week" value={`${activeCount} / ${enrolledMembers.length}`} hint={inactiveCount === 0 ? "Everyone's active" : `${inactiveCount} inactive 7+ days`} />
                   <KpiTile label="Avg exam accuracy" value={teamAvgExamAccuracy != null ? `${teamAvgExamAccuracy}%` : "—"} hint="First-try accuracy, quiz-graded completions" />
                   <KpiTile label="Ideas shipped" value={shippedCount} hint={`${ideas.length} submitted by learners`} accent />
                 </div>
 
-                <NeedsSupportCard members={members} teamAvgPct={avgPct} onOpen={setSelected} />
+                <NeedsSupportCard members={enrolledMembers} teamAvgPct={avgPct} onOpen={setSelected} />
 
                 <section style={card}>
                   <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
@@ -816,15 +866,15 @@ export default function TeamPage() {
                     <p style={eyebrow}>Coverage</p>
                     <h2 style={cardTitle}>Skills across the team</h2>
                     <p style={cardCaption}>Spot gaps at a glance — darker means stronger.</p>
-                    <SkillHeatmap members={members} />
+                    <SkillHeatmap members={enrolledMembers} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <LearningImpactCard members={members} ideas={ideas} />
+                    <LearningImpactCard members={enrolledMembers} ideas={ideas} />
                     <div style={card}>
                       <p style={eyebrow}>Distribution</p>
                       <h2 style={cardTitle}>Where the team sits</h2>
                       <p style={cardCaption}>Learners per seniority level.</p>
-                      <LevelDistribution members={members} />
+                      <LevelDistribution members={enrolledMembers} />
                     </div>
                   </div>
                 </div>

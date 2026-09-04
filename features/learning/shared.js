@@ -214,15 +214,21 @@ function weekKeyUTC(dateInput) {
 // Learner Dashboard's "Weekly streak" KPI — consecutive weeks (ending at the
 // current week, or last week if this week hasn't landed one yet) with at
 // least one course actually completed THROUGH Auto Schedule. Scoped to
-// calendar_event_id courses on purpose: Auto Schedule is the only place this
-// app has anything resembling a "session," so that's the signal used, not
-// every completion regardless of how it was scheduled (a course completed
-// with no calendar booking at all doesn't count toward this one). A learner
-// who's never used Auto Schedule reads a plain 0, not a broken number.
+// has_scheduled_session courses on purpose: Auto Schedule is the only place
+// this app has anything resembling a "session," so that's the signal used,
+// not every completion regardless of how it was scheduled (a course
+// completed with no calendar booking at all doesn't count toward this
+// one). A learner who's never used Auto Schedule reads a plain 0, not a
+// broken number. has_scheduled_session (getJourney(), features/learning/
+// queries.js) is itself derived from either of two columns — the legacy
+// single event (calendar_event_id, migration 027) or the current
+// one-per-session array (calendar_event_ids, migration 029, since one
+// course can now have more than one session) — so this function only ever
+// needs the one boolean, not both raw columns.
 //
-// No live Google Calendar read here — calendar_event_id already tells us
-// "this course had a real booked session," and completion itself only ever
-// lives in course_assignments.status, never in the calendar event, so
+// No live Google Calendar read here — has_scheduled_session already tells
+// us "this course had a real booked session," and completion itself only
+// ever lives in course_assignments.status, never in the calendar event, so
 // fetching the live event wouldn't add a signal we don't already have; it'd
 // just add a network round trip, token-refresh handling, and a "calendar
 // access revoked" failure mode for no extra information.
@@ -233,7 +239,7 @@ function weekKeyUTC(dateInput) {
 export function weeklyStreak(courses, today = new Date()) {
   const completedWeeks = new Set(
     courses
-      .filter((c) => c.calendar_event_id && c.status === "complete" && c.updated_at)
+      .filter((c) => c.has_scheduled_session && c.status === "complete" && c.updated_at)
       .map((c) => weekKeyUTC(c.updated_at))
   );
   const cursor = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));

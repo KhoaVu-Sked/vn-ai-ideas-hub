@@ -64,8 +64,12 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
       <nav style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 8 }}>
         {hub === "ideas" && <Link href="/ideas" className="hdr-nav">Board</Link>}
         {hub === "ideas" && admin && <Link href="/dashboard" className="hdr-nav">Dashboard</Link>}
-        {hub === "learning" && <Link href="/learning" className="hdr-nav">Learning Hub</Link>}
-        {hub === "learning" && <Link href="/learning/dashboard" className="hdr-nav">My Dashboard</Link>}
+        {/* Pre-onboarding (no enrolled track yet — me.onboarded, from
+            /api/auth/me), Learning Hub itself IS the "get started" gateway,
+            and My Dashboard has nothing to show yet, so it stays hidden
+            rather than opening to an empty state. */}
+        {hub === "learning" && <Link href={me?.onboarded ? "/learning/journey" : "/learning"} className="hdr-nav">Learning Hub</Link>}
+        {hub === "learning" && me?.onboarded && <Link href="/learning/dashboard" className="hdr-nav">My Dashboard</Link>}
         {hub === "learning" && admin && <Link href="/learning/team" className="hdr-nav">Team</Link>}
         {hub && admin && <Link href="/tasks" className="hdr-nav">Tasks</Link>}
         {hub && admin && <Link href="/activity" className="hdr-nav">Activity</Link>}
