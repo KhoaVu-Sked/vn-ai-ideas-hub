@@ -215,7 +215,7 @@ function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, cor
               Calendar step is skippable, so this is where "do it later"
               actually happens. Same /api/calendar/connect route Auto
               Schedule's own connect flow uses, but back to the Learning Hub
-              landing page (?returnTo=/learning-hub) rather than reopening
+              landing page (?returnTo=/learning) rather than reopening
               Auto Schedule here — this button isn't part of that flow. */}
           <div style={{ marginTop: 8 }}>
             {calendarConnected ? (
@@ -223,7 +223,7 @@ function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, cor
                 ✓ Google Calendar connected
               </span>
             ) : (
-              <a href="/api/calendar/connect?returnTo=/learning-hub" style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
+              <a href="/api/calendar/connect?returnTo=/learning" style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
                 📅 Connect Google Calendar
               </a>
             )}
@@ -461,7 +461,7 @@ export default function JourneyPage() {
   // Read via window.location rather than next/navigation's useSearchParams so
   // this client component doesn't need a Suspense boundary just for this.
   //
-  // The Get Started wizard's own Calendar step passes ?returnTo=/learning-hub
+  // The Get Started wizard's own Calendar step passes ?returnTo=/learning
   // (app/api/calendar/connect/route.js), so it lands there directly and
   // never touches this page in the common case. This bounce is a defensive
   // fallback for the one other way a not-yet-onboarded visitor can still
@@ -469,7 +469,7 @@ export default function JourneyPage() {
   // Schedule's own inline prompt (a 409 mid-modal), which doesn't pass
   // returnTo and defaults back here on purpose (see 4.7's own comment) — if
   // that happens before the account has enrolled in a track, send them to
-  // /learning-hub instead, same param, so the wizard is what reopens and
+  // /learning instead, same param, so the wizard is what reopens and
   // resumes rather than this page reacting to a param the wizard actually
   // owns. Gated on `me` actually having loaded, so a not-yet-resolved
   // session can't misread as "not onboarded" and bounce someone who's
@@ -478,7 +478,7 @@ export default function JourneyPage() {
     if (me === undefined) return;
     const cal = new URLSearchParams(window.location.search).get("calendar");
     if (!cal) return;
-    if (!me.onboarded) { router.replace(`/learning-hub?calendar=${encodeURIComponent(cal)}`); return; }
+    if (!me.onboarded) { router.replace(`/learning?calendar=${encodeURIComponent(cal)}`); return; }
     if (cal === "connected") setAutoScheduleOpen(true);
     else if (cal !== "cancelled") setErr("Couldn't connect Google Calendar — try again from the Auto Schedule button.");
     window.history.replaceState({}, "", window.location.pathname);
@@ -581,7 +581,7 @@ export default function JourneyPage() {
   // "onboarded" check reads this), and calendar_connections. Deliberately
   // leaves user_role alone: that's general account data set on Manage ->
   // Users, not this feature's to erase (see resetJourney()'s own comment,
-  // features/learning/queries.js). Lands back on /learning-hub afterward,
+  // features/learning/queries.js). Lands back on /learning afterward,
   // since that's now the same gateway a genuinely new account sees.
   // Gated by ConfirmModal (below) rather than a native confirm() — the
   // button itself just opens that; this is the actual reset, run only from
@@ -602,7 +602,7 @@ export default function JourneyPage() {
         setResetting(false);
         return;
       }
-      router.push("/learning-hub");
+      router.push("/learning");
     } catch (e) {
       setErr(e.message);
     } finally {

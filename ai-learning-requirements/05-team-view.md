@@ -2,7 +2,7 @@
 
 Part of [ai-learning-requirements](00-overview.md) — read that first for the status-tag legend and how these files relate.
 
-Lives at `/learning-hub/team` (`features/learning/TeamPage.jsx`). Rebuilt to follow the same design mockup as the Learner Dashboard (`AI Learning dashboards.html`, repo root) — this time its **Team View** tab — rather than the plain stat-tiles-plus-roster layout described in earlier drafts of this doc. Same relationship as [04-learner-dashboard.md](04-learner-dashboard.md) has to that mockup's "My Progress" tab.
+Lives at `/learning/team` (`features/learning/TeamPage.jsx`). Rebuilt to follow the same design mockup as the Learner Dashboard (`AI Learning dashboards.html`, repo root) — this time its **Team View** tab — rather than the plain stat-tiles-plus-roster layout described in earlier drafts of this doc. Same relationship as [04-learner-dashboard.md](04-learner-dashboard.md) has to that mockup's "My Progress" tab.
 
 **Access — a real decision, not the original plan:** this app has no manager/report hierarchy anywhere (no `manager_id`, no "my direct reports" concept). Rather than build one, Team view reuses `accounts.role = 'admin'` — the exact same gate as Dashboard/Manage/Activity. That means **any admin sees every enrolled learner org-wide**, not a personal "my team" view scoped to specific reports. If a real hierarchy is ever wanted, that's new schema (an admin UI to assign who manages whom) — not built, not planned.
 

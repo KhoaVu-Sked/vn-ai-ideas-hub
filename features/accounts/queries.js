@@ -79,7 +79,7 @@ const shortText = (v) => {
 };
 
 // position/has_tracks/calendar_connected feed the AI Learning "get started"
-// gateway (features/learning: /learning-hub, AppHeader's nav, the
+// gateway (features/learning: /learning, AppHeader's nav, the
 // onboarding wizard's resume-step logic) — has_tracks ALONE is what makes
 // an account count as onboarded there, deliberately not ANDed with
 // position: user_role predates account_tracks by two migrations, so an

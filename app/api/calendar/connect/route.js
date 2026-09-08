@@ -6,7 +6,7 @@ import { connectUrl, calendarConfigured, resolveReturnPath } from "@/features/le
 const STATE_COOKIE = "gc_state";
 const RETURN_COOKIE = "gc_return";
 
-// GET /api/calendar/connect?returnTo=/learning-hub|/learning-hub/journey →
+// GET /api/calendar/connect?returnTo=/learning|/learning/journey →
 // send the (already signed-in) browser to Google's consent screen for
 // Calendar scopes. Not a login flow — unlike /api/auth/google, this never
 // creates a session; requireUser() must already pass, or there's nothing to
