@@ -68,7 +68,7 @@ const helpBadge = { display: "inline-flex", alignItems: "center", justifyContent
 // its own "Connect Google Calendar" screen instead. That's a real browser
 // navigation (an <a>, not a fetch), since it has to leave the app for
 // Google's consent screen and come back to a fresh page load — back to
-// /learning-hub/journey specifically, so it reopens right where the
+// /learning/journey specifically, so it reopens right where the
 // learner left off (see app/api/calendar/connect/route.js's own ?returnTo).
 export default function AutoScheduleModal({ currentPosition, annualReviewDate, onClose, onScheduled }) {
   const [from, setFrom] = useState(currentPosition || POSITION_ORDER[0]);

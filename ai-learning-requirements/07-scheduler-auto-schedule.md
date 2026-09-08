@@ -9,9 +9,9 @@ Other automations in this app run through n8n (Slack notify, SLA checks — CLAU
 
 ### 8.2 Calendar access is authorization, not login
 This app's own auth is unaffected (Google Sign-in restricted to `@skedulo.com` — `features/auth/google.js`, `PASSWORD_LOGIN` is off for normal users). Connecting Google Calendar is a separate, additional grant a signed-in learner makes from one of three places, and each lands back somewhere different once it's done — the initial `GET /api/calendar/connect?returnTo=...` request picks, the callback re-validates it against a closed allowlist (`resolveReturnPath`, `features/learning/googleCalendar.js` — never an open redirect) rather than trusting it blind, and both legs pass it through a short-lived `gc_return` cookie alongside the existing CSRF `gc_state` one:
-- Up next's 🪄 button — Auto Schedule's own modal drives this inline on a 409 `not_connected`, no `returnTo`, defaults to (and reopens) `/learning-hub/journey` right where the learner left off.
-- The Get Started wizard's optional Calendar step ([02-track-enrollment.md](02-track-enrollment.md)) — `returnTo=/learning-hub`, so the wizard is what reopens and resumes.
-- Your Journey's profile-strip **Connect Google Calendar** button ([03-your-journey.md](03-your-journey.md), 4.2) — also `returnTo=/learning-hub`.
+- Up next's 🪄 button — Auto Schedule's own modal drives this inline on a 409 `not_connected`, no `returnTo`, defaults to (and reopens) `/learning/journey` right where the learner left off.
+- The Get Started wizard's optional Calendar step ([02-track-enrollment.md](02-track-enrollment.md)) — `returnTo=/learning`, so the wizard is what reopens and resumes.
+- Your Journey's profile-strip **Connect Google Calendar** button ([03-your-journey.md](03-your-journey.md), 4.2) — also `returnTo=/learning`.
 
 Auto Schedule's own button is greyed out until connected ([03-your-journey.md](03-your-journey.md), 4.7) rather than only failing inline on click.
 

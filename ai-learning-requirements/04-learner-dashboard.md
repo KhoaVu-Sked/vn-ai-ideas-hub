@@ -3,7 +3,7 @@
 Part of [ai-learning-requirements](00-overview.md) — read that first for the status-tag legend and how these files relate.
 
 ## 4.10 Learner Dashboard — ✅ Built (rebuilt this pass to follow a design mockup)
-Lives at `/learning-hub/dashboard` (`features/learning/LearnerDashboardPage.jsx`). Originally built alongside pulling the Mind map out of Your Journey ([03-your-journey.md](03-your-journey.md), 4.4); since rebuilt again to follow a design mockup (`AI Learning dashboards.html`, repo root) rather than the plain stat-tiles layout described in earlier drafts of this doc. Still reuses the same `GET /api/journey` fetch Your Journey already makes — no new endpoint, no new table.
+Lives at `/learning/dashboard` (`features/learning/LearnerDashboardPage.jsx`). Originally built alongside pulling the Mind map out of Your Journey ([03-your-journey.md](03-your-journey.md), 4.4); since rebuilt again to follow a design mockup (`AI Learning dashboards.html`, repo root) rather than the plain stat-tiles layout described in earlier drafts of this doc. Still reuses the same `GET /api/journey` fetch Your Journey already makes — no new endpoint, no new table.
 
 **KPI row** — four tiles:
 - **Roadmap complete** — % of what's expected by now (the same `isExpectedByNow`/`effectivePosition` scoping Your Journey uses: courses at or below the learner's own tier, plus one stage of early access once that tier's done) that's actually `complete`.

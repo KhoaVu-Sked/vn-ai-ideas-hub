@@ -306,7 +306,7 @@ function CalendarStep({ calendarConnected, onContinue }) {
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <button onClick={() => setWarnOpen(true)} style={wizardBtn}>Continue</button>
-            <a href="/api/calendar/connect?returnTo=/learning-hub" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
+            <a href="/api/calendar/connect?returnTo=/learning" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
           </div>
         </>
       )}
@@ -442,7 +442,7 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
         <p style={wizardSubtext}>Google Calendar isn't connected after all — connect it to finish setting this up, or skip and do it later from Your Journey.</p>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button onClick={onSkip} style={wizardBtn}>Skip for now</button>
-          <a href="/api/calendar/connect?returnTo=/learning-hub" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
+          <a href="/api/calendar/connect?returnTo=/learning" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
         </div>
       </>
     );
@@ -523,12 +523,12 @@ function DoneStep({ scheduled, onGoToJourney, finishing }) {
 // state every time it opens (no client- or server-side "current step"
 // flag to desync): role is skipped once me.position is set; calendar is
 // skipped once already connected OR once a `?calendar=` outcome is present.
-// The Calendar step's own connect link passes ?returnTo=/learning-hub (see
+// The Calendar step's own connect link passes ?returnTo=/learning (see
 // app/api/calendar/connect/route.js), so the OAuth round trip lands
 // straight back here with that param — JourneyPage's own `?calendar=`
 // bounce is a defensive fallback for the one other way to reach this app's
 // Calendar-connect while not yet onboarded (Auto Schedule's own inline
-// prompt, which doesn't pass returnTo and defaults to /learning-hub/journey
+// prompt, which doesn't pass returnTo and defaults to /learning/journey
 // — see JourneyPage.jsx's `?calendar=` effect), not the primary path.
 // "Skip for now" writes nothing — there's no "declined" flag, matching
 // this codebase's existing derive-don't-flag pattern (JourneyPage's
@@ -678,7 +678,7 @@ export default function LearningHubPage() {
 
   const finishOnboarding = async () => {
     await refresh(); // so AppHeader/this page see onboarded:true right away
-    router.push("/learning-hub/journey");
+    router.push("/learning/journey");
   };
 
   const enrolledTracks = tracks.filter((t) => t.assigned);
