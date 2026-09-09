@@ -1,6 +1,6 @@
 // AI Learning: tracks + their course roadmap.
 
-import { sql } from "@/lib/sql";
+import { sql, toArray } from "@/lib/sql";
 import { POSITIONS } from "@/features/accounts/constants";
 
 // The ladder, passed into queries as a parameter (see array_position() below)
@@ -128,16 +128,27 @@ export async function getTeamOverview() {
 // this feeds uses the Ideas Hub's own real lifecycle instead of a
 // hand-copied (and driftable) second list of statuses.
 
-// The caller's own Ideas Hub submissions — Learner Dashboard's Application
-// card ("What I've built from what I learned"). Ordered newest-first, same
-// as the Ideas Hub's own board default.
+// Every idea the caller has a hand in — submitted (Initiator) or joined a
+// team as a different role (AI Design, Tester, ...) — for the Learner
+// Dashboard's Application card ("What I've built from what I learned").
+// idea_members already carries 'Initiator' as one of its own roles
+// (createProject, features/ideas/queries.js, inserts it there at
+// idea-creation time), so this reads that table directly rather than only
+// initiator_account_id; the OR on initiator_account_id is just a
+// defensive fallback for an idea whose idea_members row predates that
+// insert. my_roles rides along so the card can say *which* role earned
+// this idea its spot, not just that the account has one. Ordered
+// newest-first, same as the Ideas Hub's own board default.
 export async function getMyIdeas(accountId) {
-  return sql`
-    select id, name, status, 'IDEA-' || lpad(coalesce(seq, 0)::text, 3, '0') as number
-    from ideas
-    where initiator_account_id = ${accountId}
-    order by created_at desc
+  const rows = await sql`
+    select i.id, i.name, i.status, 'IDEA-' || lpad(coalesce(i.seq, 0)::text, 3, '0') as number,
+      coalesce((select m.roles from idea_members m where m.idea_id = i.id and m.account_id = ${accountId}), array['Initiator']) as my_roles
+    from ideas i
+    where i.initiator_account_id = ${accountId}
+       or exists (select 1 from idea_members m where m.idea_id = i.id and m.account_id = ${accountId})
+    order by i.created_at desc
   `;
+  return rows.map((r) => ({ ...r, my_roles: toArray(r.my_roles) }));
 }
 
 // Every idea initiated by a currently-enrolled learner (account_tracks) —

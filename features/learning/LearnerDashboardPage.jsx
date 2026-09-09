@@ -17,17 +17,22 @@
 // dragging the average toward 0 (or, for in_progress, showing a number
 // before there's a real result behind it).
 //
-// "Ideas shipped" (KPI, renamed from the mockup's "Skills applied") and the
-// full-width Application card read the Ideas Hub's `ideas` table by OWNER
-// and STATUS only (ideas.initiator_account_id, ideas.status) — both already
-// point at the same shared accounts table course_assignments does, so this
-// needed no new column, no new table, and no idea<->course link. That link
-// (which idea came from which course/skill) still doesn't exist — the
-// mockup's own "From Prompting + Summarizing" per-idea attribution isn't
-// shown here for that reason, and the KPI is named for what's actually
-// counted (ideas launched) rather than "skills applied," which this can't
-// measure. STATUS_META/STATUS_ORDER (features/ideas/constants.js) are
-// imported for this the same way POSITIONS is already imported from
+// "Ideas shipped" (KPI, renamed from the mockup's "Skills applied") reads
+// the Ideas Hub's `ideas` table by OWNER and STATUS only
+// (ideas.initiator_account_id, ideas.status) — both already point at the
+// same shared accounts table course_assignments does, so this needed no
+// new column, no new table, and no idea<->course link. That link (which
+// idea came from which course/skill) still doesn't exist — the mockup's
+// own "From Prompting + Summarizing" per-idea attribution isn't shown here
+// for that reason, and the KPI is named for what's actually counted (ideas
+// launched, submissions only) rather than "skills applied," which this
+// can't measure. The full-width Application card is scoped wider than the
+// KPI: it shows every idea the learner has ANY hand in, not just ones they
+// submitted — getMyIdeas (features/learning/queries.js) also matches
+// idea_members, so joining someone else's idea as, say, AI Design or
+// Tester earns it a place here too, tagged with that role (my_roles) — see
+// IdeaRow below. STATUS_META/STATUS_ORDER (features/ideas/constants.js)
+// are imported for this the same way POSITIONS is already imported from
 // features/accounts/constants (features/learning/queries.js) — reusing the
 // Ideas Hub's own status vocabulary/colors rather than a second, driftable
 // copy of it.
@@ -149,12 +154,18 @@ function NextRow({ icon, title, detail }) {
   );
 }
 
-// One of the learner's own Ideas Hub submissions — Application card. Links
+// One of the learner's own Ideas Hub ideas — either submitted (Initiator)
+// or joined as a team member in a different role — Application card. Links
 // to the real idea page; status pill reuses STATUS_META (features/ideas/
 // constants.js) so it matches the Ideas Hub's own board colors exactly,
-// rather than a second palette invented for this one card.
+// rather than a second palette invented for this one card. my_roles
+// (getMyIdeas, features/learning/queries.js) names which role earned this
+// idea its spot — "Initiator" for a submission, or e.g. "AI Design"/
+// "Tester" for a team join — so joining in a non-Initiator role still
+// shows up here with real context, not indistinguishable from submitting.
 function IdeaRow({ idea }) {
   const meta = STATUS_META[idea.status] || { bg: "#eef0f4", fg: "#5e687a" };
+  const roleLabel = (idea.my_roles || []).join(", ");
   return (
     <Link
       href={`/idea/${idea.id}`}
@@ -162,7 +173,7 @@ function IdeaRow({ idea }) {
     >
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{idea.name}</div>
-        <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{idea.number}</div>
+        <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{idea.number}{roleLabel && ` · ${roleLabel}`}</div>
       </div>
       <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap", background: meta.bg, color: meta.fg }}>{idea.status}</span>
     </Link>
@@ -338,8 +349,11 @@ export default function LearnerDashboardPage() {
   // KPI: "Ideas shipped" — count of the learner's own Ideas Hub submissions
   // (ideas.initiator_account_id) that reached Launched (ideas.status). See
   // the file header comment for why this is owner+status only, not a
-  // fabricated skill-level "applied" count.
-  const shippedIdeas = ideas.filter((i) => i.status === "Launched").length;
+  // fabricated skill-level "applied" count. Scoped to my_roles including
+  // Initiator so this stays "submitted by me," unlike the wider Application
+  // card below it (which also counts ideas joined in another role).
+  const myOwnIdeas = ideas.filter((i) => (i.my_roles || []).includes("Initiator"));
+  const shippedIdeas = myOwnIdeas.filter((i) => i.status === "Launched").length;
 
   // Same skip-a-tier action the Mind map has always had — moved here with it.
   const confirmSkip = async () => {
@@ -376,8 +390,8 @@ export default function LearnerDashboardPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
                   <KpiHolder label="Roadmap complete" value={`${roadmapPct}%`} hint={`${roadmapComplete} of ${visibleJourney.length}${visiblePosition ? ` · through ${POSITION_LABEL[visiblePosition] || visiblePosition}` : ""}`} />
                   <KpiHolder label="Level" value={POSITION_LABEL[position] || "—"} hint={levelHint} />
-                  <KpiHolder label="Weekly streak" value={`${streak} wk${streak === 1 ? "" : "s"}`} hint="From Auto Schedule sessions" />
-                  <KpiHolder label="Ideas shipped" value={shippedIdeas} hint={`${ideas.length} submitted total`} accent />
+                  <KpiHolder label="Weekly streak" value={`${streak} wk${streak === 1 ? "" : "s"}`} hint="Weeks with a course completed" />
+                  <KpiHolder label="Ideas shipped" value={shippedIdeas} hint={`${myOwnIdeas.length} submitted total`} accent />
                 </div>
 
                 {/* ── Learning + side column ── */}
@@ -468,9 +482,9 @@ export default function LearnerDashboardPage() {
                 <div style={{ ...card, marginBottom: 16 }}>
                   <p style={eyebrow}>Application · AI Ideas Hub</p>
                   <h2 style={cardTitle}>What I've built from what I learned</h2>
-                  <p style={cardCaption}>Ideas you've submitted to the Ideas Hub — not yet linked back to the specific course or skill each one came from.</p>
+                  <p style={cardCaption}>Ideas you've submitted or joined a team on — not yet linked back to the specific course or skill each one came from.</p>
                   {ideas.length === 0 ? (
-                    <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Nothing submitted yet.</div>
+                    <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Nothing here yet.</div>
                   ) : (
                     <div>{ideas.map((idea) => <IdeaRow key={idea.id} idea={idea} />)}</div>
                   )}
