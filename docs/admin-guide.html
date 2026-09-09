@@ -707,7 +707,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <table>
           <thead><tr><th style="width:200px">Panel</th><th>What it shows</th></tr></thead>
           <tbody>
-            <tr><td><b>Coverage</b> (heatmap)</td><td>One row per skill, one column per learner, bucketed None / Learning / Proficient / Strong. Skills are whatever the team&rsquo;s courses are actually tagged with, strongest first. <b>None</b> means no engaged courses for that skill &mdash; not a zero score.</td></tr>
+            <tr><td><b>Coverage</b> (heatmap)</td><td>One row per skill, one column per learner, bucketed None / Learning / Proficient / Strong. Skills are whatever the team&rsquo;s courses are actually tagged with, strongest first. <b>None</b> means no completed course toward that skill yet (a course in progress doesn&rsquo;t count) &mdash; not a zero score.</td></tr>
             <tr><td><b>Distribution</b></td><td>How many enrolled learners sit at each seniority level.</td></tr>
             <tr><td><b>Application</b></td><td>A funnel of ideas raised by enrolled learners, using the board&rsquo;s own statuses. <b>On Hold</b> and <b>Declined</b> are excluded, as the board treats them as off-timeline. Below it, how many learners have raised at least one idea; click to expand a per-person breakdown.</td></tr>
           </tbody>
@@ -716,7 +716,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <h3>Drilling into one person</h3>
 
-      <p>Clicking a roster row opens that learner&rsquo;s roadmap <b>read-only</b>. You cannot reorder it, and the <b>Wrap-up link is hidden entirely</b> &mdash; an admin cannot open someone else&rsquo;s quiz. It is scoped the way the learner&rsquo;s own view is: their tier and below, plus one tier of early access.</p>
+      <p>Clicking a roster row opens that learner&rsquo;s roadmap <b>read-only</b>: the <b>Wrap-up link is hidden entirely</b> &mdash; an admin cannot open someone else&rsquo;s quiz. It is scoped the way the learner&rsquo;s own view is: their tier and below, plus one tier of early access.</p>
 
       <p>It is the roadmap table only, not their full dashboard. You will not see their quiz statistics or skill confidence here.</p>
 

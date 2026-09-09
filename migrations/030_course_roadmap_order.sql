@@ -1,0 +1,17 @@
+-- Migration 030 — an explicit ordering column for the course catalog
+--
+-- courses had no column that captured the seed's own authored curriculum
+-- sequence. getTrackWithCourses()/getJourney() (features/learning/queries.js)
+-- fell back to c.created_at to break ties within a stage/tier, but both
+-- ai-track-seed.sql and migration 023 before it insert every course in ONE
+-- statement — every course in the same stage shares the exact same
+-- created_at (now() is constant for the life of a statement), so that
+-- "tiebreak" never actually broke anything. Whatever order Postgres
+-- happened to return instead had nothing to do with the seed's own row
+-- order — e.g. Claude 101 could sort ahead of AI Capabilities and
+-- Limitations, even though the seed lists it second.
+--
+-- Content — which number lands on which course — is seeded separately by
+-- ai-track-seed.sql (an UPDATE block, re-runnable), same split as skills
+-- (migration 028): this file is structure, that one is content.
+alter table courses add column if not exists roadmap_order integer;

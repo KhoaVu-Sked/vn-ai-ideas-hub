@@ -33,9 +33,9 @@ export const POSITION_ORDER = POSITIONS;
 // from a course's existing expected_by_position, not a new column or a
 // replacement for it. Every gating rule that actually cares about seniority
 // (isExpectedByNow below, MindMap's tier locks, Team view's roster/heatmap,
-// Auto Schedule's from/to range, JourneyTable's same-tier drag check) keeps
-// reading the raw 5-value position exactly as before — Senior and Principal
-// stay fully distinct everywhere except this one chart, where they share the
+// Auto Schedule's from/to range) keeps reading the raw 5-value position
+// exactly as before — Senior and Principal stay fully distinct everywhere
+// except this one chart, where they share the
 // "Advanced" bar simply because there's one more role than there are named
 // levels, not because either role's own tracking changes anywhere else.
 export const PROGRESS_LEVEL_ORDER = ["foundations", "applied", "intermediate", "advanced"];
@@ -265,25 +265,25 @@ export function weeklyStreak(courses, today = new Date()) {
 export const SKILL_CONFIDENCE_SCALE = 5;
 
 // One course's contribution to whichever skill(s) it's tagged with
-// (courses.skills, migration 028) — null for a course that hasn't been
-// started yet, so it's excluded from the average entirely rather than
-// dragging a skill toward 0 just because the learner hasn't gotten there.
-// A skipped course carries the same "no signal" treatment as not_started —
-// skipping says nothing about how well the material was learned.
+// (courses.skills, migration 028) — null for anything short of complete, so
+// it's excluded from the average entirely rather than counting a skill the
+// learner hasn't actually finished proving. in_progress used to count for
+// half credit; removed on the product owner's own reasoning — "started, not
+// yet proven" was still showing a confidence number before any course
+// tagged with that skill had a real result behind it. A skipped course gets
+// the same "no signal" treatment — skipping says nothing about how well the
+// material was learned.
 //   - complete + has a quiz snapshot: first-try accuracy (quiz_correct_first_try
 //     / quiz_total_questions) — the same ratio the Knowledge artifacts card
 //     already shows per course (03-your-journey.md), reused here as the
 //     "how well" signal instead of inventing a second one.
-//   - complete + no quiz (5 of the 20 catalog courses have none —
-//     01-course-catalog.md): full credit. There's nothing to grade, and
-//     finishing the course is still real progress toward the skill.
-//   - in_progress: half credit — started, not yet proven.
+//   - complete + no quiz (5 of the 20 AI Track courses, and all 36 Career
+//     Track ones, have none — 01-course-catalog.md): full credit. There's
+//     nothing to grade, and finishing the course is still real progress
+//     toward the skill.
 function courseStrength(course) {
-  if (course.status === "complete") {
-    return course.quiz_total_questions ? course.quiz_correct_first_try / course.quiz_total_questions : 1;
-  }
-  if (course.status === "in_progress") return 0.5;
-  return null; // not_started / skipped
+  if (course.status !== "complete") return null; // not_started / in_progress / skipped
+  return course.quiz_total_questions ? course.quiz_correct_first_try / course.quiz_total_questions : 1;
 }
 
 // Groups a journey's courses by skill tag (a course can carry more than

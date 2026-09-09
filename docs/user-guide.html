@@ -1068,7 +1068,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <h3>Order, dates, and Up next</h3>
 
-      <p>You can <b>drag rows to reorder</b> them, but only within the same level &mdash; a course cannot be dragged into a different tier. Reordering is also switched off while you have a single track filtered; clear the filter back to all tracks to rearrange.</p>
+      <p>Rows are ordered Intern through your own level, then by the roadmap's own sequence within a level &mdash; there is no manual reordering.</p>
 
       <p>The <b>Up next</b> card shows the next two courses you have not finished, dated ones first. Three controls sit on it:</p>
 
@@ -1172,6 +1172,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
         <table>
           <thead><tr><th style="width:180px">Behaviour</th><th>Detail</th></tr></thead>
           <tbody>
+            <tr><td><b>Level range</b></td><td>Capped at your own current level. Finish every course in it and you earn one level of early access (section 12) &mdash; Auto Schedule then defaults From and To to just that new level, since everything below is already booked.</td></tr>
             <tr><td><b>Block length</b></td><td>One session per course, capped at 4 hours however long the course estimate says.</td></tr>
             <tr><td><b>Existing commitments</b></td><td>It reads your calendar's busy times and avoids them, and avoids double-booking its own blocks.</td></tr>
             <tr><td><b>Running it again</b></td><td>Updates the blocks it already made rather than creating duplicates. If you deleted one yourself, it makes a new one.</td></tr>
@@ -1269,7 +1270,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <p>It is display only. Every rule that actually gates a course &mdash; locking, ordering, what your roadmap expects &mdash; uses the five positions, not these four names.</p>
 
-      <p>Below the bars, <b>My courses</b> is the same list as Your Journey, not a read-only copy: you can drag to reorder and open a wrap-up quiz from here exactly as you can there.</p>
+      <p>Below the bars, <b>My courses</b> is the same list as Your Journey, not a read-only copy: you can open a wrap-up quiz from here exactly as you can there.</p>
 
       <h3>The mind map, and courses that are locked</h3>
 
@@ -1314,7 +1315,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
           <thead><tr><th style="width:180px">Card</th><th>What it tells you</th></tr></thead>
           <tbody>
             <tr><td><b>Learning activity</b></td><td>Courses completed, hours logged, in progress, and your current streak. All-time, not this month.</td></tr>
-            <tr><td><b>Confidence by skill</b></td><td>Your quiz accuracy grouped by <b>skill</b> rather than by course. A skill you have not started any course toward is <b>left out entirely</b> rather than shown at zero.</td></tr>
+            <tr><td><b>Confidence by skill</b></td><td>Your quiz accuracy grouped by <b>skill</b> rather than by course, counting only courses you have actually completed &mdash; a course you have started but not finished does not count yet. A skill with no completed course toward it is <b>left out entirely</b> rather than shown at zero.</td></tr>
             <tr><td><b>What&rsquo;s next</b></td><td>The same next pick as Your Journey&rsquo;s Up next, plus a nudge drawn from the last course you finished.</td></tr>
             <tr><td><b>Application</b></td><td>Every idea you have raised, with its board status. This is the one place the two halves of the app meet.</td></tr>
           </tbody>

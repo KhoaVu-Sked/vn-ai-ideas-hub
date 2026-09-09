@@ -1,21 +1,31 @@
 -- TS - AI Ideas Hub — AI Track content seed
 --
--- The AI Learning feature's actual content: the AI Track + Core Competency
--- tracks, the AI Track's 23 real courses (imported from the roadmap
--- spreadsheet), the wrap-up quiz questions for 15 of them (imported from
--- "AI Learning Course Framework.xlsx" — see migrations 022, 023, and 025 for
--- how this data was originally introduced, one delta at a time), and the
--- skill tags each course carries (courses.skills, migration 028).
+-- The AI Learning feature's AI Track content: 20 real courses (imported
+-- from the roadmap spreadsheet), wrap-up quiz questions for 15 of them
+-- (imported from "AI Learning Course Framework.xlsx" — see migrations 022,
+-- 023, and 025 for how this data was originally introduced, one delta at a
+-- time), and its own skill tags (courses.skills, migration 028). Every
+-- course carries courses.roadmap_order (migration 030) — see that
+-- migration's own comment for why created_at can't do this job.
+--
+-- The Career Track's own content lives in career-track-seed.sql, a sibling
+-- file, not here — split out so each track can be edited and re-run
+-- independently (originally both lived in this file; the Career Track grew
+-- enough, and changes enough, that sharing a file stopped being convenient).
+-- "Core Competency" (the third track row, still empty — see
+-- 01-course-catalog.md, 2.1) is a different, older idea; its tracks row is
+-- created right below, same as always, but it has no content seed of its
+-- own to run.
 --
 -- Separate from schema.sql on purpose: schema.sql is table design only
 -- (every create table / alter table this app needs); this file is content,
 -- run once schema.sql has already created tracks/courses/course_assignments/
 -- course_quiz_questions. Not destructive — every insert here is
 -- ON CONFLICT DO NOTHING, safe to re-run on a database that already has
--- some or all of this content. The skills UPDATE near the bottom is
--- re-runnable for a different reason (plain UPDATE, not an insert) — see the
--- comment there. That's also the block to edit and re-run on its own if the
--- skill taxonomy itself needs to change later.
+-- some or all of this content. The skills UPDATE block is re-runnable for
+-- a different reason (plain UPDATE, not an insert) — see its own comment.
+-- That's also the block to edit and re-run on its own if the AI Track's
+-- skill taxonomy needs to change later.
 --
 -- Run schema.sql first.
 
@@ -91,6 +101,39 @@ from (values
   ('Claude Code 101', array['Applied AI Development']::text[]),
   ('Claude Code in Action', array['Applied AI Development']::text[])
 ) as v(title, skills)
+where courses.title = v.title
+  and courses.track_id = (select id from tracks where name = 'AI Track');
+
+-- Curriculum sequence (courses.roadmap_order, migration 030) — the number
+-- getJourney()/getTrackWithCourses() (features/learning/queries.js) now sort
+-- by within a stage/tier, instead of the created_at tiebreak that never
+-- actually broke ties (every course above is inserted in one statement, so
+-- they all share one created_at). Same re-runnable-UPDATE-by-title pattern
+-- as skills just above, and the same reason: renumbering the roadmap later
+-- means editing the numbers below and re-running just this block.
+update courses set roadmap_order = v.ord
+from (values
+  ('AI Capabilities and Limitations', 1),
+  ('Claude 101', 2),
+  ('AI Fluency: Framework & Foundations', 3),
+  ('Skedulo AI Usage Policy', 4),
+  ('GenAI for Beginners', 5),
+  ('Prompt Engineering: ChatGPT, Claude & AI Masterclass', 6),
+  ('Customer Experience with Generative AI', 7),
+  ('Gemini for Google Workspace (learning path)', 8),
+  ('Claude for Work', 9),
+  ('DevRev Product Mastery', 10),
+  ('AI Foundations & Industry Applications', 11),
+  ('Custom assistants: Claude Projects / Gemini Gems', 12),
+  ('Introduction to Claude Cowork', 13),
+  ('Introduction to subagents', 14),
+  ('Introduction to Model Context Protocol (MCP)', 15),
+  ('Generative AI with Gemini and Google AI Studio for Beginners', 16),
+  ('Build with Claude (API)', 17),
+  ('Claude Code 101', 18),
+  ('Claude Code in Action', 19),
+  ('Introduction to subagents (applied)', 20)
+) as v(title, ord)
 where courses.title = v.title
   and courses.track_id = (select id from tracks where name = 'AI Track');
 

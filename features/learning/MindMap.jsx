@@ -4,9 +4,9 @@
 // JourneyPage.jsx), which now shows the List view only. Lives on the Learner
 // Dashboard (features/learning/LearnerDashboardPage.jsx) instead. Columns by
 // expected_by_position, nodes rendered as an explicit chain (course 1 -> 2 ->
-// 3) within a column via a dot/line rail — the order itself is still set on
-// the List view's table (drag-reorder lives there); this is read-only display
-// of whatever order the query returns.
+// 3) within a column via a dot/line rail — the order itself comes from the
+// catalog's own roadmap_order (queries.js); this is read-only display of
+// whatever order the query returns.
 //
 // A course is Locked until every course in the tier below it is complete or
 // skipped — a tier gate, not a per-course prerequisite graph (this app has no
@@ -64,9 +64,8 @@ function MindMapNode({ course, index, locked, onRequestSkip }) {
 
 // Each node explicitly links to the next — course 1 -> course 2 -> course 3
 // — via a dot-line-arrow-dot connector. Purely a display of whatever order
-// the courses arrive in; the order itself is set on the List view's table
-// (drag-reorder lives there), not here, so there's only one place that
-// implements reordering.
+// the courses arrive in (courses.roadmap_order, queries.js) — nothing here
+// or on the List view changes it; there's no reordering anywhere anymore.
 function NodeRail({ courses, locked, onRequestSkip }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>

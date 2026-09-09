@@ -47,8 +47,9 @@ const SESSION_LENGTH_OPTIONS = [
 const HOW_IT_WORKS_HINT = "Each course's estimated hours are split into sessions of your chosen length (the last one may be shorter). Sessions land on the earliest open weekday slot — 9am–6pm, never 11am–1pm lunch — one per day per course, working around your calendar.";
 const helpBadge = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--line)", background: "none", color: "var(--muted)", fontSize: 10.5, fontWeight: 700, cursor: "help", padding: 0 };
 
-// Asks for a position range ("From" defaults to the learner's own current
-// seniority) and a "Complete by" date — defaults to the next occurrence of
+// Asks for a position range — capped at the learner's own current level, or
+// one level further once early access to it is earned (ceiling/earlyAccess
+// below) — and a "Complete by" date — defaults to the next occurrence of
 // the annual review (annualReviewDate, an admin-editable MM-DD — see Team
 // view's header, TeamPage.jsx), so a roadmap naturally targets "done before
 // the review" unless the learner picks something tighter (the quick-picks
@@ -70,9 +71,18 @@ const helpBadge = { display: "inline-flex", alignItems: "center", justifyContent
 // Google's consent screen and come back to a fresh page load — back to
 // /learning/journey specifically, so it reopens right where the
 // learner left off (see app/api/calendar/connect/route.js's own ?returnTo).
-export default function AutoScheduleModal({ currentPosition, annualReviewDate, onClose, onScheduled }) {
-  const [from, setFrom] = useState(currentPosition || POSITION_ORDER[0]);
-  const [to, setTo] = useState(currentPosition || POSITION_ORDER[POSITION_ORDER.length - 1]);
+export default function AutoScheduleModal({ currentPosition, visiblePosition, annualReviewDate, onClose, onScheduled }) {
+  // Never lets you plan past your own level — or one level further once
+  // early access to it is earned (effectivePosition, shared.js).
+  const ceiling = visiblePosition || currentPosition || POSITION_ORDER[POSITION_ORDER.length - 1];
+  const ceilingIdx = POSITION_ORDER.indexOf(ceiling);
+  const allowedPositions = ceilingIdx === -1 ? POSITION_ORDER : POSITION_ORDER.slice(0, ceilingIdx + 1);
+  const earlyAccess = Boolean(visiblePosition) && visiblePosition !== currentPosition;
+
+  // Early access means the old range is already fully booked — default
+  // straight to the newly unlocked level instead of re-offering it.
+  const [from, setFrom] = useState(earlyAccess ? ceiling : (currentPosition || POSITION_ORDER[0]));
+  const [to, setTo] = useState(ceiling);
   const [sessionHours, setSessionHours] = useState(0.5); // 30 min default
   const [targetDate, setTargetDate] = useState(nextAnnualReviewDateStr(annualReviewDate));
   const [busy, setBusy] = useState(false);
@@ -151,18 +161,25 @@ export default function AutoScheduleModal({ currentPosition, annualReviewDate, o
             <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 18px", lineHeight: 1.5 }}>
               Splits every not-yet-done course in this range into study sessions of the length you pick below, working around your existing meetings.
             </p>
-            <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: allowedPositions.length < POSITION_ORDER.length ? 6 : 14 }}>
               <label style={modalField}>From
                 <select value={from} onChange={(e) => setFrom(e.target.value)} style={modalSelect}>
-                  {POSITION_ORDER.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
+                  {allowedPositions.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
                 </select>
               </label>
               <label style={modalField}>To
                 <select value={to} onChange={(e) => setTo(e.target.value)} style={modalSelect}>
-                  {POSITION_ORDER.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
+                  {allowedPositions.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
                 </select>
               </label>
             </div>
+            {allowedPositions.length < POSITION_ORDER.length && (
+              <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 14px" }}>
+                {earlyAccess
+                  ? `You've unlocked ${POSITION_LABEL[ceiling]} early access — Auto Schedule covers just that level until your own level officially updates.`
+                  : `Capped at your current level (${POSITION_LABEL[ceiling]}) — finish it to unlock early access to the next one.`}
+              </p>
+            )}
             <div style={{ marginBottom: 14 }}>
               <div style={modalLabel}>How long is a study session you'd like?</div>
               <div style={{ display: "flex", gap: 6 }}>

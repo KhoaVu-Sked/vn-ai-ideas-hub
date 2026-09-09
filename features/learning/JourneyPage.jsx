@@ -1,7 +1,12 @@
 "use client";
 
 // Your Journey: every course across the tracks you're enrolled in, as a
-// List view only — ordered intern -> principal, scrolled after ~7 rows.
+// List view only — ordered intern -> principal, then by the roadmap's own
+// authored sequence within a tier (courses.roadmap_order), scrolled after
+// ~7 rows. Manual drag-to-reorder existed here before; it was removed for
+// producing bugs (courses could show in a different order than the
+// roadmap intended), not replaced with anything — courses.roadmap_order is
+// what getJourney() (features/learning/queries.js) now sorts by instead.
 // Restricted to what's expected of this account BY NOW: an Intern only
 // sees the Intern tier, a Junior sees Intern + Junior, and so on
 // (isExpectedByNow, shared.js — the same rule the % completion numbers
@@ -12,18 +17,6 @@
 // visible on the Mind map (Learner Dashboard) — that view is meant to show
 // the road ahead, this one is meant to show what's actually on your plate
 // right now (plus whatever you've just earned).
-// Rows are drag-reorderable (persisted per account on
-// course_assignments.position) — a drop only lands on a row in the same
-// position tier, so a drag can never move a course into a different stage.
-// This is the ONLY place reordering happens; the Mind map (moved to the
-// Learner Dashboard — features/learning/LearnerDashboardPage.jsx) just
-// displays whatever order this table's query already returns.
-// Reordering is disabled (readOnly) whenever a single track is selected in
-// the filter, rather than "All tracks": reorderStage writes position for
-// every course in a tier at once, but a tier can span more than one track —
-// dragging while filtered to one track would only see (and rewrite) that
-// track's slice of the tier, leaving the other track's same-tier courses
-// with stale positions.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -43,26 +36,11 @@ import {
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
-// Draggable row (native HTML5 DnD, no library) — drop is only accepted onto
-// a row in the SAME position tier (checked in JourneyTable.handleDrop), so a
-// drag can never move a course into a different stage.
-function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true }) {
+function JourneyRow({ course, index, expanded, onToggle }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
   return (
     <>
-      <tr
-        draggable={draggable}
-        onDragStart={drag.onDragStart}
-        onDragOver={drag.onDragOver}
-        onDrop={drag.onDrop}
-        onDragEnd={drag.onDragEnd}
-        onClick={onToggle}
-        style={{
-          borderTop: "1px solid var(--line)", cursor: draggable ? "grab" : "pointer",
-          opacity: drag.dragging ? 0.4 : 1,
-          outline: drag.dropTarget ? "2px dashed var(--blue)" : "none", outlineOffset: -2,
-        }}
-      >
+      <tr onClick={onToggle} style={{ borderTop: "1px solid var(--line)", cursor: "pointer" }}>
         <td style={{ ...td, color: "var(--faint)" }}>{index}</td>
         <td style={{ ...td, fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{course.title}</td>
         <td style={td}>{course.track_name}</td>
@@ -90,47 +68,11 @@ function JourneyRow({ course, index, expanded, onToggle, drag, draggable = true 
   );
 }
 
-// Scrolls after ~7 rows; header stays pinned while the body scrolls.
-// Rows are drag-reorderable, but a drop only lands if the dragged row and
-// the drop target share the same expected_by_position — the ordering this
-// table already has (tier first) puts same-tier rows in one contiguous
-// block, so reordering can only ever happen within a stage.
-export function JourneyTable({ courses, onReorder, readOnly = false }) {
-  const [order, setOrder] = useState(courses.map((c) => c.id));
-  const [dragId, setDragId] = useState(null);
-  const [overId, setOverId] = useState(null);
+// Scrolls after ~7 rows; header stays pinned while the body scrolls. Plain
+// display order — whatever `courses` arrives in (getJourney()'s own SQL
+// ORDER BY, features/learning/queries.js).
+export function JourneyTable({ courses }) {
   const [expandedId, setExpandedId] = useState(null);
-  // `courses` is a new array reference on every parent render (it's `journey.
-  // filter(...)`), including ones unrelated to a real reorder — e.g. an
-  // unrelated course's status flips via auto-start or a target-date edit, or
-  // a tab-focus revalidate. Resetting `order` on every reference change would
-  // snap a just-dragged row back to server order before the fire-and-forget
-  // reorderStage() POST (no reload, by design) has landed. Reset only when
-  // the actual SET of course ids changed — a real reload, or the track
-  // filter switching to a different subset — not merely the reference.
-  useEffect(() => {
-    const nextIds = courses.map((c) => c.id);
-    const nextSet = new Set(nextIds);
-    setOrder((prev) => (prev.length === nextSet.size && prev.every((id) => nextSet.has(id)) ? prev : nextIds));
-  }, [courses]);
-
-  const byId = new Map(courses.map((c) => [c.id, c]));
-  const ordered = order.map((id) => byId.get(id)).filter(Boolean);
-  const draggingCourse = dragId ? byId.get(dragId) : null;
-
-  const handleDrop = (targetId) => {
-    if (readOnly) return;
-    setOverId(null);
-    const target = byId.get(targetId);
-    if (!dragId || dragId === targetId || !draggingCourse || !target) { setDragId(null); return; }
-    if (draggingCourse.expected_by_position !== target.expected_by_position) { setDragId(null); return; } // different stage — reject
-    const next = order.filter((id) => id !== dragId);
-    next.splice(next.indexOf(targetId), 0, dragId); // drop before the target's current slot
-    setOrder(next);
-    setDragId(null);
-    const tierIds = next.filter((id) => byId.get(id)?.expected_by_position === target.expected_by_position);
-    onReorder(target.expected_by_position, tierIds);
-  };
 
   return (
     <div style={{ overflow: "auto", maxHeight: HEADER_H + VISIBLE_ROWS * ROW_H, border: "1px solid var(--line)", borderRadius: 10 }}>
@@ -148,22 +90,13 @@ export function JourneyTable({ courses, onReorder, readOnly = false }) {
           </tr>
         </thead>
         <tbody>
-          {ordered.map((c, i) => (
+          {courses.map((c, i) => (
             <JourneyRow
               key={c.id}
               course={c}
               index={i + 1}
               expanded={expandedId === c.id}
               onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-              draggable={!readOnly}
-              drag={{
-                dragging: !readOnly && dragId === c.id,
-                dropTarget: !readOnly && overId === c.id && dragId && dragId !== c.id && draggingCourse?.expected_by_position === c.expected_by_position,
-                onDragStart: readOnly ? undefined : () => setDragId(c.id),
-                onDragOver: readOnly ? undefined : (e) => { e.preventDefault(); if (overId !== c.id) setOverId(c.id); },
-                onDrop: readOnly ? undefined : () => handleDrop(c.id),
-                onDragEnd: readOnly ? undefined : () => { setDragId(null); setOverId(null); },
-              }}
             />
           ))}
         </tbody>
@@ -610,14 +543,6 @@ export default function JourneyPage() {
     }
   };
 
-  // JourneyTable already reordered itself locally for instant feedback; this
-  // just persists it. No reload — a stale-order fetch racing the drop would
-  // visibly snap the rows back, and the local order is already correct.
-  const reorderStage = (position, courseIds) => {
-    api("/api/journey/reorder", { method: "POST", body: JSON.stringify({ position, courseIds }) })
-      .catch((e) => setErr(e.message));
-  };
-
   // Best-effort and silent — this is a background auto-signal, not a user
   // action, so a failure here shouldn't surface a scary error banner.
   const autoStartCourse = (courseId) => {
@@ -668,7 +593,6 @@ export default function JourneyPage() {
                       ? `Showing Intern through ${POSITION_LABEL[visiblePosition] || visiblePosition} — you've finished ${POSITION_LABEL[position] || position} and unlocked early access to the next stage — across every track you're enrolled in.`
                       : `Showing Intern through ${POSITION_LABEL[position] || position} — your current stage — across every track you're enrolled in.`
                     : "Ordered intern → principal, across every track you're enrolled in."}
-                  {" "}Drag a row to reorder it within its stage.
                 </p>
               </div>
               {(journey.length > 0 || calendarConnected) && (
@@ -720,7 +644,7 @@ export default function JourneyPage() {
                 Nothing in this track for the {POSITION_LABEL[visiblePosition] || visiblePosition} stage yet — check back as you progress.
               </div>
             ) : (
-              <JourneyTable courses={visibleJourney} onReorder={reorderStage} readOnly={selectedTrack !== "all"} />
+              <JourneyTable courses={visibleJourney} />
             )}
           </section>
 
@@ -736,6 +660,7 @@ export default function JourneyPage() {
       {autoScheduleOpen && (
         <AutoScheduleModal
           currentPosition={position}
+          visiblePosition={visiblePosition}
           annualReviewDate={annualReviewDate}
           onClose={() => setAutoScheduleOpen(false)}
           onScheduled={load}

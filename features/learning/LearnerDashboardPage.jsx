@@ -11,10 +11,11 @@
 // ai-track-seed.sql) that's deliberately coarser than courses.focus_area
 // (a per-course description, ~1:1 with the title, and not what this reads).
 // Each skill's meter averages courseStrength (shared.js) across whichever of
-// that skill's courses the learner has actually started — quiz accuracy
-// where one exists, full credit for a complete course with no quiz, half
-// credit for in_progress, and not-started/skipped courses excluded rather
-// than dragging the average toward 0.
+// that skill's courses the learner has actually COMPLETED — quiz accuracy
+// where one exists, full credit for a complete course with no quiz. Not
+// started, in progress, and skipped courses are all excluded rather than
+// dragging the average toward 0 (or, for in_progress, showing a number
+// before there's a real result behind it).
 //
 // "Ideas shipped" (KPI, renamed from the mockup's "Skills applied") and the
 // full-width Application card read the Ideas Hub's `ideas` table by OWNER
@@ -318,14 +319,6 @@ export default function LearnerDashboardPage() {
   // fabricated skill-level "applied" count.
   const shippedIdeas = ideas.filter((i) => i.status === "Launched").length;
 
-  // JourneyTable already reorders itself locally for instant feedback (same
-  // component Your Journey uses); this just persists it. No reload — see
-  // JourneyPage's own reorderStage for why.
-  const reorderCourses = (tierPosition, courseIds) => {
-    api("/api/journey/reorder", { method: "POST", body: JSON.stringify({ position: tierPosition, courseIds }) })
-      .catch((e) => setErr(e.message));
-  };
-
   // Same skip-a-tier action the Mind map has always had — moved here with it.
   const confirmSkip = async () => {
     setSkipping(true);
@@ -378,11 +371,11 @@ export default function LearnerDashboardPage() {
                     </div>
 
                     <h2 style={{ ...cardTitle, fontSize: 16, marginTop: 20 }}>My courses</h2>
-                    <p style={cardCaption}>Same list as Your Journey — drag a row to reorder it within its stage.</p>
+                    <p style={cardCaption}>Same list as Your Journey.</p>
                     {visibleJourney.length === 0 ? (
                       <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing expected yet for your stage.</div>
                     ) : (
-                      <JourneyTable courses={visibleJourney} onReorder={reorderCourses} />
+                      <JourneyTable courses={visibleJourney} />
                     )}
                   </section>
 
@@ -451,7 +444,7 @@ export default function LearnerDashboardPage() {
                     <div>
                       <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Mind map</h1>
                       <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
-                        Ordered intern → principal. Reorder from the List view on Your Journey.
+                        Ordered intern → principal.
                       </p>
                     </div>
                     <select
