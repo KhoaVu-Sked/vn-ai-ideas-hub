@@ -113,18 +113,21 @@ create table if not exists courses (
   expected_by_position  text
                           check (expected_by_position in ('intern', 'junior', 'middle', 'senior', 'principal')),
   skills                text[] not null default '{}',  -- shared skill tags (migration 028) — see ai-learning-requirements/01-course-catalog.md
+  roadmap_order         integer,  -- the seed's own authored curriculum sequence (migration 030) — created_at can't do this; every course in a stage is seeded in one statement and ties
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
   unique (track_id, title)
 );
 create index if not exists courses_track_id_idx on courses (track_id);
 -- Existing databases predate these columns — stage/cost/outcome (migration
--- 023) and skills (migration 028). Kept right here, same pattern as
--- course_assignments' own predate-columns block below.
+-- 023), skills (migration 028), and roadmap_order (migration 030). Kept
+-- right here, same pattern as course_assignments' own predate-columns block
+-- below.
 alter table courses add column if not exists stage text;
 alter table courses add column if not exists cost text;
 alter table courses add column if not exists outcome text;
 alter table courses add column if not exists skills text[] not null default '{}';
+alter table courses add column if not exists roadmap_order integer;
 
 -- One row per (account, course): a learner's target date and progress.
 create table if not exists course_assignments (
@@ -134,7 +137,7 @@ create table if not exists course_assignments (
   target_date date,
   status      text not null default 'not_started'
                 check (status in ('not_started', 'in_progress', 'complete', 'skipped')),
-  position    integer,  -- learner's own display order within a position tier
+  position    integer,  -- unused: was the learner's own drag-reorder within a tier — the feature was removed (app code, no migration), column kept rather than dropped
   quiz_total_questions    integer,  -- snapshot at completion time (see migration 026)
   quiz_correct_first_try  integer,  -- how many of those were right on the first click
   calendar_event_id       text,     -- Google Calendar event Auto Schedule created for this course (see migration 027) — legacy single-event bookings only, see calendar_event_ids below

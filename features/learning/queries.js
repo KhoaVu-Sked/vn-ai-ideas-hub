@@ -173,11 +173,12 @@ export async function listTracks(accountId) {
   `;
 }
 
-// One track's roadmap: its courses (ordered by stage, then when they were
-// added) plus the given account's own status per course, defaulting to
-// 'not_started' where no course_assignments row exists yet, plus whether the
-// account is assigned to the track itself. One round trip — json_agg folds
-// the course list into the same query as the track lookup.
+// One track's roadmap: its courses (ordered by stage, then the catalog's
+// own authored sequence — roadmap_order) plus the given account's own
+// status per course, defaulting to 'not_started' where no course_assignments
+// row exists yet, plus whether the account is assigned to the track itself.
+// One round trip — json_agg folds the course list into the same query as
+// the track lookup.
 export async function getTrackWithCourses(trackId, accountId) {
   const rows = await sql`
     select t.id, t.name,
@@ -188,7 +189,7 @@ export async function getTrackWithCourses(trackId, accountId) {
           'platform', c.platform, 'est_hours', c.est_hours, 'cost', c.cost, 'outcome', c.outcome,
           'priority', c.priority, 'link', c.link, 'expected_by_position', c.expected_by_position,
           'status', coalesce(ca.status, 'not_started'), 'target_date', ca.target_date
-        ) order by c.stage asc, c.created_at asc
+        ) order by c.stage asc, coalesce(c.roadmap_order, 999999), c.created_at asc
       ) filter (where c.id is not null), '[]') as courses
     from tracks t
     left join courses c on c.track_id = t.id
@@ -201,10 +202,11 @@ export async function getTrackWithCourses(trackId, accountId) {
 
 // Your Journey: the account's own seniority level plus every course across
 // every track it's enrolled in (via account_tracks), flattened into one
-// list — ordered by position tier, then the learner's own custom order
-// within that tier (course_assignments.position, if they've ever reordered
-// it), then track/stage/created_at as the fallback before that. target_date
-// is only ever non-null once something actually writes course_assignments.
+// list — ordered by position tier, then track name, then the catalog's own
+// authored sequence within that tier (courses.roadmap_order — there's no
+// per-learner override; manual drag-reorder existed and was removed for
+// producing bugs). target_date is only ever non-null once something
+// actually writes course_assignments.
 // calendar_connected (another scalar subquery, same round trip) is what
 // Your Journey greys out the Auto Schedule button on until true.
 // One round trip: position is a scalar subquery, courses is json_agg — same
@@ -233,7 +235,7 @@ export async function getJourney(accountId) {
           'updated_at', ca.updated_at
         ) order by
           coalesce(array_position(${POSITION_ORDER}::text[], c.expected_by_position), 999),
-          coalesce(ca.position, 2147483647), t.name asc, c.stage asc, c.created_at asc
+          t.name asc, coalesce(c.roadmap_order, 999999), c.stage asc, c.created_at asc
       ) filter (where c.id is not null), '[]') as courses,
       (
         select coalesce(json_agg(
@@ -260,39 +262,6 @@ export async function getJourney(accountId) {
     where acct.account_id = ${accountId}
   `;
   return rows[0];
-}
-
-// Reorder the courses within one position tier, for this account only —
-// someone else's ordering of the same tier is untouched. Writes position
-// for every course in that tier at once (not just the ones that moved), so
-// the tier never ends up with a mix of set/unset positions. Scoped to
-// courses actually in that tier and reachable via the account's enrolled
-// tracks, so a tampered courseId list can't write positions cross-tier.
-// Deduped defensively: a courseId repeated in the array would make two
-// `valid` rows target the same (account_id, course_id) conflict key inside
-// one INSERT, which Postgres rejects outright ("ON CONFLICT DO UPDATE
-// command cannot affect row a second time") — normal drag-and-drop can't
-// produce that, but a malformed direct POST could.
-export async function reorderStage(accountId, position, courseIds) {
-  const uniqueIds = [...new Set(courseIds)];
-  const rows = await sql`
-    with ord as (
-      select course_id, ord - 1 as position
-      from unnest(${uniqueIds}::uuid[]) with ordinality as t(course_id, ord)
-    ),
-    valid as (
-      select o.course_id, o.position
-      from ord o
-      join courses c on c.id = o.course_id
-      join account_tracks acct on acct.track_id = c.track_id and acct.account_id = ${accountId}
-      where c.expected_by_position = ${position}
-    )
-    insert into course_assignments (account_id, course_id, position)
-    select ${accountId}::uuid, course_id, position from valid
-    on conflict (account_id, course_id) do update set position = excluded.position, updated_at = now()
-    returning course_id
-  `;
-  return { reordered: rows.length };
 }
 
 // Auto-signal "this is the course you're on now": flips a course from
@@ -518,7 +487,7 @@ export async function getAccountSchedulingInfo(accountId) {
 }
 
 // Every not-yet-done course between fromPosition and toPosition (inclusive),
-// across the account's own enrolled tracks — same tier-then-custom-order
+// across the account's own enrolled tracks — same tier-then-roadmap-order
 // shape as getJourney, so Auto Schedule proposes courses in the same order
 // the learner already sees them in. existing_event_ids flattens the legacy
 // single event (calendar_event_id, migration 027) and the current
@@ -541,7 +510,7 @@ export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosit
       and coalesce(ca.status, 'not_started') not in ('complete', 'skipped')
     order by
       array_position(${POSITION_ORDER}::text[], c.expected_by_position),
-      coalesce(ca.position, 2147483647), c.created_at asc
+      coalesce(c.roadmap_order, 999999), c.created_at asc
   `;
   return rows.map((r) => ({
     ...r,

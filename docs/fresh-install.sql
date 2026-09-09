@@ -117,6 +117,7 @@ create table if not exists courses (
   expected_by_position  text
                           check (expected_by_position in ('intern', 'junior', 'middle', 'senior', 'principal')),
   skills                text[] not null default '{}',  -- shared skill tags (migration 028)
+  roadmap_order         integer,  -- seed's own curriculum sequence (migration 030)
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
   unique (track_id, title)
@@ -131,7 +132,7 @@ create table if not exists course_assignments (
   target_date date,
   status      text not null default 'not_started'
                 check (status in ('not_started', 'in_progress', 'complete', 'skipped')),
-  position    integer,  -- learner's own display order within a position tier
+  position    integer,  -- unused: was the learner's own drag-reorder within a tier — the feature was removed (app code, no migration)
   quiz_total_questions    integer,  -- snapshot at completion time (see migration 026)
   quiz_correct_first_try  integer,  -- how many of those were right on the first click
   calendar_event_id       text,     -- Google Calendar event Auto Schedule created for this course (see migration 027) — legacy single-event bookings only, see calendar_event_ids below
