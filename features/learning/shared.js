@@ -277,8 +277,9 @@ export const SKILL_CONFIDENCE_SCALE = 5;
 //     / quiz_total_questions) — the same ratio the Knowledge artifacts card
 //     already shows per course (03-your-journey.md), reused here as the
 //     "how well" signal instead of inventing a second one.
-//   - complete + no quiz (5 of the 20 AI Track courses, and all 36 Career
-//     Track ones, have none — 01-course-catalog.md): full credit. There's
+//   - complete + no quiz (5 of the AI Track's 20 courses have none — Core
+//     Competency has full coverage across all 36, 01-course-catalog.md,
+//     so this branch never actually fires there): full credit. There's
 //     nothing to grade, and finishing the course is still real progress
 //     toward the skill.
 function courseStrength(course) {

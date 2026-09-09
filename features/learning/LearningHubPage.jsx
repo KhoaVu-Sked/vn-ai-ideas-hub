@@ -21,7 +21,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import ConfirmModal from "@/features/learning/ConfirmModal";
 import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, DEFAULT_ANNUAL_REVIEW_MONTH_DAY,
-  todayStr, nextAnnualReviewDateStr, addMonthsDateStr, monthsUntilDateStr, formatMonthDay,
+  todayStr, nextAnnualReviewDateStr, addMonthsDateStr, monthsUntilDateStr, formatMonthDay, fmtDate,
 } from "@/features/learning/shared";
 
 // "Completed" replaces "Enrolled" once every course in the track is done
@@ -416,17 +416,24 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [needsConnect, setNeedsConnect] = useState(false);
+  const [overflowWarning, setOverflowWarning] = useState(null);
 
-  const submit = async () => {
+  // Mirrors AutoScheduleModal.jsx's own handling of the same endpoint's
+  // { warning: "timeline_exceeded" } response — see that file for the full
+  // explanation. confirmOverflow is only ever true from this screen's own
+  // "Schedule anyway" button below.
+  const submit = async (confirmOverflow = false) => {
     if (targetDate <= todayStr()) { setError("Pick a date after today."); return; }
     setBusy(true); setError(""); setNeedsConnect(false);
+    if (!confirmOverflow) setOverflowWarning(null);
     const timeline_months = monthsUntilDateStr(targetDate);
     try {
       const res = await api("/api/courses/auto-schedule", {
         method: "POST",
-        body: JSON.stringify({ from_position: POSITION_ORDER[0], to_position: currentPosition || POSITION_ORDER[0], timeline_months, session_hours: sessionHours }),
+        body: JSON.stringify({ from_position: POSITION_ORDER[0], to_position: currentPosition || POSITION_ORDER[0], timeline_months, session_hours: sessionHours, confirm_overflow: confirmOverflow }),
       });
-      onSaved(res);
+      if (res.warning === "timeline_exceeded") setOverflowWarning(res);
+      else onSaved(res);
     } catch (e) {
       if (e.message === "not_connected") setNeedsConnect(true);
       else setError(e.message);
@@ -443,6 +450,29 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button onClick={onSkip} style={wizardBtn}>Skip for now</button>
           <a href="/api/calendar/connect?returnTo=/learning" style={wizardBtnPrimary(false)}>Connect Google Calendar</a>
+        </div>
+      </>
+    );
+  }
+
+  if (overflowWarning) {
+    return (
+      <>
+        <AutoScheduleTitle />
+        <p style={wizardSubtext}>
+          {overflowWarning.overflowing.length} course{overflowWarning.overflowing.length === 1 ? "" : "s"} won't finish by {fmtDate(overflowWarning.target_date)} at this session length — there isn't enough room in that timeline. Go back and pick a longer "Complete by" date or a longer session, or schedule anyway and let these run over.
+        </p>
+        <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 }}>
+          {overflowWarning.overflowing.map((c) => (
+            <div key={c.course_id} style={{ fontSize: 12.5, color: "var(--body)" }}>
+              <strong>{c.title}</strong> — finishes {fmtDate(c.finishes_at)}, {c.overdue_days} day{c.overdue_days === 1 ? "" : "s"} late
+            </div>
+          ))}
+        </div>
+        {error && <div style={{ ...errBanner, marginBottom: 14 }}>{error}</div>}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={() => setOverflowWarning(null)} disabled={busy} style={wizardBtn}>Back</button>
+          <button onClick={() => submit(true)} disabled={busy} style={wizardBtnPrimary(busy)}>{busy ? "Scheduling…" : "Schedule anyway"}</button>
         </div>
       </>
     );
@@ -489,7 +519,7 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
       {error && <div style={{ ...errBanner, marginBottom: 14 }}>{error}</div>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
         <button onClick={onSkip} disabled={busy} style={wizardBtn}>Skip for now</button>
-        <button onClick={submit} disabled={busy} style={wizardBtnPrimary(busy)}>{busy ? "Scheduling…" : "Save"}</button>
+        <button onClick={() => submit(false)} disabled={busy} style={wizardBtnPrimary(busy)}>{busy ? "Scheduling…" : "Save"}</button>
       </div>
     </>
   );

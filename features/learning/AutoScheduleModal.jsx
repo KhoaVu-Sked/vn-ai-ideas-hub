@@ -49,7 +49,10 @@ const helpBadge = { display: "inline-flex", alignItems: "center", justifyContent
 
 // Asks for a position range — capped at the learner's own current level, or
 // one level further once early access to it is earned (ceiling/earlyAccess
-// below) — and a "Complete by" date — defaults to the next occurrence of
+// below) — scoped to whichever track is currently selected on Your Journey
+// (trackId/trackName, passed down from JourneyPage.jsx's own track filter —
+// there's no separate track choice in this form) — and a "Complete by"
+// date — defaults to the next occurrence of
 // the annual review (annualReviewDate, an admin-editable MM-DD — see Team
 // view's header, TeamPage.jsx), so a roadmap naturally targets "done before
 // the review" unless the learner picks something tighter (the quick-picks
@@ -71,7 +74,7 @@ const helpBadge = { display: "inline-flex", alignItems: "center", justifyContent
 // Google's consent screen and come back to a fresh page load — back to
 // /learning/journey specifically, so it reopens right where the
 // learner left off (see app/api/calendar/connect/route.js's own ?returnTo).
-export default function AutoScheduleModal({ currentPosition, visiblePosition, annualReviewDate, onClose, onScheduled }) {
+export default function AutoScheduleModal({ currentPosition, visiblePosition, trackId, trackName, annualReviewDate, onClose, onScheduled }) {
   // Never lets you plan past your own level — or one level further once
   // early access to it is earned (effectivePosition, shared.js).
   const ceiling = visiblePosition || currentPosition || POSITION_ORDER[POSITION_ORDER.length - 1];
@@ -89,18 +92,31 @@ export default function AutoScheduleModal({ currentPosition, visiblePosition, an
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [needsConnect, setNeedsConnect] = useState(false);
+  const [overflowWarning, setOverflowWarning] = useState(null);
 
-  const submit = async () => {
+  // confirmOverflow is only ever true when re-called from the warning
+  // screen's own "Schedule anyway" button below — the form's Save button
+  // always starts a fresh check. A response carrying `warning:
+  // "timeline_exceeded"` (app/api/courses/auto-schedule/route.js) means
+  // nothing was booked yet: one or more courses would finish after the
+  // "Complete by" date picked below, so this shows that list instead of
+  // treating the call as done.
+  const submit = async (confirmOverflow = false) => {
     if (targetDate <= todayStr()) { setError("Pick a date after today."); return; }
     setBusy(true); setError(""); setResult(null); setNeedsConnect(false);
+    if (!confirmOverflow) setOverflowWarning(null);
     const timeline_months = monthsUntilDateStr(targetDate);
     try {
       const res = await api("/api/courses/auto-schedule", {
         method: "POST",
-        body: JSON.stringify({ from_position: from, to_position: to, timeline_months, session_hours: sessionHours }),
+        body: JSON.stringify({ from_position: from, to_position: to, timeline_months, session_hours: sessionHours, track_id: trackId, confirm_overflow: confirmOverflow }),
       });
-      setResult(res);
-      if (res.scheduled?.length) onScheduled();
+      if (res.warning === "timeline_exceeded") {
+        setOverflowWarning(res);
+      } else {
+        setResult(res);
+        if (res.scheduled?.length) onScheduled();
+      }
     } catch (e) {
       if (e.message === "not_connected") setNeedsConnect(true);
       else setError(e.message);
@@ -111,113 +127,145 @@ export default function AutoScheduleModal({ currentPosition, visiblePosition, an
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.5)", zIndex: 220, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: "var(--card)", borderRadius: 14, padding: 24, width: 440, maxWidth: "100%", boxShadow: "0 20px 60px rgba(10,22,44,0.35)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", marginBottom: 6 }}>
+      {/* Header/body/footer as three flex rows, not one flat block — the
+          body is the only one that scrolls (maxHeight below is the whole
+          card's budget, minus the header/footer it never gives up), so a
+          long scheduled-courses list (result screen, a big track) scrolls
+          in place instead of pushing the Got it button off-screen with no
+          way back to it. */}
+      <div style={{ background: "var(--card)", borderRadius: 14, width: 440, maxWidth: "100%", maxHeight: "calc(100vh - 40px)", boxShadow: "0 20px 60px rgba(10,22,44,0.35)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", padding: "24px 24px 6px" }}>
           🪄 Auto Schedule
           <button type="button" className="icon-tip icon-tip-wide" data-tip={HOW_IT_WORKS_HINT} aria-label="How Auto Schedule calculates sessions" style={helpBadge}>?</button>
         </div>
 
         {needsConnect ? (
           <>
-            <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 18px", lineHeight: 1.5 }}>
-              Connect your Google Calendar first — this only asks once. You'll come back here automatically.
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <div style={{ padding: "0 24px", overflowY: "auto", flex: "1 1 auto", minHeight: 0 }}>
+              <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 18px", lineHeight: 1.5 }}>
+                Connect your Google Calendar first — this only asks once. You'll come back here automatically.
+              </p>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "0 24px 24px" }}>
               <button onClick={onClose} style={modalBtn}>Cancel</button>
               <a href="/api/calendar/connect" style={{ ...modalBtn, border: "none", background: "var(--blue)", color: "#fff" }}>Connect Google Calendar</a>
             </div>
           </>
-        ) : result ? (
+        ) : overflowWarning ? (
           <>
-            <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 14px" }}>
-              {result.message || (result.scheduled.length > 0
-                ? `Booked ${result.scheduled.reduce((sum, s) => sum + s.sessions_booked, 0)} study session${result.scheduled.reduce((sum, s) => sum + s.sessions_booked, 0) === 1 ? "" : "s"} across ${result.scheduled.length} course${result.scheduled.length === 1 ? "" : "s"}.`
-                : "Couldn't book any study sessions — see below.")}
-            </p>
-            {result.scheduled?.length > 0 && (
+            <div style={{ padding: "0 24px", overflowY: "auto", flex: "1 1 auto", minHeight: 0 }}>
+              <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 14px", lineHeight: 1.5 }}>
+                {overflowWarning.overflowing.length} course{overflowWarning.overflowing.length === 1 ? "" : "s"} won't finish by {fmtDate(overflowWarning.target_date)} at this session length — there isn't enough room in that timeline. Go back and pick a longer "Complete by" date or a longer session, or schedule anyway and let these run over.
+              </p>
               <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-                {result.scheduled.map((s) => (
-                  <div key={s.course_id} style={{ fontSize: 12.5, color: "var(--body)" }}>
-                    <strong>{s.title}</strong> — {s.sessions_booked} session{s.sessions_booked === 1 ? "" : "s"}, starting {fmtDate(s.target_date)}
-                    {s.sessions_booked < s.sessions_planned && <span style={{ color: "var(--muted)" }}> · fewer than planned, ran out of room</span>}
+                {overflowWarning.overflowing.map((c) => (
+                  <div key={c.course_id} style={{ fontSize: 12.5, color: "var(--body)" }}>
+                    <strong>{c.title}</strong> — finishes {fmtDate(c.finishes_at)}, {c.overdue_days} day{c.overdue_days === 1 ? "" : "s"} late
                   </div>
                 ))}
               </div>
-            )}
-            {result.skipped?.length > 0 && (
-              <div style={{ marginBottom: 4, display: "flex", flexDirection: "column", gap: 4 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)" }}>Couldn't place {result.skipped.length}:</div>
-                {result.skipped.map((s) => (
-                  <div key={s.course_id} style={{ fontSize: 12, color: "var(--muted)" }}>{s.title} — {s.reason}</div>
-                ))}
-              </div>
-            )}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
-              <button onClick={onClose} style={modalBtnPrimary(false)}>Done</button>
+              {error && <div style={{ ...errBanner, marginBottom: 14 }}>{error}</div>}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 24px 24px", borderTop: "1px solid var(--line)", marginTop: 4 }}>
+              <button onClick={() => setOverflowWarning(null)} disabled={busy} style={modalBtn}>Back</button>
+              <button onClick={() => submit(true)} disabled={busy} style={modalBtnPrimary(busy)}>{busy ? "Scheduling…" : "Schedule anyway"}</button>
+            </div>
+          </>
+        ) : result ? (
+          <>
+            <div style={{ padding: "0 24px", overflowY: "auto", flex: "1 1 auto", minHeight: 0 }}>
+              <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 14px" }}>
+                {result.message || (result.scheduled.length > 0
+                  ? `Booked ${result.scheduled.reduce((sum, s) => sum + s.sessions_booked, 0)} study session${result.scheduled.reduce((sum, s) => sum + s.sessions_booked, 0) === 1 ? "" : "s"} across ${result.scheduled.length} course${result.scheduled.length === 1 ? "" : "s"}.`
+                  : "Couldn't book any study sessions — see below.")}
+              </p>
+              {result.scheduled?.length > 0 && (
+                <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                  {result.scheduled.map((s) => (
+                    <div key={s.course_id} style={{ fontSize: 12.5, color: "var(--body)" }}>
+                      <strong>{s.title}</strong> — {s.sessions_booked} session{s.sessions_booked === 1 ? "" : "s"}, starting {fmtDate(s.target_date)}
+                      {s.sessions_booked < s.sessions_planned && <span style={{ color: "var(--muted)" }}> · fewer than planned, ran out of room</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {result.skipped?.length > 0 && (
+                <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)" }}>Couldn't place {result.skipped.length}:</div>
+                  {result.skipped.map((s) => (
+                    <div key={s.course_id} style={{ fontSize: 12, color: "var(--muted)" }}>{s.title} — {s.reason}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "14px 24px 24px", borderTop: "1px solid var(--line)", marginTop: 4 }}>
+              <button onClick={onClose} style={modalBtnPrimary(false)}>Got it</button>
             </div>
           </>
         ) : (
           <>
-            <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 18px", lineHeight: 1.5 }}>
-              Splits every not-yet-done course in this range into study sessions of the length you pick below, working around your existing meetings.
-            </p>
-            <div style={{ display: "flex", gap: 10, marginBottom: allowedPositions.length < POSITION_ORDER.length ? 6 : 14 }}>
-              <label style={modalField}>From
-                <select value={from} onChange={(e) => setFrom(e.target.value)} style={modalSelect}>
-                  {allowedPositions.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
-                </select>
-              </label>
-              <label style={modalField}>To
-                <select value={to} onChange={(e) => setTo(e.target.value)} style={modalSelect}>
-                  {allowedPositions.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
-                </select>
-              </label>
-            </div>
-            {allowedPositions.length < POSITION_ORDER.length && (
-              <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 14px" }}>
-                {earlyAccess
-                  ? `You've unlocked ${POSITION_LABEL[ceiling]} early access — Auto Schedule covers just that level until your own level officially updates.`
-                  : `Capped at your current level (${POSITION_LABEL[ceiling]}) — finish it to unlock early access to the next one.`}
+            <div style={{ padding: "0 24px", overflowY: "auto", flex: "1 1 auto", minHeight: 0 }}>
+              <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 18px", lineHeight: 1.5 }}>
+                Splits every not-yet-done course in {trackName || "this track"}, in this range, into study sessions of the length you pick below, working around your existing meetings.
               </p>
-            )}
-            <div style={{ marginBottom: 14 }}>
-              <div style={modalLabel}>How long is a study session you'd like?</div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {SESSION_LENGTH_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.hours}
-                    type="button"
-                    onClick={() => setSessionHours(opt.hours)}
-                    style={sessionHours === opt.hours ? quickPickSelected : quickPick}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+              <div style={{ display: "flex", gap: 10, marginBottom: allowedPositions.length < POSITION_ORDER.length ? 6 : 14 }}>
+                <label style={modalField}>From
+                  <select value={from} onChange={(e) => setFrom(e.target.value)} style={modalSelect}>
+                    {allowedPositions.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
+                  </select>
+                </label>
+                <label style={modalField}>To
+                  <select value={to} onChange={(e) => setTo(e.target.value)} style={modalSelect}>
+                    {allowedPositions.map((p) => <option key={p} value={p}>{POSITION_LABEL[p]}</option>)}
+                  </select>
+                </label>
               </div>
+              {allowedPositions.length < POSITION_ORDER.length && (
+                <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 14px" }}>
+                  {earlyAccess
+                    ? `You've unlocked ${POSITION_LABEL[ceiling]} early access — Auto Schedule covers just that level until your own level officially updates.`
+                    : `Capped at your current level (${POSITION_LABEL[ceiling]}) — finish it to unlock early access to the next one.`}
+                </p>
+              )}
+              <div style={{ marginBottom: 14 }}>
+                <div style={modalLabel}>How long is a study session you'd like?</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {SESSION_LENGTH_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.hours}
+                      type="button"
+                      onClick={() => setSessionHours(opt.hours)}
+                      style={sessionHours === opt.hours ? quickPickSelected : quickPick}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label style={modalField}>Complete by
+                <input
+                  type="date"
+                  min={todayStr()}
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                  style={modalSelect}
+                />
+              </label>
+              <p style={{ fontSize: 11, color: "var(--muted)", margin: "6px 0 8px" }}>
+                Defaults to this year's annual review ({formatMonthDay(annualReviewDate || DEFAULT_ANNUAL_REVIEW_MONTH_DAY)}). Busy? Pick a closer date to compress the same courses into a tighter timeline.
+              </p>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
+                <button type="button" onClick={() => setTargetDate(nextAnnualReviewDateStr(annualReviewDate))} style={quickPick}>
+                  Annual review · {formatMonthDay(annualReviewDate || DEFAULT_ANNUAL_REVIEW_MONTH_DAY)}
+                </button>
+                <button type="button" onClick={() => setTargetDate(addMonthsDateStr(3))} style={quickPick}>3 months</button>
+                <button type="button" onClick={() => setTargetDate(addMonthsDateStr(6))} style={quickPick}>6 months</button>
+              </div>
+              {error && <div style={{ ...errBanner, marginBottom: 14 }}>{error}</div>}
             </div>
-            <label style={modalField}>Complete by
-              <input
-                type="date"
-                min={todayStr()}
-                value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-                style={modalSelect}
-              />
-            </label>
-            <p style={{ fontSize: 11, color: "var(--muted)", margin: "6px 0 8px" }}>
-              Defaults to this year's annual review ({formatMonthDay(annualReviewDate || DEFAULT_ANNUAL_REVIEW_MONTH_DAY)}). Busy? Pick a closer date to compress the same courses into a tighter timeline.
-            </p>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
-              <button type="button" onClick={() => setTargetDate(nextAnnualReviewDateStr(annualReviewDate))} style={quickPick}>
-                Annual review · {formatMonthDay(annualReviewDate || DEFAULT_ANNUAL_REVIEW_MONTH_DAY)}
-              </button>
-              <button type="button" onClick={() => setTargetDate(addMonthsDateStr(3))} style={quickPick}>3 months</button>
-              <button type="button" onClick={() => setTargetDate(addMonthsDateStr(6))} style={quickPick}>6 months</button>
-            </div>
-            {error && <div style={{ ...errBanner, marginBottom: 14 }}>{error}</div>}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 24px 24px" }}>
               <button onClick={onClose} disabled={busy} style={modalBtn}>Cancel</button>
-              <button onClick={submit} disabled={busy} style={modalBtnPrimary(busy)}>{busy ? "Scheduling…" : "Save"}</button>
+              <button onClick={() => submit(false)} disabled={busy} style={modalBtnPrimary(busy)}>{busy ? "Scheduling…" : "Save"}</button>
             </div>
           </>
         )}

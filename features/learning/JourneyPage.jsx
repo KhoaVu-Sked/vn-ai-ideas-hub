@@ -36,7 +36,7 @@ import {
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
-function JourneyRow({ course, index, expanded, onToggle }) {
+function JourneyRow({ course, index, expanded, onToggle, onUnschedule }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
   return (
     <>
@@ -60,6 +60,16 @@ function JourneyRow({ course, index, expanded, onToggle }) {
                 </a>
               )}
               {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
+              {course.has_scheduled_session && onUnschedule && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onUnschedule(course); }}
+                  title="Delete this course's calendar event(s) and clear its target date"
+                  style={{ alignSelf: "flex-start", background: "none", border: "none", color: "var(--muted)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", padding: 0 }}
+                >
+                  Remove from calendar
+                </button>
+              )}
             </div>
           </td>
         </tr>
@@ -71,7 +81,7 @@ function JourneyRow({ course, index, expanded, onToggle }) {
 // Scrolls after ~7 rows; header stays pinned while the body scrolls. Plain
 // display order — whatever `courses` arrives in (getJourney()'s own SQL
 // ORDER BY, features/learning/queries.js).
-export function JourneyTable({ courses }) {
+export function JourneyTable({ courses, onUnschedule }) {
   const [expandedId, setExpandedId] = useState(null);
 
   return (
@@ -97,6 +107,7 @@ export function JourneyTable({ courses }) {
               index={i + 1}
               expanded={expandedId === c.id}
               onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))}
+              onUnschedule={onUnschedule}
             />
           ))}
         </tbody>
@@ -220,6 +231,11 @@ const calendarWarnBanner = { background: "#fff4e0", border: "1px solid #ffdf9e",
 // consistency across the app.
 const autoScheduleBtn = { display: "inline-flex", alignItems: "center", gap: 8, border: "none", background: "var(--blue)", color: "#fff", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" };
 const autoScheduleBtnDisabled = { ...autoScheduleBtn, background: "var(--bg)", color: "var(--faint)", cursor: "not-allowed" };
+// "Clear schedule" — next to Auto Schedule, not buried in the page header
+// with Reset: it's the same track-scoped tool's own undo, so it belongs
+// where the tool itself is. Outlined, not filled — a real but rarer,
+// more-cautious action than Auto Schedule's own primary blue.
+const clearScheduleBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, color: "var(--body)", cursor: "pointer", whiteSpace: "nowrap" };
 
 // The next 2 courses, not yet complete/skipped: dated ones first (soonest
 // target_date first), then undated ones filling any remaining slots in the
@@ -233,8 +249,12 @@ const autoScheduleBtnDisabled = { ...autoScheduleBtn, background: "var(--bg)", c
 // — "this is the one you're on now" — the moment it becomes the top pick,
 // not on any click. Guarded by a ref so the same course only gets the
 // start call once per mount, not on every re-render.
-function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected }) {
+function UpNextCard({ courses, onAutoStart, onAutoSchedule, onClearSchedule, calendarConnected }) {
   const eligible = courses.filter((c) => c.status !== "complete" && c.status !== "skipped");
+  // Clear schedule only makes sense once Auto Schedule has actually booked
+  // something in this track — hidden rather than a no-op button when there's
+  // nothing to clear yet.
+  const hasAnyScheduled = courses.some((c) => c.has_scheduled_session);
   const dated = eligible.filter((c) => c.target_date).sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
   const undated = eligible.filter((c) => !c.target_date);
   const upcoming = [...dated, ...undated].slice(0, 2);
@@ -262,16 +282,23 @@ function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected })
             AutoScheduleModal's own 409 `needsConnect` screen stays as a
             defensive fallback for a connection that dies between this
             page's load and the click. */}
-        <button
-          onClick={calendarConnected ? onAutoSchedule : undefined}
-          disabled={!calendarConnected}
-          aria-label={calendarConnected ? "Auto Schedule — book study time on your calendar" : "Auto Schedule — connect Google Calendar first, above"}
-          className={calendarConnected ? undefined : "icon-tip"}
-          data-tip={calendarConnected ? undefined : "Connect Google Calendar first — see your profile above"}
-          style={calendarConnected ? autoScheduleBtn : autoScheduleBtnDisabled}
-        >
-          🪄 Auto Schedule
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {calendarConnected && hasAnyScheduled && (
+            <button onClick={onClearSchedule} title="Remove every Auto-Scheduled calendar event for this track and clear their target dates" style={clearScheduleBtn}>
+              Clear schedule
+            </button>
+          )}
+          <button
+            onClick={calendarConnected ? onAutoSchedule : undefined}
+            disabled={!calendarConnected}
+            aria-label={calendarConnected ? "Auto Schedule — book study time on your calendar" : "Auto Schedule — connect Google Calendar first, above"}
+            className={calendarConnected ? undefined : "icon-tip"}
+            data-tip={calendarConnected ? undefined : "Connect Google Calendar first — see your profile above"}
+            style={calendarConnected ? autoScheduleBtn : autoScheduleBtnDisabled}
+          >
+            🪄 Auto Schedule
+          </button>
+        </div>
       </div>
       {!calendarConnected && (
         <div style={calendarWarnBanner}>
@@ -304,17 +331,83 @@ function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected })
   );
 }
 
-// The 3 most recently completed courses, with their wrap-up quiz stats —
-// questions, when, and first-try accuracy. quiz_total_questions/
-// quiz_correct_first_try are a snapshot taken at completion (queries.js ->
-// completeCourse), not a live join, so a course whose quiz changed later
-// still shows what was actually answered. Both null for a course completed
-// before this existed (or completed with no stats sent) — shown honestly as
-// "No quiz data recorded" rather than a fabricated number.
-// inProgressCourse: the account's own current in_progress pick (from the
-// already-fetched journey list — no extra fetch), shown as one more row
-// below the completions so the card also points at what's next, not just
-// what's done. Null when nothing's in progress; no fallback fabricated.
+const clearModalBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "var(--body)", cursor: "pointer" };
+const clearModalBtnDanger = (busy) => ({ border: "none", background: "#c92a2a", color: "#fff", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 });
+
+// Up next's "Clear schedule" opens this instead of a plain yes/no confirm —
+// picking exactly which of the track's currently-scheduled courses to clear,
+// not an all-or-nothing wipe. Every row starts checked (the button's own
+// name implies "everything," so that's the default; unchecking a row just
+// keeps it as it is) — same header/scrollable-body/pinned-footer shape as
+// AutoScheduleModal's own result screen, for the same reason: this list is
+// exactly as long as however many courses got Auto-Scheduled, which for a
+// big track can be a real scrollful.
+function ClearScheduleModal({ courses, trackName, busy, onCancel, onConfirm }) {
+  const [checked, setChecked] = useState(() => new Set(courses.map((c) => c.id)));
+  const toggle = (id) => setChecked((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const allChecked = checked.size === courses.length;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.5)", zIndex: 260, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
+      <div style={{ background: "var(--card)", borderRadius: 14, width: 440, maxWidth: "100%", maxHeight: "calc(100vh - 40px)", boxShadow: "0 20px 60px rgba(10,22,44,0.35)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "24px 24px 10px" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+            <span aria-hidden="true" style={{ width: 40, height: 40, borderRadius: "50%", background: "#fdeaea", color: "#c92a2a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, flexShrink: 0 }}>🗑️</span>
+            <div>
+              <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 4px" }}>Clear {trackName}'s schedule?</div>
+              <p style={{ fontSize: 12.5, color: "var(--body)", margin: 0, lineHeight: 1.5 }}>
+                Removes the calendar event and target date for whichever courses below stay checked. Progress (completed, in-progress, skipped) isn't affected. No undo — re-run Auto Schedule to re-book.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setChecked(allChecked ? new Set() : new Set(courses.map((c) => c.id)))}
+            style={{ background: "none", border: "none", color: "var(--blue)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", padding: 0 }}
+          >
+            {allChecked ? "Deselect all" : "Select all"}
+          </button>
+        </div>
+        <div style={{ padding: "0 24px", overflowY: "auto", flex: "1 1 auto", minHeight: 0 }}>
+          {courses.map((c) => (
+            <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid var(--line)", cursor: "pointer" }}>
+              <input type="checkbox" checked={checked.has(c.id)} onChange={() => toggle(c.id)} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{c.title}</div>
+                <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{c.target_date ? `Target ${fmtDate(c.target_date)}` : "No target date"}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 24px 24px", borderTop: "1px solid var(--line)", marginTop: 4 }}>
+          <button onClick={onCancel} disabled={busy} style={clearModalBtn}>Cancel</button>
+          <button onClick={() => onConfirm([...checked])} disabled={busy || checked.size === 0} style={clearModalBtnDanger(busy)}>
+            {busy ? "Clearing…" : `Clear ${checked.size} course${checked.size === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The 3 most recently completed courses IN THE SELECTED TRACK, with their
+// wrap-up quiz stats — questions, when, and first-try accuracy. Computed
+// client-side from filteredJourney (JourneyPage's own derived const), not a
+// separate fetch — switching the track dropdown re-derives this instantly.
+// quiz_total_questions/quiz_correct_first_try are a snapshot taken at
+// completion (queries.js -> completeCourse), not a live join, so a course
+// whose quiz changed later still shows what was actually answered. Both
+// null for a course completed before this existed (or completed with no
+// stats sent) — shown honestly as "No quiz data recorded" rather than a
+// fabricated number.
+// inProgressCourse: the account's current in_progress pick, same track
+// scope, shown as one more row below the completions so the card also
+// points at what's next, not just what's done. Null when nothing's in
+// progress; no fallback fabricated.
 function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
   return (
     <section style={card}>
@@ -363,12 +456,21 @@ export default function JourneyPage() {
   const { user: me, refresh } = useSession();
   const router = useRouter();
   const [journey, setJourney] = useState([]);
-  const [recentCompletions, setRecentCompletions] = useState([]);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const [selectedTrack, setSelectedTrack] = useState("all");
+  // Clear schedule: track-scoped (whichever track is currently selected —
+  // Up next's own new button, next to Auto Schedule). Remove from calendar:
+  // one course at a time (JourneyTable's row-expand) — unscheduleTarget
+  // holds the course pending confirmation, or null.
+  const [clearScheduleConfirmOpen, setClearScheduleConfirmOpen] = useState(false);
+  const [clearingSchedule, setClearingSchedule] = useState(false);
+  const [unscheduleTarget, setUnscheduleTarget] = useState(null);
+  const [unscheduling, setUnscheduling] = useState(false);
+  // No "all tracks" option — always one specific enrolled track (its id),
+  // auto-picked below once trackOptions is known; "" only until then.
+  const [selectedTrack, setSelectedTrack] = useState("");
   const [position, setPosition] = useState(null);
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false);
   const [annualReviewDate, setAnnualReviewDate] = useState(DEFAULT_ANNUAL_REVIEW_MONTH_DAY);
@@ -420,10 +522,9 @@ export default function JourneyPage() {
   const load = useCallback(async () => {
     setErr("");
     try {
-      const { courses, position: pos, recentCompletions: completions, calendarConnected: cc } = await api("/api/journey");
+      const { courses, position: pos, calendarConnected: cc } = await api("/api/journey");
       setJourney(courses);
       setPosition(pos);
-      setRecentCompletions(completions || []);
       setCalendarConnected(Boolean(cc));
     } catch (e) { setErr(e.message); } finally { setReady(true); }
   }, []);
@@ -434,12 +535,15 @@ export default function JourneyPage() {
   // Derived straight from the journey data already on hand — no extra fetch.
   const trackOptions = Array.from(new Map(journey.map((c) => [c.track_id, c.track_name])).entries())
     .map(([id, name]) => ({ id, name }));
-  // If the previously selected track was un-enrolled (reset, or dropped a
-  // track), fall back to "all" rather than silently showing nothing.
+  // No "all tracks" choice — there's always exactly one selected track (or
+  // none, if not enrolled in any). Auto-picks the first enrolled track on
+  // first load, and re-picks whenever the current selection stops being
+  // valid (the previously selected track was un-enrolled — a Reset, or one
+  // dropped — or this is the very first render, before anything's chosen).
   useEffect(() => {
-    if (selectedTrack !== "all" && !trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack("all");
+    if (!trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack(trackOptions[0]?.id || "");
   }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
+  const filteredJourney = journey.filter((c) => c.track_id === selectedTrack);
   // The List (and Up next, below) only show courses in tiers at or below
   // this account's current position — an Intern sees the Intern tier, a
   // Junior sees Intern + Junior, and so on (isExpectedByNow, shared.js).
@@ -486,12 +590,20 @@ export default function JourneyPage() {
   // two congrats banners.
   const ownTierCourses = journey.filter((c) => c.expected_by_position === position);
   const tierJustFinished = position && ownTierCourses.length > 0 && isTierDone(journey, position);
-  // Knowledge artifacts' "waiting on the quiz" row — the account's current
-  // in_progress pick, across every enrolled track (not scoped to the track
-  // dropdown, same as recentCompletions isn't). Already on hand from the
-  // journey fetch, so no extra request. First match is enough: in practice
-  // there's only ever one, since only the top Up next pick auto-starts.
-  const inProgressCourse = journey.find((c) => c.status === "in_progress") || null;
+  // Knowledge artifacts — both scoped to the track dropdown, same as the
+  // rest of the page now that there's always exactly one selected track
+  // (each track auto-starts its own "Up next" #1 pick independently, so
+  // journey can genuinely hold one in_progress course per enrolled track —
+  // reading the unfiltered journey here would risk showing the OTHER
+  // track's in-progress course while a different one is selected).
+  // Both computed from filteredJourney, already on hand from the journey
+  // fetch — no extra request.
+  const inProgressCourse = filteredJourney.find((c) => c.status === "in_progress") || null;
+  const recentCompletions = filteredJourney
+    .filter((c) => c.status === "complete")
+    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+    .slice(0, 3)
+    .map((c) => ({ ...c, completed_at: c.updated_at }));
   // Core-course progress for the profile strip — the RAW position, not
   // visiblePosition/visibleJourney (see the comment above visibleJourney's
   // own definition for why the % stays uncoupled from early access).
@@ -506,8 +618,8 @@ export default function JourneyPage() {
   // (as a second, selectable view) once visiblePosition !== position.
   const nextTierCoreCourses = filteredJourney.filter((c) => c.priority === "core" && c.expected_by_position === visiblePosition);
   const nextTierCoreComplete = nextTierCoreCourses.filter((c) => c.status === "complete").length;
-  // "All tracks" shows a tag per enrolled track; one specific track shows just that one.
-  const trackTags = selectedTrack === "all" ? trackOptions.map((t) => t.name) : trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
+  // Always exactly the one selected track's own name (or none, pre-selection).
+  const trackTags = trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
   // Resets everything AI Learning itself owns, not just course progress —
   // course_assignments, account_tracks (the Get Started gateway's own
@@ -540,6 +652,51 @@ export default function JourneyPage() {
       setErr(e.message);
     } finally {
       setResetting(false);
+    }
+  };
+
+  // Removes every Auto-Scheduled calendar event for whichever courseIds the
+  // learner left checked in ClearScheduleModal (always a subset of the
+  // CURRENTLY SELECTED track's own scheduled courses — that modal's own
+  // list, never a different track's) and clears their target dates —
+  // status/completions untouched, unlike Reset. The modal stays open
+  // (its own button switches to "Clearing…") until this settles, then
+  // closes itself here — a full reload (not an optimistic patch) since
+  // this can touch several courses at once, not just one.
+  const doClearSchedule = async (courseIds) => {
+    setClearingSchedule(true);
+    setErr("");
+    try {
+      const { calendarError } = await api(`/api/tracks/${selectedTrack}/clear-schedule`, {
+        method: "POST",
+        body: JSON.stringify({ course_ids: courseIds }),
+      });
+      await load();
+      if (calendarError) setErr(calendarError);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setClearingSchedule(false);
+      setClearScheduleConfirmOpen(false);
+    }
+  };
+
+  // Removes just ONE course's own Auto-Scheduled calendar event(s) and
+  // clears its target date (app/api/courses/:id/clear-schedule) — status
+  // untouched. Optimistic local patch, same pattern autoStartCourse already
+  // uses, rather than a full reload for a single known row.
+  const doUnschedule = async (courseId) => {
+    setUnscheduling(true);
+    setErr("");
+    try {
+      const { calendarError } = await api(`/api/courses/${courseId}/clear-schedule`, { method: "POST" });
+      setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, target_date: null, has_scheduled_session: false } : c)));
+      if (calendarError) setErr(calendarError);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setUnscheduling(false);
+      setUnscheduleTarget(null);
     }
   };
 
@@ -582,7 +739,6 @@ export default function JourneyPage() {
                       onChange={(e) => setSelectedTrack(e.target.value)}
                       style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 28, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}
                     >
-                      <option value="all">All tracks</option>
                       {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                   )}
@@ -590,9 +746,9 @@ export default function JourneyPage() {
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
                   {position
                     ? visiblePosition !== position
-                      ? `Showing Intern through ${POSITION_LABEL[visiblePosition] || visiblePosition} — you've finished ${POSITION_LABEL[position] || position} and unlocked early access to the next stage — across every track you're enrolled in.`
-                      : `Showing Intern through ${POSITION_LABEL[position] || position} — your current stage — across every track you're enrolled in.`
-                    : "Ordered intern → principal, across every track you're enrolled in."}
+                      ? `Showing Intern through ${POSITION_LABEL[visiblePosition] || visiblePosition} — you've finished ${POSITION_LABEL[position] || position} and unlocked early access to the next stage — in ${trackTags[0] || "this track"}.`
+                      : `Showing Intern through ${POSITION_LABEL[position] || position} — your current stage — in ${trackTags[0] || "this track"}.`
+                    : `Ordered intern → principal, in ${trackTags[0] || "this track"}.`}
                 </p>
               </div>
               {(journey.length > 0 || calendarConnected) && (
@@ -644,12 +800,18 @@ export default function JourneyPage() {
                 Nothing in this track for the {POSITION_LABEL[visiblePosition] || visiblePosition} stage yet — check back as you progress.
               </div>
             ) : (
-              <JourneyTable courses={visibleJourney} />
+              <JourneyTable courses={visibleJourney} onUnschedule={(course) => setUnscheduleTarget(course)} />
             )}
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
-            <UpNextCard courses={visibleJourney} onAutoStart={autoStartCourse} onAutoSchedule={() => setAutoScheduleOpen(true)} calendarConnected={calendarConnected} />
+            <UpNextCard
+              courses={visibleJourney}
+              onAutoStart={autoStartCourse}
+              onAutoSchedule={() => setAutoScheduleOpen(true)}
+              onClearSchedule={() => setClearScheduleConfirmOpen(true)}
+              calendarConnected={calendarConnected}
+            />
             <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourse={inProgressCourse} />
           </div>
           </div>
@@ -661,6 +823,8 @@ export default function JourneyPage() {
         <AutoScheduleModal
           currentPosition={position}
           visiblePosition={visiblePosition}
+          trackId={selectedTrack}
+          trackName={trackTags[0] || "this track"}
           annualReviewDate={annualReviewDate}
           onClose={() => setAutoScheduleOpen(false)}
           onScheduled={load}
@@ -676,6 +840,28 @@ export default function JourneyPage() {
           confirmLabel="Reset everything"
           onCancel={() => setResetConfirmOpen(false)}
           onConfirm={() => { setResetConfirmOpen(false); doReset(); }}
+        />
+      )}
+
+      {clearScheduleConfirmOpen && (
+        <ClearScheduleModal
+          courses={visibleJourney.filter((c) => c.has_scheduled_session)}
+          trackName={trackTags[0] || "this track"}
+          busy={clearingSchedule}
+          onCancel={() => setClearScheduleConfirmOpen(false)}
+          onConfirm={doClearSchedule}
+        />
+      )}
+
+      {unscheduleTarget && (
+        <ConfirmModal
+          icon="📅"
+          tone="danger"
+          title="Remove this course from your calendar?"
+          body={`This deletes "${unscheduleTarget.title}"'s Auto-Scheduled calendar event(s) and clears its target date. Its progress (status, quiz results) is not affected. There is no undo — you'd need to run Auto Schedule again to re-book it.`}
+          confirmLabel={unscheduling ? "Removing…" : "Remove from calendar"}
+          onCancel={() => setUnscheduleTarget(null)}
+          onConfirm={() => doUnschedule(unscheduleTarget.id)}
         />
       )}
     </div>
