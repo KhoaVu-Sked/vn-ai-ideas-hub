@@ -166,9 +166,11 @@ function NextRow({ icon, title, detail }) {
 // so joining in a non-Initiator role still shows up here with real
 // context, not indistinguishable from submitting. task_count/tasks_done
 // (same idea's Task board, features/ideas — IdeaPage.jsx's own "tasks")
-// only render when the idea actually has tasks, same "no fabricated
-// numbers" rule as the rest of this dashboard — an idea with none doesn't
-// show a misleading "0 of 0."
+// are scoped to tasks ASSIGNED TO THIS ACCOUNT, not every task on the idea
+// regardless of owner — this card is about what this learner built, not
+// the whole team's throughput. Only render when this account actually has
+// tasks on the idea, same "no fabricated numbers" rule as the rest of this
+// dashboard — an idea with none doesn't show a misleading "0 of 0."
 function IdeaRow({ idea }) {
   const meta = STATUS_META[idea.status] || { bg: "#eef0f4", fg: "#5e687a" };
   const roles = idea.my_roles || [];

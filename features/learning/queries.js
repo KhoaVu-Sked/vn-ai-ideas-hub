@@ -139,16 +139,18 @@ export async function getTeamOverview() {
 // insert. my_roles rides along so the card can say *which* role(s) earned
 // this idea its spot — a member can hold several at once (idea_members.
 // roles is an array), so this isn't a single value. task_count/tasks_done
-// count that idea's own `requests` rows (the Ideas Hub's Task board —
-// IdeaPage.jsx calls them "tasks" in its own UI, same table) so the card
-// can show real progress, not just status. Ordered newest-first, same as
-// the Ideas Hub's own board default.
+// count that idea's `requests` rows ASSIGNED TO THIS ACCOUNT specifically
+// (r.assignee_id — same field mineToDo, features/ideas/queries.js, already
+// uses for "is this task mine") — not every task on the idea regardless of
+// who it's for, since a card about what *this learner* built shouldn't
+// take credit for a teammate's unfinished work. Ordered newest-first, same
+// as the Ideas Hub's own board default.
 export async function getMyIdeas(accountId) {
   const rows = await sql`
     select i.id, i.name, i.status, 'IDEA-' || lpad(coalesce(i.seq, 0)::text, 3, '0') as number,
       coalesce((select m.roles from idea_members m where m.idea_id = i.id and m.account_id = ${accountId}), array['Initiator']) as my_roles,
-      (select count(*) from requests r where r.idea_id = i.id)::int as task_count,
-      (select count(*) from requests r where r.idea_id = i.id and r.state = 'done')::int as tasks_done
+      (select count(*) from requests r where r.idea_id = i.id and r.assignee_id = ${accountId})::int as task_count,
+      (select count(*) from requests r where r.idea_id = i.id and r.assignee_id = ${accountId} and r.state = 'done')::int as tasks_done
     from ideas i
     where i.initiator_account_id = ${accountId}
        or exists (select 1 from idea_members m where m.idea_id = i.id and m.account_id = ${accountId})
