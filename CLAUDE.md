@@ -104,4 +104,4 @@ Full doc: [`docs/AI_Ideas_Hub_Requirements_v0.1.docx`](docs/AI_Ideas_Hub_Require
 4. **Join approval and per-role caps** are specified but not built — anyone can self-assign any free role. This is the main gap blocking contribution scoring.
 5. **Notifications:** email is wired; **Slack is not**, and there's no weekly digest or per-user preference.
 6. **Not built:** CSV export, EN/VI content, Draft saving, related-ideas linking.
-7. **Parked:** the Task board (Jira-style columns for an idea's requests) is on `feature/idea-tasks-board`, not merged.
+7. **Task board:** built and merged (`features/ideas/TaskBoard.jsx`/`TaskModal.jsx`/`TaskDrawer.jsx`, `/api/ideas/[id]/tasks*`) — Jira-style columns over an idea's `requests` rows, reachable from the idea page's own "Tasks" tab. `feature/idea-tasks-board` is fully merged (no commits ahead of `main`); this entry previously said "parked," which is now stale.

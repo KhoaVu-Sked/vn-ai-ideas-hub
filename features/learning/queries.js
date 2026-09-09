@@ -136,13 +136,19 @@ export async function getTeamOverview() {
 // idea-creation time), so this reads that table directly rather than only
 // initiator_account_id; the OR on initiator_account_id is just a
 // defensive fallback for an idea whose idea_members row predates that
-// insert. my_roles rides along so the card can say *which* role earned
-// this idea its spot, not just that the account has one. Ordered
-// newest-first, same as the Ideas Hub's own board default.
+// insert. my_roles rides along so the card can say *which* role(s) earned
+// this idea its spot — a member can hold several at once (idea_members.
+// roles is an array), so this isn't a single value. task_count/tasks_done
+// count that idea's own `requests` rows (the Ideas Hub's Task board —
+// IdeaPage.jsx calls them "tasks" in its own UI, same table) so the card
+// can show real progress, not just status. Ordered newest-first, same as
+// the Ideas Hub's own board default.
 export async function getMyIdeas(accountId) {
   const rows = await sql`
     select i.id, i.name, i.status, 'IDEA-' || lpad(coalesce(i.seq, 0)::text, 3, '0') as number,
-      coalesce((select m.roles from idea_members m where m.idea_id = i.id and m.account_id = ${accountId}), array['Initiator']) as my_roles
+      coalesce((select m.roles from idea_members m where m.idea_id = i.id and m.account_id = ${accountId}), array['Initiator']) as my_roles,
+      (select count(*) from requests r where r.idea_id = i.id)::int as task_count,
+      (select count(*) from requests r where r.idea_id = i.id and r.state = 'done')::int as tasks_done
     from ideas i
     where i.initiator_account_id = ${accountId}
        or exists (select 1 from idea_members m where m.idea_id = i.id and m.account_id = ${accountId})

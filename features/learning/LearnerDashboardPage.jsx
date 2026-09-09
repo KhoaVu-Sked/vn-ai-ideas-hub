@@ -159,13 +159,20 @@ function NextRow({ icon, title, detail }) {
 // to the real idea page; status pill reuses STATUS_META (features/ideas/
 // constants.js) so it matches the Ideas Hub's own board colors exactly,
 // rather than a second palette invented for this one card. my_roles
-// (getMyIdeas, features/learning/queries.js) names which role earned this
-// idea its spot — "Initiator" for a submission, or e.g. "AI Design"/
-// "Tester" for a team join — so joining in a non-Initiator role still
-// shows up here with real context, not indistinguishable from submitting.
+// (getMyIdeas, features/learning/queries.js) names which role(s) earned
+// this idea its spot — "Initiator" for a submission, or e.g. "AI Design"/
+// "Tester" for a team join — one pill per role, since a member can hold
+// several at once (idea_members.roles is an array, not a single value),
+// so joining in a non-Initiator role still shows up here with real
+// context, not indistinguishable from submitting. task_count/tasks_done
+// (same idea's Task board, features/ideas — IdeaPage.jsx's own "tasks")
+// only render when the idea actually has tasks, same "no fabricated
+// numbers" rule as the rest of this dashboard — an idea with none doesn't
+// show a misleading "0 of 0."
 function IdeaRow({ idea }) {
   const meta = STATUS_META[idea.status] || { bg: "#eef0f4", fg: "#5e687a" };
-  const roleLabel = (idea.my_roles || []).join(", ");
+  const roles = idea.my_roles || [];
+  const rolePill = { fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "1px 7px", background: "var(--bg)", color: "var(--muted)" };
   return (
     <Link
       href={`/idea/${idea.id}`}
@@ -173,7 +180,13 @@ function IdeaRow({ idea }) {
     >
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{idea.name}</div>
-        <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{idea.number}{roleLabel && ` · ${roleLabel}`}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 3 }}>
+          <span style={{ fontSize: 11.5, color: "var(--muted)" }}>{idea.number}</span>
+          {roles.map((role) => <span key={role} style={rolePill}>{role}</span>)}
+          {idea.task_count > 0 && (
+            <span style={{ fontSize: 11.5, color: "var(--muted)" }}>{idea.tasks_done} of {idea.task_count} tasks done</span>
+          )}
+        </div>
       </div>
       <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap", background: meta.bg, color: meta.fg }}>{idea.status}</span>
     </Link>
