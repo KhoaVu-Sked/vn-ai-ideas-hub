@@ -8,14 +8,13 @@
 -- course carries courses.roadmap_order (migration 030) — see that
 -- migration's own comment for why created_at can't do this job.
 --
--- The Career Track's own content lives in career-track-seed.sql, a sibling
--- file, not here — split out so each track can be edited and re-run
--- independently (originally both lived in this file; the Career Track grew
--- enough, and changes enough, that sharing a file stopped being convenient).
--- "Core Competency" (the third track row, still empty — see
--- 01-course-catalog.md, 2.1) is a different, older idea; its tracks row is
--- created right below, same as always, but it has no content seed of its
--- own to run.
+-- The Core Competency track's own content lives in core-competency-seed.sql,
+-- a sibling file, not here — split out so each track can be edited and
+-- re-run independently (that content was briefly a third track of its own,
+-- "Career Track", before folding into Core Competency instead — see that
+-- file's own header for the naming history). That file creates the Core
+-- Competency tracks row too, since it's the one that actually populates it;
+-- this file only ever creates its own 'AI Track' row.
 --
 -- Separate from schema.sql on purpose: schema.sql is table design only
 -- (every create table / alter table this app needs); this file is content,
@@ -29,7 +28,7 @@
 --
 -- Run schema.sql first.
 
-insert into tracks (name) values ('AI Track'), ('Core Competency')
+insert into tracks (name) values ('AI Track')
 on conflict (name) do nothing;
 
 insert into courses (track_id, stage, focus_area, title, platform, priority, est_hours, cost, outcome, expected_by_position, link)

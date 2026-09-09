@@ -496,7 +496,14 @@ export async function getAccountSchedulingInfo(accountId) {
 // placing this run's fresh sessions — see app/api/courses/auto-schedule/
 // route.js for why delete-then-recreate, not an in-place update, is what
 // a re-run does now that a course can have more than one session.
-export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosition) {
+// trackId is optional — omitted, this still spans every enrolled track
+// exactly as before; passed (AutoScheduleModal always sends the learner's
+// currently-selected track now — features/learning/JourneyPage.jsx), it
+// narrows to that one, so scheduling AI Track never touches Core
+// Competency's own courses or vice versa. No extra trust check needed
+// beyond the coalesce below — a trackId the caller isn't enrolled in just
+// matches zero rows via the account_tracks join, same as any other track.
+export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosition, trackId) {
   const rows = await sql`
     select c.id, c.title, c.est_hours, c.link, c.outcome, c.expected_by_position,
       ca.calendar_event_id, ca.calendar_event_ids
@@ -504,6 +511,7 @@ export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosit
     join courses c on c.track_id = acct.track_id
     left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
     where acct.account_id = ${accountId}
+      and (${trackId}::uuid is null or c.track_id = ${trackId})
       and array_position(${POSITION_ORDER}::text[], c.expected_by_position)
         between array_position(${POSITION_ORDER}::text[], ${fromPosition})
             and array_position(${POSITION_ORDER}::text[], ${toPosition})
@@ -516,6 +524,90 @@ export async function getCoursesForAutoSchedule(accountId, fromPosition, toPosit
     ...r,
     existing_event_ids: [r.calendar_event_id, ...(r.calendar_event_ids || [])].filter(Boolean),
   }));
+}
+
+// Clears whatever Auto Schedule booked for not-yet-done courses in one
+// track, for this account — target_date and both calendar_event_id(s)
+// columns, nothing else. Deliberately an UPDATE, not resetJourney()'s own
+// DELETE: that one wipes the whole row (status included, effectively
+// un-completing everything via the row's absence); this is meant to undo
+// only the SCHEDULING side — a learner who over-booked a track, or wants a
+// clean slate before re-running Auto Schedule, keeps every quiz result and
+// completion exactly as it was. courseIds is optional — omitted, this
+// clears every scheduled course in the track (the "Clear schedule" button's
+// own default, everything pre-checked); passed, it narrows to just that
+// subset (the same modal, some rows unchecked) — either way still
+// constrained to c.track_id = trackId, so a course_id from a different
+// track can't be cleared through this even if the caller sent one by
+// mistake. One round trip: `target` (the pre-update event ids — an
+// UPDATE's own RETURNING would hand back the values just written,
+// null/empty, not the ones that need deleting on Google's side) feeds
+// `upd`, and the final SELECT reads both explicitly — a CTE that nothing
+// downstream selects from is NOT guaranteed to run at all, so `upd` is
+// referenced here the same way resetJourney's own delete CTEs are, not
+// left dangling.
+export async function clearTrackSchedule(accountId, trackId, courseIds) {
+  const rows = await sql`
+    with target as (
+      select ca.course_id, ca.calendar_event_id, ca.calendar_event_ids
+      from course_assignments ca
+      join courses c on c.id = ca.course_id
+      where ca.account_id = ${accountId} and c.track_id = ${trackId}
+        and (${courseIds ?? null}::uuid[] is null or ca.course_id = any(${courseIds ?? null}::uuid[]))
+        and (ca.calendar_event_id is not null or coalesce(array_length(ca.calendar_event_ids, 1), 0) > 0)
+    ),
+    upd as (
+      update course_assignments
+      set target_date = null, calendar_event_id = null, calendar_event_ids = '{}', updated_at = now()
+      where account_id = ${accountId} and course_id in (select course_id from target)
+      returning 1
+    )
+    select
+      (select coalesce(json_agg(json_build_object(
+        'course_id', course_id, 'calendar_event_id', calendar_event_id, 'calendar_event_ids', calendar_event_ids
+      )), '[]') from target) as courses,
+      (select count(*)::int from upd) as cleared_count
+  `;
+  const r = rows[0];
+  return {
+    cleared: r.cleared_count,
+    eventIds: r.courses.flatMap((c) => [c.calendar_event_id, ...(c.calendar_event_ids || [])]).filter(Boolean),
+  };
+}
+
+// Same as clearTrackSchedule, scoped to one course instead of a whole
+// track — the per-course "remove from my calendar" action (JourneyTable's
+// own row-expand, features/learning/JourneyPage.jsx). Scoped to
+// account_id = accountId in the UPDATE itself, so a course_id belonging to
+// someone else's own assignment can never be touched via this — there is
+// no separate ownership check to get wrong. Same explicit double-reference
+// of `upd` as clearTrackSchedule, for the same reason (an unreferenced
+// writable CTE isn't guaranteed to run).
+export async function clearCourseSchedule(accountId, courseId) {
+  const rows = await sql`
+    with target as (
+      select calendar_event_id, calendar_event_ids
+      from course_assignments
+      where account_id = ${accountId} and course_id = ${courseId}
+        and (calendar_event_id is not null or coalesce(array_length(calendar_event_ids, 1), 0) > 0)
+    ),
+    upd as (
+      update course_assignments
+      set target_date = null, calendar_event_id = null, calendar_event_ids = '{}', updated_at = now()
+      where account_id = ${accountId} and course_id = ${courseId}
+      returning 1
+    )
+    select
+      (select coalesce(json_agg(json_build_object(
+        'calendar_event_id', calendar_event_id, 'calendar_event_ids', calendar_event_ids
+      )), '[]') from target) as rows,
+      (select count(*)::int from upd) as cleared_count
+  `;
+  const r = rows[0];
+  return {
+    cleared: r.cleared_count > 0,
+    eventIds: r.rows.flatMap((c) => [c.calendar_event_id, ...(c.calendar_event_ids || [])]).filter(Boolean),
+  };
 }
 
 // Writes what Auto Schedule decided for one course: the target_date Up next
