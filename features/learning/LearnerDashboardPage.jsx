@@ -32,15 +32,9 @@
 // Ideas Hub's own status vocabulary/colors rather than a second, driftable
 // copy of it.
 //
-// Weekly streak (weeklyStreak, shared.js) is scoped to courses actually
-// booked through Auto Schedule (has_scheduled_session true) — Auto
-// Schedule is the only place this app has anything resembling a
-// "session," so that's the signal, not every completion regardless of how
-// it was scheduled. No live Google Calendar read: completion only ever
-// lives in course_assignments.status, never in the calendar event itself,
-// so has_scheduled_session already carries the one bit a live fetch would
-// add ("was this actually booked") without the token-refresh/revoked-
-// access failure modes a live call brings.
+// Weekly streak (weeklyStreak, shared.js) counts any completed course —
+// Auto Schedule booking a session is a scheduling aid for motivation, not
+// a precondition for the streak.
 //
 // The mockup's own "My Progress / Team View" toggle is dropped here — this
 // app already separates those as two nav links in AppHeader ("My Dashboard"
