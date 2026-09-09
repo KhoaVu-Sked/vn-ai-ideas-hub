@@ -9,7 +9,7 @@
 // (the date field, the endpoint call) rather than bending this component's
 // editable-range shape to also support a locked one.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/apiClient";
 import {
   errBanner, POSITION_LABEL, POSITION_ORDER, fmtDate, todayStr,
@@ -51,7 +51,13 @@ const helpBadge = { display: "inline-flex", alignItems: "center", justifyContent
 // one level further once early access to it is earned (ceiling/earlyAccess
 // below) — scoped to whichever track is currently selected on Your Journey
 // (trackId/trackName, passed down from JourneyPage.jsx's own track filter —
-// there's no separate track choice in this form) — and a "Complete by"
+// there's no separate track choice in this form). Picking a range surfaces
+// every not-yet-done course it currently covers as a scrollable checklist
+// (eligibleCourses, derived from the `journey` prop — the same array
+// JourneyPage.jsx already has loaded, so this needs no extra fetch and
+// re-derives instantly as From/To change) — every course starts checked,
+// and unchecking one just leaves it for a later run rather than excluding
+// it from the roadmap. Below that, a "Complete by"
 // date — defaults to the next occurrence of
 // the annual review (annualReviewDate, an admin-editable MM-DD — see Team
 // view's header, TeamPage.jsx), so a roadmap naturally targets "done before
@@ -74,7 +80,7 @@ const helpBadge = { display: "inline-flex", alignItems: "center", justifyContent
 // Google's consent screen and come back to a fresh page load — back to
 // /learning/journey specifically, so it reopens right where the
 // learner left off (see app/api/calendar/connect/route.js's own ?returnTo).
-export default function AutoScheduleModal({ currentPosition, visiblePosition, trackId, trackName, annualReviewDate, onClose, onScheduled }) {
+export default function AutoScheduleModal({ currentPosition, visiblePosition, trackId, trackName, journey, annualReviewDate, onClose, onScheduled }) {
   // Never lets you plan past your own level — or one level further once
   // early access to it is earned (effectivePosition, shared.js).
   const ceiling = visiblePosition || currentPosition || POSITION_ORDER[POSITION_ORDER.length - 1];
@@ -94,6 +100,39 @@ export default function AutoScheduleModal({ currentPosition, visiblePosition, tr
   const [needsConnect, setNeedsConnect] = useState(false);
   const [overflowWarning, setOverflowWarning] = useState(null);
 
+  // Every not-yet-done course the current From/To + track actually covers —
+  // same three conditions getCoursesForAutoSchedule() (queries.js) filters
+  // on server-side (track, position range, status not complete/skipped),
+  // computed here client-side from the journey the caller already has
+  // loaded rather than a round trip, so the list updates the instant From/To
+  // changes. journey's own order (getJourney()'s SQL) already sorts by
+  // position tier then roadmap_order, so no re-sort is needed here.
+  const fromIdx = POSITION_ORDER.indexOf(from);
+  const toIdx = POSITION_ORDER.indexOf(to);
+  const eligibleCourses = journey.filter((c) => {
+    if (trackId && c.track_id !== trackId) return false;
+    const idx = POSITION_ORDER.indexOf(c.expected_by_position);
+    if (idx < 0 || idx < fromIdx || idx > toIdx) return false;
+    return c.status !== "complete" && c.status !== "skipped";
+  });
+  const eligibleKey = eligibleCourses.map((c) => c.id).join(",");
+
+  // Every eligible course starts checked — unchecking one just leaves it
+  // for a later run. Resets to "all checked" whenever the eligible SET
+  // itself changes (From/To or track), not preserved piecemeal across a
+  // range change, since a course that dropped out of range wouldn't mean
+  // anything to keep track of anyway.
+  const [selectedCourseIds, setSelectedCourseIds] = useState(() => new Set(eligibleCourses.map((c) => c.id)));
+  useEffect(() => {
+    setSelectedCourseIds(new Set(eligibleCourses.map((c) => c.id)));
+  }, [eligibleKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleCourse = (id) => setSelectedCourseIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const allCoursesChecked = selectedCourseIds.size === eligibleCourses.length && eligibleCourses.length > 0;
+
   // confirmOverflow is only ever true when re-called from the warning
   // screen's own "Schedule anyway" button below — the form's Save button
   // always starts a fresh check. A response carrying `warning:
@@ -109,7 +148,10 @@ export default function AutoScheduleModal({ currentPosition, visiblePosition, tr
     try {
       const res = await api("/api/courses/auto-schedule", {
         method: "POST",
-        body: JSON.stringify({ from_position: from, to_position: to, timeline_months, session_hours: sessionHours, track_id: trackId, confirm_overflow: confirmOverflow }),
+        body: JSON.stringify({
+          from_position: from, to_position: to, timeline_months, session_hours: sessionHours,
+          track_id: trackId, course_ids: [...selectedCourseIds], confirm_overflow: confirmOverflow,
+        }),
       });
       if (res.warning === "timeline_exceeded") {
         setOverflowWarning(res);
@@ -206,7 +248,7 @@ export default function AutoScheduleModal({ currentPosition, visiblePosition, tr
           <>
             <div style={{ padding: "0 24px", overflowY: "auto", flex: "1 1 auto", minHeight: 0 }}>
               <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 18px", lineHeight: 1.5 }}>
-                Splits every not-yet-done course in {trackName || "this track"}, in this range, into study sessions of the length you pick below, working around your existing meetings.
+                Splits every checked course in {trackName || "this track"}, in this range, into study sessions of the length you pick below, working around your existing meetings.
               </p>
               <div style={{ display: "flex", gap: 10, marginBottom: allowedPositions.length < POSITION_ORDER.length ? 6 : 14 }}>
                 <label style={modalField}>From
@@ -227,6 +269,41 @@ export default function AutoScheduleModal({ currentPosition, visiblePosition, tr
                     : `Capped at your current level (${POSITION_LABEL[ceiling]}) — finish it to unlock early access to the next one.`}
                 </p>
               )}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                  <div style={modalLabel}>
+                    {eligibleCourses.length === 0 ? "Courses in this range" : `Courses in this range (${selectedCourseIds.size} of ${eligibleCourses.length} selected)`}
+                  </div>
+                  {eligibleCourses.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCourseIds(allCoursesChecked ? new Set() : new Set(eligibleCourses.map((c) => c.id)))}
+                      style={{ background: "none", border: "none", color: "var(--blue)", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}
+                    >
+                      {allCoursesChecked ? "Deselect all" : "Select all"}
+                    </button>
+                  )}
+                </div>
+                {eligibleCourses.length === 0 ? (
+                  <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>
+                    Nothing to schedule in that range — every course there is already complete or skipped.
+                  </p>
+                ) : (
+                  <div style={{ border: "1px solid var(--line)", borderRadius: 8, maxHeight: 190, overflowY: "auto" }}>
+                    {eligibleCourses.map((c) => (
+                      <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 10px", borderTop: "1px solid var(--line)", cursor: "pointer" }}>
+                        <input type="checkbox" checked={selectedCourseIds.has(c.id)} onChange={() => toggleCourse(c.id)} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{c.title}</div>
+                          <div style={{ fontSize: 10.5, color: "var(--muted)" }}>
+                            {POSITION_LABEL[c.expected_by_position] || c.expected_by_position}{c.est_hours != null ? ` · ${c.est_hours} hrs` : ""}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div style={{ marginBottom: 14 }}>
                 <div style={modalLabel}>How long is a study session you'd like?</div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -265,7 +342,7 @@ export default function AutoScheduleModal({ currentPosition, visiblePosition, tr
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 24px 24px" }}>
               <button onClick={onClose} disabled={busy} style={modalBtn}>Cancel</button>
-              <button onClick={() => submit(false)} disabled={busy} style={modalBtnPrimary(busy)}>{busy ? "Scheduling…" : "Save"}</button>
+              <button onClick={() => submit(false)} disabled={busy || selectedCourseIds.size === 0} style={modalBtnPrimary(busy)}>{busy ? "Scheduling…" : "Save"}</button>
             </div>
           </>
         )}

@@ -32,15 +32,9 @@
 // Ideas Hub's own status vocabulary/colors rather than a second, driftable
 // copy of it.
 //
-// Weekly streak (weeklyStreak, shared.js) is scoped to courses actually
-// booked through Auto Schedule (has_scheduled_session true) — Auto
-// Schedule is the only place this app has anything resembling a
-// "session," so that's the signal, not every completion regardless of how
-// it was scheduled. No live Google Calendar read: completion only ever
-// lives in course_assignments.status, never in the calendar event itself,
-// so has_scheduled_session already carries the one bit a live fetch would
-// add ("was this actually booked") without the token-refresh/revoked-
-// access failure modes a live call brings.
+// Weekly streak (weeklyStreak, shared.js) counts any completed course —
+// Auto Schedule booking a session is a scheduling aid for motivation, not
+// a precondition for the streak.
 //
 // The mockup's own "My Progress / Team View" toggle is dropped here — this
 // app already separates those as two nav links in AppHeader ("My Dashboard"
@@ -125,12 +119,17 @@ function ConfidenceMeter({ dots }) {
   );
 }
 
+// A fixed row height (rather than organic padding, like MiniRow uses) so
+// the "3 at a time" scroll window below sizes exactly — not an eyeballed
+// maxHeight that happens to roughly fit 3 rows depending on font rendering.
+const SKILL_ROW_H = 34;
+
 // A skill name + its confidence meter — Retention card's own row shape
 // (label left, meter right), distinct from MiniRow (label + text value)
-// even though both share the same border-top/padding rhythm.
+// even though both share the same border-top rhythm.
 function SkillRow({ skill, dots }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--line)" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: SKILL_ROW_H, boxSizing: "border-box", borderTop: "1px solid var(--line)" }}>
       <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{skill}</span>
       <ConfidenceMeter dots={dots} />
     </div>
@@ -431,7 +430,13 @@ export default function LearnerDashboardPage() {
                         <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Start a course to see your confidence by skill.</div>
                       ) : (
                         <div>
-                          {skillRows.map((s) => <SkillRow key={s.skill} skill={s.skill} dots={s.dots} />)}
+                          {/* Scrolls after 3 rows (SKILL_ROW_H) rather than growing the
+                              whole card taller with every skill the learner's touched —
+                              "Avg exam accuracy" stays outside/below, always visible,
+                              since it's one aggregate stat, not another skill to scroll past. */}
+                          <div style={{ overflowY: "auto", maxHeight: SKILL_ROW_H * 3 }}>
+                            {skillRows.map((s) => <SkillRow key={s.skill} skill={s.skill} dots={s.dots} />)}
+                          </div>
                           {myAvgExamAccuracy != null && <MiniRow k="Avg exam accuracy" v={`${myAvgExamAccuracy}%`} />}
                         </div>
                       )}
