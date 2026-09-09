@@ -72,6 +72,10 @@ import { STATUS_META } from "@/features/ideas/constants";
 
 const cardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" };
 const cardCaption = { fontSize: 12, color: "var(--muted)", margin: "0 0 14px" };
+// The small per-section track picker both "My courses" (below) and the Mind
+// map use — same look, two independent values (coursesTrack/selectedTrack),
+// never bound together.
+const trackSelect = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 28, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" };
 
 // ── New (mockup-driven) pieces below ────────────────────────────────────
 
@@ -198,7 +202,8 @@ export default function LearnerDashboardPage() {
   const [ideas, setIdeas] = useState([]);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
-  const [selectedTrack, setSelectedTrack] = useState("all");
+  const [selectedTrack, setSelectedTrack] = useState("");
+  const [coursesTrack, setCoursesTrack] = useState("");
   const [skipTarget, setSkipTarget] = useState(null);
   const [skipping, setSkipping] = useState(false);
   const [skipErr, setSkipErr] = useState("");
@@ -228,11 +233,25 @@ export default function LearnerDashboardPage() {
   // same pattern JourneyPage uses for its own track filter.
   const trackOptions = Array.from(new Map(journey.map((c) => [c.track_id, c.track_name])).entries())
     .map(([id, name]) => ({ id, name }));
-  useEffect(() => {
-    if (selectedTrack !== "all" && !trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack("all");
-  }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filteredJourney = selectedTrack === "all" ? journey : journey.filter((c) => c.track_id === selectedTrack);
+  // Both filters below are scoped the same way Your Journey's own track
+  // filter is (JourneyPage.jsx): always exactly one of the learner's own
+  // enrolled tracks, never an "All tracks" bypass — this dashboard has no
+  // combined-track view anywhere. Two independent selections, not one
+  // shared value: selectedTrack drives the Mind map (bottom of the page),
+  // coursesTrack drives "My courses" (below) — picking a track for one has
+  // no effect on the other. Both default to whichever track sorts first
+  // (getJourney()'s own `t.name asc` — "AI Track" ahead of "Core
+  // Competency").
+  useEffect(() => {
+    if (!trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack(trackOptions[0]?.id || "");
+  }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!trackOptions.some((t) => t.id === coursesTrack)) setCoursesTrack(trackOptions[0]?.id || "");
+  }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const coursesTrackName = trackOptions.find((t) => t.id === coursesTrack)?.name || "";
+
+  const filteredJourney = journey.filter((c) => c.track_id === selectedTrack);
 
   // "Progress by level" — completion per progress level (not raw role;
   // see PROGRESS_LEVEL_ORDER, shared.js) across every enrolled track,
@@ -246,16 +265,20 @@ export default function LearnerDashboardPage() {
     return { level, label: PROGRESS_LEVEL_LABEL[level], roleLabel: roles.join(" & "), total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
   }).filter((l) => l.total > 0);
 
-  // "My courses" reuses Your Journey's own list (JourneyTable) as-is, so it
-  // behaves and scopes identically: what's expected by now (own tier, or one
-  // stage of early access once that tier's fully done — effectivePosition/
-  // isExpectedByNow, shared.js), across every enrolled track. Not the Mind
-  // map's own track filter below.
+  // visibleJourney: what's expected by now (own tier, or one stage of early
+  // access once that tier's fully done — effectivePosition/isExpectedByNow,
+  // shared.js), across every enrolled track — the KPI row and What's next
+  // (below) both stay scoped to this, unfiltered by track, same as before.
+  // "My courses" itself (JourneyTable, below) narrows this further to just
+  // coursesTrack — its own filter, independent of the Mind map's
+  // selectedTrack and of the KPIs above it.
   const visiblePosition = effectivePosition(journey, position);
   const visibleJourney = journey.filter((c) => isExpectedByNow(c, visiblePosition));
+  const coursesJourney = visibleJourney.filter((c) => c.track_id === coursesTrack);
 
-  // KPI: "Roadmap complete" — % of what's expected by now (same scope as
-  // My courses above) that's actually done. No "+X% this month" trend, on
+  // KPI: "Roadmap complete" — % of what's expected by now, across every
+  // enrolled track (visibleJourney, unfiltered by coursesTrack — see that
+  // comment above), that's actually done. No "+X% this month" trend, on
   // purpose — that would need a snapshot history we don't keep, and a
   // fabricated delta would be worse than none.
   const roadmapComplete = visibleJourney.filter((c) => c.status === "complete").length;
@@ -363,19 +386,28 @@ export default function LearnerDashboardPage() {
                   <section style={card}>
                     <p style={eyebrow}>Learning</p>
                     <h2 style={{ ...cardTitle, fontSize: 16 }}>Progress by level</h2>
-                    <p style={cardCaption}>Completion by roadmap stage, across every track you're enrolled in.</p>
+                    <p style={cardCaption}>Completion by roadmap stage, across every track you're enrolled in — not affected by the course filter below.</p>
                     <div>
                       {perLevel.map((l) => (
                         <LevelRow key={l.level} label={l.label} roleLabel={l.roleLabel} complete={l.complete} total={l.total} current={l.level === myLevel} />
                       ))}
                     </div>
 
-                    <h2 style={{ ...cardTitle, fontSize: 16, marginTop: 20 }}>My courses</h2>
-                    <p style={cardCaption}>Same list as Your Journey.</p>
-                    {visibleJourney.length === 0 ? (
-                      <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing expected yet for your stage.</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginTop: 20 }}>
+                      <div>
+                        <h2 style={{ ...cardTitle, fontSize: 16 }}>My courses</h2>
+                        <p style={{ ...cardCaption, margin: 0 }}>Same list as Your Journey, {coursesTrackName || "this track"} only.</p>
+                      </div>
+                      <select value={coursesTrack} onChange={(e) => setCoursesTrack(e.target.value)} style={trackSelect}>
+                        {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
+                    {coursesJourney.length === 0 ? (
+                      <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 14 }}>Nothing expected yet for your stage in {coursesTrackName || "this track"}.</div>
                     ) : (
-                      <JourneyTable courses={visibleJourney} />
+                      <div style={{ marginTop: 14 }}>
+                        <JourneyTable courses={coursesJourney} />
+                      </div>
                     )}
                   </section>
 
@@ -447,12 +479,7 @@ export default function LearnerDashboardPage() {
                         Ordered intern → principal.
                       </p>
                     </div>
-                    <select
-                      value={selectedTrack}
-                      onChange={(e) => setSelectedTrack(e.target.value)}
-                      style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 28, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}
-                    >
-                      <option value="all">All tracks</option>
+                    <select value={selectedTrack} onChange={(e) => setSelectedTrack(e.target.value)} style={trackSelect}>
                       {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                   </div>
