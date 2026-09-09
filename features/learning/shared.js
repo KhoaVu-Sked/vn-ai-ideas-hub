@@ -113,7 +113,7 @@ export const td = { padding: "10px 8px", fontSize: 12.5, color: "var(--body)" };
 // Row/header sizing shared by the List view's scrollable table (JourneyPage)
 // and the Mind map's per-column scroll height (MindMap) — same visible-rows
 // budget in both places.
-export const VISIBLE_ROWS = 7;
+export const VISIBLE_ROWS = 8;
 export const ROW_H = 42;
 export const HEADER_H = 34;
 

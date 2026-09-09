@@ -6,10 +6,9 @@ import { decrypt } from "@/lib/crypto";
 
 // POST /api/courses/:id/clear-schedule → removes just THIS course's own
 // Auto-Scheduled calendar event(s) and clears its target_date, leaving
-// status (complete/in_progress/etc.) and every other course untouched.
-// Same shape as tracks/:id/clear-schedule, one course instead of a whole
-// track — see clearCourseSchedule (queries.js) for why this is an UPDATE,
-// not a delete of the course_assignments row itself.
+// status (complete/in_progress/etc.) and every other course untouched —
+// see clearCourseSchedule (queries.js) for why this is an UPDATE, not a
+// delete of the course_assignments row itself.
 export async function POST(_request, { params }) {
   try {
     const user = await requireUser();

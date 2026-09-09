@@ -51,13 +51,22 @@ async function mapWithConcurrency(items, limit, worker) {
   return results;
 }
 
-// POST /api/courses/auto-schedule { from_position, to_position, timeline_months, session_hours, track_id, confirm_overflow }
+// POST /api/courses/auto-schedule { from_position, to_position, timeline_months, session_hours, track_id, course_ids, confirm_overflow }
 //
 // track_id is optional — omitted, this spans every track the caller is
 // enrolled in, same as always; AutoScheduleModal (features/learning/
 // AutoScheduleModal.jsx) always sends the learner's own currently-selected
 // track now, so a run started from Your Journey only ever touches that one
 // track's courses, never a different enrolled track's.
+//
+// course_ids is optional too — omitted (or not an array), every not-yet-
+// done course the range/track covers is eligible, same as before this
+// existed (LearningHubPage.jsx's AutoScheduleStep, the Get Started
+// wizard's fixed-range run, never sends it). AutoScheduleModal sends the
+// IDs left checked in its own scrollable list — always a subset of what
+// the range already covers, never a way to schedule a course OUTSIDE the
+// range/track/account scoping below (getCoursesForAutoSchedule, queries.js
+// ANDs it in alongside those, never instead of them).
 //
 // confirm_overflow is optional and defaults falsy. When the computed plan
 // would finish one or more courses AFTER the learner's own "Complete by"
@@ -94,7 +103,12 @@ async function mapWithConcurrency(items, limit, worker) {
 export async function POST(request) {
   try {
     const user = await requireUser();
-    const { from_position, to_position, timeline_months, session_hours, track_id, confirm_overflow } = await request.json();
+    const { from_position, to_position, timeline_months, session_hours, track_id, course_ids, confirm_overflow } = await request.json();
+    // Any non-array value (omitted, malformed) is treated the same as
+    // "no course filter" — same permissive-coerce idiom this codebase
+    // already uses for other optional array body fields (features/ideas/
+    // queries.js's own Array.isArray(tags) ? tags : null).
+    const courseIds = Array.isArray(course_ids) ? course_ids : null;
 
     if (!POSITIONS.includes(from_position) || !POSITIONS.includes(to_position)) {
       throw err(400, "Pick a valid position range.");
@@ -116,7 +130,7 @@ export async function POST(request) {
       return Response.json({ error: "not_connected" }, { status: 409 });
     }
 
-    const courses = await getCoursesForAutoSchedule(user.uid, from_position, to_position, track_id);
+    const courses = await getCoursesForAutoSchedule(user.uid, from_position, to_position, track_id, courseIds);
     if (courses.length === 0) {
       return Response.json({
         scheduled: [], skipped: [],

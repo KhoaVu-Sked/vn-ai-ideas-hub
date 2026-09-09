@@ -125,12 +125,17 @@ function ConfidenceMeter({ dots }) {
   );
 }
 
+// A fixed row height (rather than organic padding, like MiniRow uses) so
+// the "3 at a time" scroll window below sizes exactly — not an eyeballed
+// maxHeight that happens to roughly fit 3 rows depending on font rendering.
+const SKILL_ROW_H = 34;
+
 // A skill name + its confidence meter — Retention card's own row shape
 // (label left, meter right), distinct from MiniRow (label + text value)
-// even though both share the same border-top/padding rhythm.
+// even though both share the same border-top rhythm.
 function SkillRow({ skill, dots }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--line)" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: SKILL_ROW_H, boxSizing: "border-box", borderTop: "1px solid var(--line)" }}>
       <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{skill}</span>
       <ConfidenceMeter dots={dots} />
     </div>
@@ -431,7 +436,13 @@ export default function LearnerDashboardPage() {
                         <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Start a course to see your confidence by skill.</div>
                       ) : (
                         <div>
-                          {skillRows.map((s) => <SkillRow key={s.skill} skill={s.skill} dots={s.dots} />)}
+                          {/* Scrolls after 3 rows (SKILL_ROW_H) rather than growing the
+                              whole card taller with every skill the learner's touched —
+                              "Avg exam accuracy" stays outside/below, always visible,
+                              since it's one aggregate stat, not another skill to scroll past. */}
+                          <div style={{ overflowY: "auto", maxHeight: SKILL_ROW_H * 3 }}>
+                            {skillRows.map((s) => <SkillRow key={s.skill} skill={s.skill} dots={s.dots} />)}
+                          </div>
                           {myAvgExamAccuracy != null && <MiniRow k="Avg exam accuracy" v={`${myAvgExamAccuracy}%`} />}
                         </div>
                       )}

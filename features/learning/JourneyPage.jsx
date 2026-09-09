@@ -3,7 +3,7 @@
 // Your Journey: every course across the tracks you're enrolled in, as a
 // List view only — ordered intern -> principal, then by the roadmap's own
 // authored sequence within a tier (courses.roadmap_order), scrolled after
-// ~7 rows. Manual drag-to-reorder existed here before; it was removed for
+// ~8 rows. Manual drag-to-reorder existed here before; it was removed for
 // producing bugs (courses could show in a different order than the
 // roadmap intended), not replaced with anything — courses.roadmap_order is
 // what getJourney() (features/learning/queries.js) now sorts by instead.
@@ -43,7 +43,7 @@ function JourneyRow({ course, index, expanded, onToggle, onUnschedule }) {
       <tr onClick={onToggle} style={{ borderTop: "1px solid var(--line)", cursor: "pointer" }}>
         <td style={{ ...td, color: "var(--faint)" }}>{index}</td>
         <td style={{ ...td, fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{course.title}</td>
-        <td style={td}>{course.track_name}</td>
+        <td style={{ ...td, textTransform: "capitalize" }}>{course.priority || "—"}</td>
         <td style={td}>{course.platform || "—"}</td>
         <td style={td}>{course.est_hours ?? "—"}</td>
         <td style={td}>{fmtDate(course.target_date)}</td>
@@ -78,7 +78,7 @@ function JourneyRow({ course, index, expanded, onToggle, onUnschedule }) {
   );
 }
 
-// Scrolls after ~7 rows; header stays pinned while the body scrolls. Plain
+// Scrolls after ~8 rows; header stays pinned while the body scrolls. Plain
 // display order — whatever `courses` arrives in (getJourney()'s own SQL
 // ORDER BY, features/learning/queries.js).
 export function JourneyTable({ courses, onUnschedule }) {
@@ -91,7 +91,7 @@ export function JourneyTable({ courses, onUnschedule }) {
           <tr style={{ textAlign: "left", color: "var(--muted)" }}>
             <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>#</th>
             <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Course</th>
-            <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Track</th>
+            <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Priority</th>
             <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Platform</th>
             <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Est. hrs</th>
             <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Target</th>
@@ -231,11 +231,6 @@ const calendarWarnBanner = { background: "#fff4e0", border: "1px solid #ffdf9e",
 // consistency across the app.
 const autoScheduleBtn = { display: "inline-flex", alignItems: "center", gap: 8, border: "none", background: "var(--blue)", color: "#fff", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" };
 const autoScheduleBtnDisabled = { ...autoScheduleBtn, background: "var(--bg)", color: "var(--faint)", cursor: "not-allowed" };
-// "Clear schedule" — next to Auto Schedule, not buried in the page header
-// with Reset: it's the same track-scoped tool's own undo, so it belongs
-// where the tool itself is. Outlined, not filled — a real but rarer,
-// more-cautious action than Auto Schedule's own primary blue.
-const clearScheduleBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, color: "var(--body)", cursor: "pointer", whiteSpace: "nowrap" };
 
 // The next 2 courses, not yet complete/skipped: dated ones first (soonest
 // target_date first), then undated ones filling any remaining slots in the
@@ -249,12 +244,8 @@ const clearScheduleBtn = { border: "1px solid var(--line)", background: "var(--c
 // — "this is the one you're on now" — the moment it becomes the top pick,
 // not on any click. Guarded by a ref so the same course only gets the
 // start call once per mount, not on every re-render.
-function UpNextCard({ courses, onAutoStart, onAutoSchedule, onClearSchedule, calendarConnected }) {
+function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected }) {
   const eligible = courses.filter((c) => c.status !== "complete" && c.status !== "skipped");
-  // Clear schedule only makes sense once Auto Schedule has actually booked
-  // something in this track — hidden rather than a no-op button when there's
-  // nothing to clear yet.
-  const hasAnyScheduled = courses.some((c) => c.has_scheduled_session);
   const dated = eligible.filter((c) => c.target_date).sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
   const undated = eligible.filter((c) => !c.target_date);
   const upcoming = [...dated, ...undated].slice(0, 2);
@@ -283,11 +274,6 @@ function UpNextCard({ courses, onAutoStart, onAutoSchedule, onClearSchedule, cal
             defensive fallback for a connection that dies between this
             page's load and the click. */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {calendarConnected && hasAnyScheduled && (
-            <button onClick={onClearSchedule} title="Remove every Auto-Scheduled calendar event for this track and clear their target dates" style={clearScheduleBtn}>
-              Clear schedule
-            </button>
-          )}
           <button
             onClick={calendarConnected ? onAutoSchedule : undefined}
             disabled={!calendarConnected}
@@ -328,69 +314,6 @@ function UpNextCard({ courses, onAutoStart, onAutoSchedule, onClearSchedule, cal
         </div>
       )}
     </section>
-  );
-}
-
-const clearModalBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "var(--body)", cursor: "pointer" };
-const clearModalBtnDanger = (busy) => ({ border: "none", background: "#c92a2a", color: "#fff", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 });
-
-// Up next's "Clear schedule" opens this instead of a plain yes/no confirm —
-// picking exactly which of the track's currently-scheduled courses to clear,
-// not an all-or-nothing wipe. Every row starts checked (the button's own
-// name implies "everything," so that's the default; unchecking a row just
-// keeps it as it is) — same header/scrollable-body/pinned-footer shape as
-// AutoScheduleModal's own result screen, for the same reason: this list is
-// exactly as long as however many courses got Auto-Scheduled, which for a
-// big track can be a real scrollful.
-function ClearScheduleModal({ courses, trackName, busy, onCancel, onConfirm }) {
-  const [checked, setChecked] = useState(() => new Set(courses.map((c) => c.id)));
-  const toggle = (id) => setChecked((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const allChecked = checked.size === courses.length;
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,44,0.5)", zIndex: 260, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
-      <div style={{ background: "var(--card)", borderRadius: 14, width: 440, maxWidth: "100%", maxHeight: "calc(100vh - 40px)", boxShadow: "0 20px 60px rgba(10,22,44,0.35)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ padding: "24px 24px 10px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
-            <span aria-hidden="true" style={{ width: 40, height: 40, borderRadius: "50%", background: "#fdeaea", color: "#c92a2a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, flexShrink: 0 }}>🗑️</span>
-            <div>
-              <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)", margin: "0 0 4px" }}>Clear {trackName}'s schedule?</div>
-              <p style={{ fontSize: 12.5, color: "var(--body)", margin: 0, lineHeight: 1.5 }}>
-                Removes the calendar event and target date for whichever courses below stay checked. Progress (completed, in-progress, skipped) isn't affected. No undo — re-run Auto Schedule to re-book.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setChecked(allChecked ? new Set() : new Set(courses.map((c) => c.id)))}
-            style={{ background: "none", border: "none", color: "var(--blue)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", padding: 0 }}
-          >
-            {allChecked ? "Deselect all" : "Select all"}
-          </button>
-        </div>
-        <div style={{ padding: "0 24px", overflowY: "auto", flex: "1 1 auto", minHeight: 0 }}>
-          {courses.map((c) => (
-            <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid var(--line)", cursor: "pointer" }}>
-              <input type="checkbox" checked={checked.has(c.id)} onChange={() => toggle(c.id)} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{c.title}</div>
-                <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{c.target_date ? `Target ${fmtDate(c.target_date)}` : "No target date"}</div>
-              </div>
-            </label>
-          ))}
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 24px 24px", borderTop: "1px solid var(--line)", marginTop: 4 }}>
-          <button onClick={onCancel} disabled={busy} style={clearModalBtn}>Cancel</button>
-          <button onClick={() => onConfirm([...checked])} disabled={busy || checked.size === 0} style={clearModalBtnDanger(busy)}>
-            {busy ? "Clearing…" : `Clear ${checked.size} course${checked.size === 1 ? "" : "s"}`}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -460,12 +383,8 @@ export default function JourneyPage() {
   const [ready, setReady] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  // Clear schedule: track-scoped (whichever track is currently selected —
-  // Up next's own new button, next to Auto Schedule). Remove from calendar:
-  // one course at a time (JourneyTable's row-expand) — unscheduleTarget
-  // holds the course pending confirmation, or null.
-  const [clearScheduleConfirmOpen, setClearScheduleConfirmOpen] = useState(false);
-  const [clearingSchedule, setClearingSchedule] = useState(false);
+  // Remove from calendar: one course at a time (JourneyTable's row-expand)
+  // — unscheduleTarget holds the course pending confirmation, or null.
   const [unscheduleTarget, setUnscheduleTarget] = useState(null);
   const [unscheduling, setUnscheduling] = useState(false);
   // No "all tracks" option — always one specific enrolled track (its id),
@@ -655,32 +574,6 @@ export default function JourneyPage() {
     }
   };
 
-  // Removes every Auto-Scheduled calendar event for whichever courseIds the
-  // learner left checked in ClearScheduleModal (always a subset of the
-  // CURRENTLY SELECTED track's own scheduled courses — that modal's own
-  // list, never a different track's) and clears their target dates —
-  // status/completions untouched, unlike Reset. The modal stays open
-  // (its own button switches to "Clearing…") until this settles, then
-  // closes itself here — a full reload (not an optimistic patch) since
-  // this can touch several courses at once, not just one.
-  const doClearSchedule = async (courseIds) => {
-    setClearingSchedule(true);
-    setErr("");
-    try {
-      const { calendarError } = await api(`/api/tracks/${selectedTrack}/clear-schedule`, {
-        method: "POST",
-        body: JSON.stringify({ course_ids: courseIds }),
-      });
-      await load();
-      if (calendarError) setErr(calendarError);
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setClearingSchedule(false);
-      setClearScheduleConfirmOpen(false);
-    }
-  };
-
   // Removes just ONE course's own Auto-Scheduled calendar event(s) and
   // clears its target date (app/api/courses/:id/clear-schedule) — status
   // untouched. Optimistic local patch, same pattern autoStartCourse already
@@ -809,7 +702,6 @@ export default function JourneyPage() {
               courses={visibleJourney}
               onAutoStart={autoStartCourse}
               onAutoSchedule={() => setAutoScheduleOpen(true)}
-              onClearSchedule={() => setClearScheduleConfirmOpen(true)}
               calendarConnected={calendarConnected}
             />
             <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourse={inProgressCourse} />
@@ -825,6 +717,7 @@ export default function JourneyPage() {
           visiblePosition={visiblePosition}
           trackId={selectedTrack}
           trackName={trackTags[0] || "this track"}
+          journey={journey}
           annualReviewDate={annualReviewDate}
           onClose={() => setAutoScheduleOpen(false)}
           onScheduled={load}
@@ -840,16 +733,6 @@ export default function JourneyPage() {
           confirmLabel="Reset everything"
           onCancel={() => setResetConfirmOpen(false)}
           onConfirm={() => { setResetConfirmOpen(false); doReset(); }}
-        />
-      )}
-
-      {clearScheduleConfirmOpen && (
-        <ClearScheduleModal
-          courses={visibleJourney.filter((c) => c.has_scheduled_session)}
-          trackName={trackTags[0] || "this track"}
-          busy={clearingSchedule}
-          onCancel={() => setClearScheduleConfirmOpen(false)}
-          onConfirm={doClearSchedule}
         />
       )}
 
