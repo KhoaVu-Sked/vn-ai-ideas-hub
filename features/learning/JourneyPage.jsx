@@ -376,11 +376,13 @@ function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
 }
 
 export default function JourneyPage() {
-  const { user: me } = useSession();
+  const { user: me, refresh } = useSession();
   const router = useRouter();
   const [journey, setJourney] = useState([]);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   // Remove from calendar: one course at a time (JourneyTable's row-expand)
   // — unscheduleTarget holds the course pending confirmation, or null.
   const [unscheduleTarget, setUnscheduleTarget] = useState(null);
@@ -538,6 +540,45 @@ export default function JourneyPage() {
   // Always exactly the one selected track's own name (or none, pre-selection).
   const trackTags = trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
+  // Reset everything is a staging-only control — the backend reset endpoint
+  // stays live everywhere, but the button only renders on the staging
+  // deployment so a production user can never see or trigger it.
+  const isStagingHost = typeof window !== "undefined" && window.location.hostname === "ts-ai-ideas-hub-staging.vercel.app";
+
+  // Resets everything AI Learning itself owns, not just course progress —
+  // course_assignments, account_tracks (the Get Started gateway's own
+  // "onboarded" check reads this), and calendar_connections. Deliberately
+  // leaves user_role alone: that's general account data set on Manage ->
+  // Users, not this feature's to erase (see resetJourney()'s own comment,
+  // features/learning/queries.js). Lands back on /learning afterward,
+  // since that's now the same gateway a genuinely new account sees.
+  // Gated by ConfirmModal (below) rather than a native confirm() — the
+  // button itself just opens that; this is the actual reset, run only from
+  // the modal's own "Reset everything" click.
+  const doReset = async () => {
+    setResetting(true);
+    setErr("");
+    try {
+      const { calendarError } = await api("/api/journey/reset", { method: "POST" });
+      await refresh(); // session's onboarded flips back to false
+      if (calendarError) {
+        // Non-fatal: everything else already reset successfully by this
+        // point — stay here (rather than navigating on) so the learner
+        // actually sees that Google Calendar may still have a leftover
+        // event or two to clear by hand.
+        await load();
+        setErr(calendarError);
+        setResetting(false);
+        return;
+      }
+      router.push("/learning");
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setResetting(false);
+    }
+  };
+
   // Removes just ONE course's own Auto-Scheduled calendar event(s) and
   // clears its target date (app/api/courses/:id/clear-schedule) — status
   // untouched. Optimistic local patch, same pattern autoStartCourse already
@@ -608,6 +649,18 @@ export default function JourneyPage() {
                     : `Ordered intern → principal, in ${trackTags[0] || "this track"}.`}
                 </p>
               </div>
+              {isStagingHost && (journey.length > 0 || calendarConnected) && (
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, maxWidth: "100%" }}>
+                  <button
+                    onClick={() => setResetConfirmOpen(true)}
+                    disabled={resetting}
+                    title="Clear course progress, tracks, and Google Calendar — your assigned role is untouched"
+                    style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 14px", height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--muted)", cursor: resetting ? "wait" : "pointer", whiteSpace: "nowrap" }}
+                  >
+                    {resetting ? "Resetting…" : "Reset everything"}
+                  </button>
+                </div>
+              )}
             </div>
             {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
             {tierJustFinished && !atCeiling && (
@@ -673,6 +726,18 @@ export default function JourneyPage() {
           annualReviewDate={annualReviewDate}
           onClose={() => setAutoScheduleOpen(false)}
           onScheduled={load}
+        />
+      )}
+
+      {isStagingHost && resetConfirmOpen && (
+        <ConfirmModal
+          icon="🗑️"
+          tone="danger"
+          title="Reset everything AI Learning knows about you?"
+          body="This clears all course progress (skips, custom order, target dates), un-enrolls you from every track, and disconnects Google Calendar — deleting any Auto Schedule events booked there too. Your assigned role is untouched (that's set on Manage → Users, not here). You'll land back on the Get Started gateway."
+          confirmLabel="Reset everything"
+          onCancel={() => setResetConfirmOpen(false)}
+          onConfirm={() => { setResetConfirmOpen(false); doReset(); }}
         />
       )}
 
