@@ -1,16 +1,18 @@
 -- TS - AI Ideas Hub — Core Competency content seed
 --
--- Core Competency's actual content: 36 real resources, the Intern (P1)
--- slice of Skedulo TS's own career-ladder learning plan (imported from
--- "TS_Career_Track__Intern_P1_Learning_Plan.xlsx", one tab per competency —
--- Troubleshooting, Custom vs Core, Process and Procedures, Tools and
--- Systems, SLAs and Deliverables, Incident Management & Escalation, Culture
--- Champion, Growth and Learning, Cross-Functional Collaboration,
--- Performance Excellence, Change Driver & Innovator, Customer First
--- mindset), and its own 8-skill taxonomy (courses.skills). Split out of
--- ai-track-seed.sql into its own file so each track's content can be
--- edited and re-run independently — that file now carries only the AI
--- Track. No quiz content: the source spreadsheet has none.
+-- Core Competency's actual content: 37 real resources at the Intern (P1)
+-- tier (36 from the original import below, plus 1 added by a later
+-- reconciliation — see that reconciliation's own comment for why the count
+-- moved), the Intern (P1) slice of Skedulo TS's own career-ladder learning
+-- plan (imported from "TS_Career_Track__Intern_P1_Learning_Plan.xlsx", one
+-- tab per competency — Troubleshooting, Custom vs Core, Process and
+-- Procedures, Tools and Systems, SLAs and Deliverables, Incident Management
+-- & Escalation, Culture Champion, Growth and Learning, Cross-Functional
+-- Collaboration, Performance Excellence, Change Driver & Innovator,
+-- Customer First mindset), and its own 8-skill taxonomy (courses.skills).
+-- Split out of ai-track-seed.sql into its own file so each track's content
+-- can be edited and re-run independently — that file now carries only the
+-- AI Track.
 --
 -- Naming history, since it's touched two names already: this content was
 -- first drafted as a brand-new third track, "Career Track" — until the
@@ -25,14 +27,23 @@
 -- reconciliation statements are no-ops on a database that never created
 -- "Career Track" in the first place.
 --
+-- A second, later reconciliation (below the main course INSERT) brings
+-- this tier in line with a newer revision of the source spreadsheet — see
+-- that block's own comment. Unlike every other reconciliation in this
+-- file, it's deliberately UPDATE/INSERT only, never DELETE: this track has
+-- real learners with real course_assignments and course_quiz_questions
+-- rows now, both on delete cascade (schema.sql), so a DELETE here risks
+-- erasing a real learner's progress with no way back.
+--
 -- Not destructive to run — every insert here is ON CONFLICT DO NOTHING,
 -- safe to re-run on a database that already has some or all of this
 -- content. The skills UPDATE is re-runnable for a different reason (plain
 -- UPDATE, not an insert) — see the comment there; that's the block to edit
 -- and re-run on its own if the skill taxonomy needs to change later.
 --
--- Run schema.sql first (needs tracks/courses/course_assignments — no
--- course_quiz_questions dependency, this track has none).
+-- Run schema.sql first (needs tracks/courses/course_assignments and
+-- course_quiz_questions — the quiz insert below the main course list
+-- needs that last one).
 
 insert into tracks (name) values ('Core Competency')
 on conflict (name) do nothing;
@@ -86,11 +97,13 @@ where track_id = (select id from tracks where name = 'Core Competency')
   'Who actually uses Skedulo — support workers, nurses and carers in the field on Skedulo Plus'
 );
 
--- 36 real resources — see file header. Every row is 'L0 — Foundations' /
--- 'intern': the source file covers only the Intern (P1) level; a later
--- level's own content, if imported later, adds more rows at
--- expected_by_position 'junior' and up, same as the AI Track already spans
--- intern through principal in one track. roadmap_order (migration 030) is
+-- 36 real resources — see file header. Every row below is still typed as
+-- 'L0 — Foundations' / 'intern', exactly as the original source file had
+-- it; 6 of them (5 to 'junior', 1 to 'middle') get moved to a higher tier
+-- by the reconciliation UPDATE below, once this INSERT has (re)established
+-- the row on a fresh run — ON CONFLICT DO NOTHING here means the
+-- reconciliation's tier change, not this literal 'intern', is what actually
+-- sticks after both have run. roadmap_order (migration 030) is
 -- set directly here (1-36, the source file's own tab-then-row order) —
 -- there's no pre-existing data on a fresh run of this file to reconcile
 -- with, unlike the AI Track's own courses, which needed a separate
@@ -144,6 +157,126 @@ from (values
   ('L0 — Foundations', 'Customer First mindset', 'TED — Joe Gebbia: How Airbnb designs for trust', 'TED', 'core', 0.25, 'Free', 'Explains how small design and communication choices build customer trust.', 'intern', 'https://www.ted.com/talks/joe_gebbia_how_airbnb_designs_for_trust', 36)
 ) as v(stage, focus_area, title, platform, priority, est_hours, cost, outcome, expected_by_position, link, roadmap_order)
 on conflict (track_id, title) do nothing;
+
+-- Reconciliation against a newer revision of the source spreadsheet,
+-- "TS Career Track - Learning Plan Master.xlsx" (the same file
+-- junior-learning-roadmap-seed.sql and complete-course-track-core-competency-seed.sql
+-- import the Junior and Specialist/Senior/Principal tiers from). This later
+-- revision also touches Intern-level content: 4 resources it no longer
+-- lists at any tier, 6 it moved up to a higher tier, 1 new resource, and
+-- small field-level drift (platform/cost relabeling, a few est_hours
+-- bumps, one priority flip, one focus_area spelling) on 9 more.
+--
+-- Deliberately NOT a DELETE this time, unlike the earlier-revision
+-- reconciliation above. That one could still call the risk theoretical
+-- ("this track hadn't shipped to production learners as of this writing");
+-- this track has real learners with real course_assignments rows now, and
+-- courses.id cascades on delete (schema.sql) straight through
+-- course_assignments and course_quiz_questions — a DELETE here would
+-- silently erase any learner's progress on that course with no way back.
+-- So the 4 resources the new master no longer lists anywhere — 'Atlassian
+-- ITSM & incident guides', 'How to Create a Linear Issue via DevRev...',
+-- 'Shared Ticketing Process – Skedulo & Lumary + Customer Admin Account
+-- Recovery procedure', and 'Skedulo release notes...' — are left exactly as
+-- they are. Retiring them for real is a separate, explicit decision for
+-- whoever checks first whether any learner has actually started one.
+--
+-- Every statement below is a plain, re-runnable UPDATE (or an
+-- ON CONFLICT DO NOTHING INSERT for the one new resource) — same result
+-- every time, nothing that touches course_assignments or
+-- course_quiz_questions rows belonging to any other course. Placed here,
+-- after the historical 36-course INSERT above rather than before it (like
+-- the earlier reconciliation is), on purpose: these UPDATEs target titles
+-- that INSERT creates, so on a brand-new database they'd match nothing if
+-- run first — putting them after guarantees the same end state whether
+-- this file is running against a fresh database or a live one.
+
+-- 5 resources the new master reclassified from Foundation to Applied
+-- (Junior Specialist) — moved, not duplicated. This is why
+-- junior-learning-roadmap-seed.sql's own header says it deliberately does
+-- NOT re-insert these same 5 titles: the row already exists here, this
+-- UPDATE is what actually moves it. roadmap_order is left untouched on
+-- purpose — renumbering these into that file's own 37-48 run would mean
+-- coordinating two files for a cosmetic sort-order gain; they'll simply
+-- sort ahead of that file's 12 courses within the Junior tier.
+update courses set stage = 'L1 — Applied', expected_by_position = 'junior'
+where track_id = (select id from tracks where name = 'Core Competency')
+  and title in (
+    'Shared Ticketing Process – Skedulo & Lumary',
+    'GraphQL (Skedulo Pulse Platform)',
+    'Incident Analysis Report (Aug 2025–Aug 2026) — severity mix, detection methods, trends',
+    'TED — Vernā Myers: How to overcome our biases? Walk boldly toward them',
+    'TED — Yves Morieux: How too many rules at work keep you from getting things done'
+  );
+
+-- 1 resource the new master moved two tiers up, to Intermediate (P3 /
+-- 'middle') rather than Applied — same reasoning and same roadmap_order
+-- treatment as the block above.
+update courses set stage = 'L2 — Intermediate', expected_by_position = 'middle'
+where track_id = (select id from tracks where name = 'Core Competency')
+  and title = 'TED — Dan Pink: The puzzle of motivation';
+
+-- 9 resources that stayed at Foundation but whose other fields drifted:
+-- mostly a platform/cost relabel (most of the "Udemy Business" catalog is
+-- now listed as "Free - Udemy" instead — same courses, same links, just a
+-- renamed label in the source), a few small est_hours bumps, Linear Basic
+-- Training's priority flipping optional -> core, and Escalation Workflow's
+-- focus_area reverting to the "Incident Mgmt & Escalation" tab's own short
+-- name (this is the same normalization the original import already made
+-- once — see the comment above the main INSERT above — undone by this
+-- newer revision, so re-applied here to match it).
+update courses set platform = v.platform, priority = v.priority, est_hours = v.est_hours, cost = v.cost, focus_area = v.focus_area
+from (values
+  ('Active Listening — You Can Be a Great Listener', 'Free - Udemy', 'core', 2.5, 'Free - Udemy', 'Cross-Functional Collaboration'),
+  ('Creativity, problem solving and generating alternatives', 'Free - Udemy', 'optional', 1.5, 'Free - Udemy', 'Change Driver & Innovator'),
+  ('Curiosity and Lifelong Learning', 'Free - Udemy', 'optional', 1.5, 'Free - Udemy', 'Growth and Learning'),
+  ('Escalation Workflow — the team''s Lucidchart escalation diagram', 'Internal', 'core', 0.25, 'Free (internal)', 'Incident Mgmt & Escalation'),
+  ('Linear Basic Training', 'Internal', 'core', 1.5, 'Free', 'Tools and Systems'),
+  ('Mastering Collaboration: Work together for the best results', 'Free - Udemy', 'optional', 1.0, 'Free - Udemy', 'Cross-Functional Collaboration'),
+  ('Productivity and Time Management for the Overwhelmed', 'Free - Udemy', 'core', 2.0, 'Free - Udemy', 'Performance Excellence'),
+  ('The Complete Storytelling Course for Speaking & Presenting', 'Free - Udemy', 'optional', 35.5, 'Free - Udemy', 'Growth and Learning'),
+  ('The Customer: How to Understand Their Needs (BITE SIZE)', 'Free - Udemy', 'core', 1.0, 'Free - Udemy', 'Customer First mindset')
+) as v(title, platform, priority, est_hours, cost, focus_area)
+where courses.title = v.title
+  and courses.track_id = (select id from tracks where name = 'Core Competency');
+
+-- 1 new Foundation-tier resource the new master adds under Process and
+-- Procedures: "Support Processes - DevRev". A quiz for it already existed
+-- in the quiz workbook (tab PP-02, Foundation level) from before this
+-- reconciliation — it just had no matching course to attach to until now.
+-- roadmap_order 104 is a fresh number past this file's own 1-36,
+-- junior-learning-roadmap-seed.sql's 37-48, and
+-- complete-course-track-core-competency-seed.sql's 49-103, since every
+-- number below 104 is already in use (nothing above was deleted) — it
+-- sorts last within Intern rather than reshuffling Process and Procedures'
+-- existing numbers for a cosmetic-only gain.
+insert into courses (track_id, stage, focus_area, title, platform, priority, est_hours, cost, outcome, expected_by_position, link, roadmap_order)
+select (select id from tracks where name = 'Core Competency'), v.*
+from (values
+  ('L0 — Foundations', 'Process and Procedures', 'Support Processes - DevRev', 'Internal', 'core', 0.25, 'Free (internal)', 'Classifies a ticket using DevRev''s Parts & Diagnosis taxonomy, applies the correct field conventions, looks up DevRev terminology, and creates a linked Linear issue from a DevRev ticket.', 'intern', 'https://skedulo.atlassian.net/wiki/spaces/SUP/folder/3323068491/Support+Processes+-+DevRev', 104)
+) as v(stage, focus_area, title, platform, priority, est_hours, cost, outcome, expected_by_position, link, roadmap_order)
+on conflict (track_id, title) do nothing;
+
+update courses set skills = array['Support Process & SLAs']::text[]
+where title = 'Support Processes - DevRev'
+  and track_id = (select id from tracks where name = 'Core Competency');
+
+insert into course_quiz_questions (course_id, position, question, options, correct_answer, rationale)
+select c.id, v.position, v.question, v.options, v.correct_answer, v.rationale
+from (values
+  ('Support Processes - DevRev', 1, 'What are the two custom fields covered by the new DevRev taxonomy standard?', '[{"label": "A", "text": "Part and Diagnosis"}, {"label": "B", "text": "Impacted Area and Impact Detail"}, {"label": "C", "text": "Severity and Stage"}, {"label": "D", "text": "Product and Capability"}]'::jsonb, 'A', 'The taxonomy doc standardises how the team uses the Part and Diagnosis fields; the old Impacted Area/Impact Detail fields caused ambiguity and inconsistent data.'),
+  ('Support Processes - DevRev', 2, 'What two levels make up a "Part" in the new taxonomy?', '[{"label": "A", "text": "Product and Capability"}, {"label": "B", "text": "Impacted Area and Impact Detail"}, {"label": "C", "text": "Diagnosis and Bug"}, {"label": "D", "text": "Ticket Type and Stage"}]'::jsonb, 'A', 'A Part consists of a Product (e.g., Skedulo Web App, Skedulo API) and a Capability underneath it — the main item of interaction for the customer.'),
+  ('Support Processes - DevRev', 3, 'At what point in a ticket''s lifecycle should the Part field be set, and can it change later?', '[{"label": "A", "text": "During triage, and the value should not change afterward"}, {"label": "B", "text": "Only after the ticket is resolved"}, {"label": "C", "text": "Whenever the customer requests an update"}, {"label": "D", "text": "It is optional and rarely used"}]'::jsonb, 'A', 'Part identifies which area of the product the user was interacting with, and is meant to be fixed at triage time — it should not change during the ticket''s lifecycle.'),
+  ('Support Processes - DevRev', 4, 'When should the Diagnosis field be finalized on a ticket?', '[{"label": "A", "text": "At the end of the ticket lifecycle, once the cause is determined"}, {"label": "B", "text": "At ticket creation, before any investigation"}, {"label": "C", "text": "Only for tickets marked as bugs"}, {"label": "D", "text": "It auto-populates from the Part field"}]'::jsonb, 'A', 'Diagnosis captures the final determination of what caused the issue, so it should be set at the end of the lifecycle or once the root cause has been established.'),
+  ('Support Processes - DevRev', 5, 'A support engineer is unsure whether to select "Bug" as the Diagnosis for a ticket. What is the documented rule?', '[{"label": "A", "text": "Only select Bug if the issue is a defect in the code that requires a code change"}, {"label": "B", "text": "Select Bug whenever a customer describes unexpected behavior"}, {"label": "C", "text": "Select Bug only after Engineering has already shipped a fix"}, {"label": "D", "text": "Bug should never be used — select ''Other'' instead"}]'::jsonb, 'A', 'The taxonomy doc is explicit that Bug should only be chosen for genuine code defects requiring a code change — not for configuration, data, or usage issues.'),
+  ('Support Processes - DevRev', 6, 'What does the ''OOTB or Customization'' field identify, and when is it required?', '[{"label": "A", "text": "Which part of the code the issue occurred in (standard product vs. customised code) — required for ticket closure"}, {"label": "B", "text": "Whether the customer is on a paid or free plan — required at ticket creation"}, {"label": "C", "text": "Whether the ticket was raised via chat or email — optional"}, {"label": "D", "text": "Which Slack channel owns the ticket — required for escalation"}]'::jsonb, 'A', 'Field Usages defines OOTB or Customization as identifying whether the issue sits in standard product code or customised code, used alongside Part and Diagnosis, and it is a required field before a ticket can be closed.'),
+  ('Support Processes - DevRev', 7, 'A support engineer wants to raise an engineering issue quickly and considers creating the Linear issue directly in Linear instead of via DevRev. What is wrong with that approach?', '[{"label": "A", "text": "It breaks the DevRev-Linear integration, so the issue can''t be linked back to the originating DevRev ticket"}, {"label": "B", "text": "Nothing — it''s equally valid and faster"}, {"label": "C", "text": "It''s fine as long as the DevRev ticket number is put in the Linear title"}, {"label": "D", "text": "Only engineering managers are allowed to create Linear issues"}]'::jsonb, 'A', 'The guide states plainly that creating a Linear issue directly in Linear breaks the integration and prevents proper tracking — the DevRev template must always be used.'),
+  ('Support Processes - DevRev', 8, 'After submitting a Linear issue via the DevRev template, roughly how long does it take for the Linear issue to appear?', '[{"label": "A", "text": "About 5 minutes"}, {"label": "B", "text": "Instantly"}, {"label": "C", "text": "Up to 24 hours"}, {"label": "D", "text": "About 1 hour"}]'::jsonb, 'A', 'The guide notes this ~5 minute delay is expected behaviour, the same as it previously was with Jira.'),
+  ('Support Processes - DevRev', 9, '15 minutes after submitting a Linear issue via the DevRev template, a support engineer still doesn''t see a Linear icon on the ticket. What should they do?', '[{"label": "A", "text": "Reach out in #support-engineering-tickets or contact their team lead"}, {"label": "B", "text": "Immediately resubmit the template a second time"}, {"label": "C", "text": "Manually create the issue in Linear as a backup"}, {"label": "D", "text": "Escalate directly to the customer"}]'::jsonb, 'A', 'The guide says that if the Linear issue hasn''t appeared after 10+ minutes, the engineer should ask in #support-engineering-tickets or contact their team lead — not resubmit or work around the template.'),
+  ('Support Processes - DevRev', 10, 'A ticket needs to be escalated from the initial Support Engineering (SE) team to another engineering team. How does this show up back on the original DevRev ticket?', '[{"label": "A", "text": "As a Child Issue, created when the SE team opens a Sub-Issue in Linear"}, {"label": "B", "text": "The original DevRev ticket is closed and a new one opened"}, {"label": "C", "text": "It only appears in Linear — DevRev has no visibility into escalations"}, {"label": "D", "text": "The Diagnosis field is automatically changed to \"Escalated\""}]'::jsonb, 'A', 'When an SE team member escalates an issue, they create a Sub-Issue in Linear, which surfaces as a Child Issue on the original DevRev ticket — giving full visibility of the escalation chain without leaving DevRev.')
+) as v(title, position, question, options, correct_answer, rationale)
+join courses c on c.title = v.title and c.track_id = (select id from tracks where name = 'Core Competency')
+on conflict (course_id, position) do nothing;
 
 -- Core Competency's own skill taxonomy (courses.skills) — same re-runnable
 -- UPDATE-by-title pattern as the AI Track's own skills block
