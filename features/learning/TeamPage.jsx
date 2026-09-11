@@ -55,7 +55,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, th, td, relTime,
   formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, skillConfidence, avgExamAccuracy,
-  isExpectedByNow, effectivePosition,
+  isVisibleNow, effectivePosition,
 } from "@/features/learning/shared";
 import { JourneyTable } from "@/features/learning/JourneyPage";
 import ProgressBar from "@/features/learning/ProgressBar";
@@ -600,11 +600,12 @@ function LearningImpactCard({ members, ideas }) {
 }
 
 // Drill-down roadmap — scoped the same way "My courses" scopes the
-// learner's own Dashboard/Journey view: isExpectedByNow/effectivePosition
-// (shared.js), courses at or below this person's own tier, plus one stage
-// of early access once that tier's fully done. NOT the whole track (every
-// tier, Intern through Principal) — an admin checking on a Junior shouldn't
-// be shown Principal-tier courses that aren't expected of them yet.
+// learner's own Dashboard/Journey view: isVisibleNow/effectivePosition
+// (shared.js), this person's own tier only, plus one stage of early access
+// once that tier's fully done. NOT the whole track (every tier, Intern
+// through Principal) — an admin checking on a Junior shouldn't be shown
+// Principal-tier courses that aren't expected of them yet, and shouldn't be
+// shown Intern-tier ones either — those are assumed already fulfilled.
 function MemberDrilldown({ member, onClose }) {
   const [journey, setJourney] = useState(null);
   const [position, setPosition] = useState(null);
@@ -625,7 +626,7 @@ function MemberDrilldown({ member, onClose }) {
 
   const pct = pctOf(member);
   const visiblePosition = journey ? effectivePosition(journey, position) : position;
-  const visibleJourney = journey ? journey.filter((c) => isExpectedByNow(c, visiblePosition)) : null;
+  const visibleJourney = journey ? journey.filter((c) => isVisibleNow(c, position, visiblePosition)) : null;
 
   return (
     <section style={{ ...card, marginTop: 18 }}>
@@ -636,7 +637,7 @@ function MemberDrilldown({ member, onClose }) {
             <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 16, color: "var(--ink)" }}>{member.name || member.username} — roadmap</div>
             <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>
               {POSITION_LABEL[member.position] || member.position || "—"} · {trackLabel(member.tracks)} · {pct}% complete · read-only
-              {visiblePosition && ` · through ${POSITION_LABEL[visiblePosition] || visiblePosition}`}
+              {visiblePosition && visiblePosition !== position && ` · plus early access to ${POSITION_LABEL[visiblePosition] || visiblePosition}`}
             </div>
           </div>
         </div>

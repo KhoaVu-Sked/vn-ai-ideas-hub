@@ -60,12 +60,12 @@ import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
-  card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, effectivePosition, fmtDate,
+  card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isVisibleNow, effectivePosition, fmtDate,
   PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel, weeklyStreak,
   skillConfidence, SKILL_CONFIDENCE_SCALE, avgExamAccuracy,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
-import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
+import { JourneyMindMap } from "@/features/learning/MindMap";
 import { JourneyTable } from "@/features/learning/JourneyPage";
 import { STATUS_META } from "@/features/ideas/constants";
 
@@ -229,9 +229,6 @@ export default function LearnerDashboardPage() {
   const [ready, setReady] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState("");
   const [coursesTrack, setCoursesTrack] = useState("");
-  const [skipTarget, setSkipTarget] = useState(null);
-  const [skipping, setSkipping] = useState(false);
-  const [skipErr, setSkipErr] = useState("");
 
   const load = useCallback(async () => {
     setErr("");
@@ -290,15 +287,15 @@ export default function LearnerDashboardPage() {
     return { level, label: PROGRESS_LEVEL_LABEL[level], roleLabel: roles.join(" & "), total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
   }).filter((l) => l.total > 0);
 
-  // visibleJourney: what's expected by now (own tier, or one stage of early
-  // access once that tier's fully done — effectivePosition/isExpectedByNow,
-  // shared.js), across every enrolled track — the KPI row and What's next
-  // (below) both stay scoped to this, unfiltered by track, same as before.
-  // "My courses" itself (JourneyTable, below) narrows this further to just
-  // coursesTrack — its own filter, independent of the Mind map's
-  // selectedTrack and of the KPIs above it.
+  // visibleJourney: what's expected by now (own tier only, plus one stage of
+  // early access once that tier's fully done — effectivePosition/
+  // isVisibleNow, shared.js), across every enrolled track — the KPI row and
+  // What's next (below) both stay scoped to this, unfiltered by track, same
+  // as before. "My courses" itself (JourneyTable, below) narrows this
+  // further to just coursesTrack — its own filter, independent of the Mind
+  // map's selectedTrack and of the KPIs above it.
   const visiblePosition = effectivePosition(journey, position);
-  const visibleJourney = journey.filter((c) => isExpectedByNow(c, visiblePosition));
+  const visibleJourney = journey.filter((c) => isVisibleNow(c, position, visiblePosition));
   const coursesJourney = visibleJourney.filter((c) => c.track_id === coursesTrack);
 
   // KPI: "Roadmap complete" — % of what's expected by now, across every
@@ -369,21 +366,6 @@ export default function LearnerDashboardPage() {
   // card below it (which also counts ideas joined in another role).
   const myOwnIdeas = ideas.filter((i) => (i.my_roles || []).includes("Initiator"));
   const shippedIdeas = myOwnIdeas.filter((i) => i.status === "Launched").length;
-
-  // Same skip-a-tier action the Mind map has always had — moved here with it.
-  const confirmSkip = async () => {
-    setSkipping(true);
-    setSkipErr("");
-    try {
-      await api(`/api/courses/${skipTarget.id}/skip`, { method: "POST" });
-      await load();
-      setSkipTarget(null);
-    } catch (e) {
-      setSkipErr(e.message);
-    } finally {
-      setSkipping(false);
-    }
-  };
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
@@ -520,7 +502,7 @@ export default function LearnerDashboardPage() {
                   {filteredJourney.length === 0 ? (
                     <div style={{ fontSize: 13, color: "var(--muted)" }}>No courses in this track.</div>
                   ) : (
-                    <JourneyMindMap courses={filteredJourney} onRequestSkip={(c) => { setSkipErr(""); setSkipTarget(c); }} />
+                    <JourneyMindMap courses={filteredJourney} />
                   )}
                 </section>
               </>
@@ -528,16 +510,6 @@ export default function LearnerDashboardPage() {
           </>
         )}
       </main>
-
-      {skipTarget && (
-        <SkipConfirmModal
-          course={skipTarget}
-          busy={skipping}
-          err={skipErr}
-          onCancel={() => setSkipTarget(null)}
-          onConfirm={confirmSkip}
-        />
-      )}
     </div>
   );
 }

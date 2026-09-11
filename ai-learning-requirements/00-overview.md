@@ -17,7 +17,7 @@ Every file (including this one) tags each section:
 |---|---|---|
 | The course/quiz catalog, seeding (`ai-track-seed.sql`, `core-competency-seed.sql`, `junior-learning-roadmap-seed.sql`, `complete-course-track-core-competency-seed.sql`), or the (unbuilt) Sheets-sync idea | [01-course-catalog.md](01-course-catalog.md) | ✅ catalog data · ⬜ sync |
 | Enrolling in a track, "Suggested tracks" / "Your tracks" on `/learning` | [02-track-enrollment.md](02-track-enrollment.md) | ✅ Built |
-| `/learning/journey` — the List view, locking + Skip prerequisite, reordering, Up next, Knowledge artifacts, the Wrap-up quiz | [03-your-journey.md](03-your-journey.md) | ✅ Built |
+| `/learning/journey` — the List view (scoped to your own tier only, no locking), Up next, Knowledge artifacts, the Wrap-up quiz | [03-your-journey.md](03-your-journey.md) | ✅ Built |
 | `/learning/dashboard` — the KPI row, "Progress by level," My courses, Consistency / Retention / What's next / Application cards, Weekly streak | [04-learner-dashboard.md](04-learner-dashboard.md) | ✅ Built |
 | `/learning/team` — admin KPI row, Needs support, the roster (Level→target/Pace/Avg exam), the skills heatmap, distribution, the Application funnel, read-only drill-down, the annual review date editor | [05-team-view.md](05-team-view.md) | ✅ Built |
 | A roadmap-sequencing agent, or NotebookLM-style mind-map/summary generation | [06-planner-knowledge-builder.md](06-planner-knowledge-builder.md) | ⬜ Not started |

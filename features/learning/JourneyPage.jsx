@@ -8,11 +8,12 @@
 // roadmap intended), not replaced with anything — courses.roadmap_order is
 // what getJourney() (features/learning/queries.js) now sorts by instead.
 // Restricted to what's expected of this account BY NOW: an Intern only
-// sees the Intern tier, a Junior sees Intern + Junior, and so on
-// (isExpectedByNow, shared.js — the same rule the % completion numbers
-// use). Finishing every course in your own tier earns early access to
-// ONE stage ahead — never more (effectivePosition, shared.js: Intern who's
-// done -> sees through Junior, Junior who's done -> sees through Middle,
+// sees the Intern tier, a Junior only sees the Junior tier (not Intern +
+// Junior — Intern is assumed already fulfilled, that's what got them
+// promoted) (isExpectedByNow, shared.js — the same rule the % completion
+// numbers use). Finishing every course in your own tier earns early access
+// to ONE stage ahead — never more (effectivePosition, shared.js: Intern
+// who's done -> also sees Junior, Junior who's done -> also sees Middle,
 // "max +1 stage"). The full roadmap, including tiers beyond that, is still
 // visible on the Mind map (Learner Dashboard) — that view is meant to show
 // the road ahead, this one is meant to show what's actually on your plate
@@ -32,7 +33,7 @@ import ConfirmModal from "@/features/learning/ConfirmModal";
 import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, HEADER_H, ROW_H, VISIBLE_ROWS, th, td,
   fmtDate, relTime,
-  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, effectivePosition, isTierDone,
+  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, isVisibleNow, effectivePosition, isTierDone,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
@@ -124,12 +125,12 @@ export function JourneyTable({ courses, onUnschedule }) {
 //
 // A SEPARATE small selector (own local state, not the track filter above)
 // appears only once early access is earned (visiblePosition !== position —
-// effectivePosition, shared.js): "my level" shows the same cumulative
-// "through X" number as always; "early access" swaps to the next tier's
-// OWN core courses (nextTierCoreComplete/Total, computed by the parent) so
-// the learner can monitor the bonus material on its own terms, not folded
-// into a number that's already sitting near 100% because the tier below it
-// is what earned the early access in the first place.
+// effectivePosition, shared.js): "my level" shows the same own-tier-only
+// number as always; "early access" swaps to the next tier's OWN core
+// courses (nextTierCoreComplete/Total, computed by the parent) so the
+// learner can monitor the bonus material on its own terms, not folded into
+// a number that's already sitting near 100% because it's the tier that
+// earned the early access in the first place.
 function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, coreComplete, coreTotal, nextTierCoreComplete, nextTierCoreTotal, calendarConnected }) {
   const [scope, setScope] = useState("mine");
   const earlyAccess = Boolean(visiblePosition) && visiblePosition !== position;
@@ -193,7 +194,7 @@ function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, cor
               {showingNext ? (
                 <span style={{ color: "var(--faint)" }}> · {POSITION_LABEL[visiblePosition] || visiblePosition} only</span>
               ) : (
-                position && <span style={{ color: "var(--faint)" }}> · through {POSITION_LABEL[position] || position}</span>
+                position && <span style={{ color: "var(--faint)" }}> · {POSITION_LABEL[position] || position} only</span>
               )}
             </div>
             <ProgressBar pct={pct} />
@@ -463,15 +464,16 @@ export default function JourneyPage() {
     if (!trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack(trackOptions[0]?.id || "");
   }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
   const filteredJourney = journey.filter((c) => c.track_id === selectedTrack);
-  // The List (and Up next, below) only show courses in tiers at or below
-  // this account's current position — an Intern sees the Intern tier, a
-  // Junior sees Intern + Junior, and so on (isExpectedByNow, shared.js).
-  // Once every course in the account's OWN tier is complete/skipped,
-  // they've earned one stage of early access too (effectivePosition —
-  // "max +1 stage": Intern -> Junior, Junior -> Middle, never further),
-  // computed off the FULL journey (every enrolled track), not
-  // filteredJourney — whether you've finished your stage shouldn't depend
-  // on which track happens to be selected in the dropdown.
+  // The List (and Up next, below) only show courses in this account's own
+  // current tier — an Intern sees the Intern tier, a Junior sees only the
+  // Junior tier (isExpectedByNow/isVisibleNow, shared.js) — the tiers below
+  // it are assumed already fulfilled, not something still owed. Once every
+  // course in the account's OWN tier is complete/skipped, they've earned one
+  // stage of early access too (effectivePosition — "max +1 stage": Intern ->
+  // also Junior, Junior -> also Middle, never further), computed off the
+  // FULL journey (every enrolled track), not filteredJourney — whether
+  // you've finished your stage shouldn't depend on which track happens to be
+  // selected in the dropdown.
   //
   // Deliberately NOT used for the % completion numbers below (coreCourses
   // stays on the raw, officially-assigned position) — % completion is a
@@ -484,7 +486,7 @@ export default function JourneyPage() {
   // tracks you're ENROLLED in is a different fact from which courses are
   // relevant to see right now.
   const visiblePosition = effectivePosition(journey, position);
-  const visibleJourney = filteredJourney.filter((c) => isExpectedByNow(c, visiblePosition));
+  const visibleJourney = filteredJourney.filter((c) => isVisibleNow(c, position, visiblePosition));
   // The "max +1 stage" cap is flat, not recursive (effectivePosition,
   // shared.js) — so someone who finishes the +1 stage TOO hits a wall:
   // nothing new becomes visible until an admin reassigns their position.
@@ -644,8 +646,8 @@ export default function JourneyPage() {
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
                   {position
                     ? visiblePosition !== position
-                      ? `Showing Intern through ${POSITION_LABEL[visiblePosition] || visiblePosition} — you've finished ${POSITION_LABEL[position] || position} and unlocked early access to the next stage — in ${trackTags[0] || "this track"}.`
-                      : `Showing Intern through ${POSITION_LABEL[position] || position} — your current stage — in ${trackTags[0] || "this track"}.`
+                      ? `Showing ${POSITION_LABEL[position] || position} — you've finished it and unlocked early access to ${POSITION_LABEL[visiblePosition] || visiblePosition} — in ${trackTags[0] || "this track"}.`
+                      : `Showing ${POSITION_LABEL[position] || position} — your current stage — in ${trackTags[0] || "this track"}.`
                     : `Ordered intern → principal, in ${trackTags[0] || "this track"}.`}
                 </p>
               </div>

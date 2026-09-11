@@ -28,14 +28,16 @@ const POSITION_ORDER = POSITIONS;
 // already generic on accountId, not hardcoded to the caller.
 //
 // core_total/core_complete are scoped to what's actually expected of each
-// account BY NOW — every course in every tier at or below their own RAW,
-// officially-assigned user_role.position, not the whole roadmap up to
-// Principal. An Intern is only on the hook for the Intern tier; a Senior
-// for everything through Senior. Same array_position() ladder comparison
-// features/learning/shared.js's isExpectedByNow() does client-side for
-// Journey's profile strip and the Learner Dashboard — this is the
-// server-side twin of that rule, for Team view's roster and its "Average
-// completion" stat card (both just read core_total/core_complete off this).
+// account BY NOW — only the courses in their own RAW, officially-assigned
+// user_role.position tier, not the whole roadmap up to Principal and not
+// the tiers below it either. An Intern is only on the hook for the Intern
+// tier; a Senior only for the Senior tier — the tiers below are assumed
+// already fulfilled (that's what earned the promotion). Same
+// array_position() ladder comparison features/learning/shared.js's
+// isExpectedByNow() does client-side for Journey's profile strip and the
+// Learner Dashboard — this is the server-side twin of that rule, for Team
+// view's roster and its "Average completion" stat card (both just read
+// core_total/core_complete off this).
 //
 // Deliberately does NOT use the one-stage-ahead "early access" position
 // (effectivePosition, shared.js) Journey's List grants once an account
@@ -44,12 +46,12 @@ const POSITION_ORDER = POSITIONS;
 // moment it's unlocked. It only grows to cover a new tier once an admin
 // actually reassigns the account's position.
 //
-// No position set yet: in_range falls back to true (count the whole
+// No position set yet: in_tier falls back to true (count the whole
 // roadmap) rather than 0/0 — same fallback isExpectedByNow() uses.
 // in_progress_count/stalled/last_activity stay UNSCOPED on purpose — those
 // are about engagement, not a graded "% expected done".
 //
-// courses (added for the Team view rebuild) is UNSCOPED by in_range too, and
+// courses (added for the Team view rebuild) is UNSCOPED by in_tier too, and
 // deliberately lean — status/skills/quiz snapshot only, not the full course
 // row getJourney() returns. It exists so skillConfidence()/avgExamAccuracy()
 // (shared.js) can run client-side per member for the "Skills across the
@@ -71,8 +73,8 @@ export async function getTeamOverview() {
         (
           ur.position is null
           or array_position(${POSITION_ORDER}::text[], c.expected_by_position)
-             <= array_position(${POSITION_ORDER}::text[], ur.position)
-        ) as in_range
+             = array_position(${POSITION_ORDER}::text[], ur.position)
+        ) as in_tier
       from account_tracks acct
       join courses c on c.track_id = acct.track_id
       left join course_assignments ca on ca.course_id = c.id and ca.account_id = acct.account_id
@@ -80,8 +82,8 @@ export async function getTeamOverview() {
     ),
     progress as (
       select account_id,
-        count(*) filter (where priority = 'core' and in_range)::int as core_total,
-        count(*) filter (where priority = 'core' and in_range and status = 'complete')::int as core_complete,
+        count(*) filter (where priority = 'core' and in_tier)::int as core_total,
+        count(*) filter (where priority = 'core' and in_tier and status = 'complete')::int as core_complete,
         count(*) filter (where status = 'in_progress')::int as in_progress_count,
         max(updated_at) as last_activity,
         bool_or(status = 'in_progress' and updated_at < now() - interval '28 days') as stalled,
@@ -296,47 +298,6 @@ export async function startCourse(accountId, courseId) {
     returning status
   `;
   return { status: rows[0]?.status || null };
-}
-
-// "Skip prerequisite" on a locked course: rather than marking that one
-// course skipped, this marks EVERY course in the position tier below it
-// 'skipped' for this account (across all its enrolled tracks) — which is
-// what satisfies the tier gate in computeLocks — and every course in the
-// clicked course's own tier 'not_started', so the whole tier unlocks
-// showing its normal, un-started state rather than a synthetic status.
-// Recorded on course_assignments like any other status, so it's the same
-// data a manager view would read.
-export async function skipPrerequisiteFor(courseId, accountId) {
-  const rows = await sql`
-    with target as (
-      select expected_by_position as current_position from courses where id = ${courseId}
-    ),
-    prev_position as (
-      -- The tier one below current, read off POSITION_ORDER by index rather
-      -- than a hand-written adjacency map — a Postgres array index of 0 (the
-      -- one-below of the ladder's first entry) is out of range and returns
-      -- null, same as the old CASE's "else null" for intern.
-      select (${POSITION_ORDER}::text[])[
-        array_position(${POSITION_ORDER}::text[], (select current_position from target)) - 1
-      ] as position
-    ),
-    affected as (
-      select c.id,
-        case
-          when c.expected_by_position = (select position from prev_position) then 'skipped'
-          when c.expected_by_position = (select current_position from target) then 'not_started'
-        end as new_status
-      from account_tracks acct
-      join courses c on c.track_id = acct.track_id
-      where acct.account_id = ${accountId}
-        and c.expected_by_position in ((select position from prev_position), (select current_position from target))
-    )
-    insert into course_assignments (account_id, course_id, status)
-    select ${accountId}::uuid, id, new_status from affected where new_status is not null
-    on conflict (account_id, course_id) do update set status = excluded.status, updated_at = now()
-    returning course_id, status
-  `;
-  return { updated: rows.length };
 }
 
 // Reset every table AI Learning itself owns for this account, not just
