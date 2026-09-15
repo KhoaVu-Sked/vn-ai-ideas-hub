@@ -230,6 +230,12 @@ a {
   line-height: 1.4;
 }
 
+/* ── Journey list row hover ───────────────────────────────────────
+   JourneyTable (features/learning/JourneyPage.jsx) — reused as-is on the
+   Learner Dashboard's "My courses" and Team view's read-only drill-down,
+   so a plain CSS hover lives here instead of per-row JS state. */
+.journey-row:hover { background: var(--bg); }
+
 /* ── Task drawer ──────────────────────────────────────────────────
    The panel comes in from the right edge it is anchored to, so the
    motion matches where it lives. The scrim only fades — sliding it
