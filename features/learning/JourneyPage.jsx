@@ -23,10 +23,14 @@
 // position/visiblePosition/atCeiling facts as a connected 5-stage path
 // rather than a lone progress bar — "Your Journey" names a real, ordered
 // sequence, so a stepped path earns its place here in a way a generic
-// numbered decoration wouldn't. JourneyTable itself stays a plain, calm
-// list: it's reused as-is on the Learner Dashboard's "My courses" and
-// Team view's read-only drill-down, so its own redesign budget is small on
-// purpose — this page spends its one bold gesture on the hero instead.
+// numbered decoration wouldn't. JourneyTable carries the same idea into
+// the course list itself: each core course is a stop on a connected path
+// (a status-colored dot + line, the same language as the hero rail and Up
+// next's own mini path), with optional courses set apart and no line
+// running through them. Reused as-is on the Learner Dashboard's "My
+// courses" and Team view's read-only drill-down (TeamPage.jsx), so all
+// three read as the same product rather than one polished page and two
+// leftover tables.
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -40,115 +44,144 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import AutoScheduleModal from "@/features/learning/AutoScheduleModal";
 import ConfirmModal from "@/features/learning/ConfirmModal";
 import {
-  card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER, HEADER_H, ROW_H, VISIBLE_ROWS, th, td,
+  card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER,
   fmtDate, relTime,
   formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, isVisibleNow, effectivePosition, isTierDone,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
-function JourneyRow({ course, index, expanded, onToggle, onUnschedule, muted }) {
+// One stop on the course-list path — a status-colored dot connected by a
+// line to the next stop, echoing the hero's own tier rail and Up next's
+// mini path at the scale of the full list. `hasLine` is false for the last
+// core row and for every optional row: optional courses sit outside the
+// required path, so nothing runs through them. `isFirst` drops the top
+// divider a row would otherwise draw against the one above it (matching
+// Up next/Knowledge artifacts' own `:first-child` treatment) — true once
+// per group (first core row, first optional row), since each group's own
+// heading already separates it from whatever came before.
+function JourneyRow({ course, expanded, onToggle, onUnschedule, muted, hasLine, isFirst }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
-  // A quiet left rail on the row currently in progress — "this is the one
-  // you're on" — rather than a second badge competing with the status pill.
-  const rail = course.status === "in_progress" ? STATUS_META.in_progress.color : "transparent";
-  const dim = muted ? { color: "var(--faint)" } : null;
+  const meta = [
+    course.platform,
+    course.est_hours != null ? `${course.est_hours} hrs` : null,
+    course.target_date ? `Target ${fmtDate(course.target_date)}` : "No target set",
+  ].filter(Boolean).join(" · ");
+
   return (
     <>
-      <tr className="journey-row" onClick={onToggle} style={{ borderTop: "1px solid var(--line)", cursor: "pointer" }}>
-        <td style={{ ...td, color: "var(--faint)", borderLeft: `3px solid ${rail}` }}>{index}</td>
-        <td style={{ ...td, fontWeight: 700, fontSize: 13.5, color: muted ? "var(--muted)" : "var(--ink)" }}>
-          {course.title}
+      <div
+        className="journey-row"
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
+        style={{ display: "flex", gap: 12, padding: "13px 6px", borderRadius: 10, cursor: "pointer", borderTop: isFirst ? "none" : "1px solid var(--line)" }}
+      >
+        <div style={{ width: 16, display: "flex", flexDirection: "column", alignItems: "center", alignSelf: "stretch", paddingTop: 5, flexShrink: 0 }}>
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: status.color, flexShrink: 0 }} />
+          {hasLine && <span style={{ width: 2, flex: 1, background: "var(--line)", marginTop: 4 }} />}
+        </div>
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 1 }}>
+          <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: muted ? "var(--muted)" : "var(--ink)" }}>
+            {course.title}
+          </div>
           {/* The competency this course builds — the branded title alone
               (e.g. "AI Fluency: Framework & Foundations") doesn't say what
               it's actually for. */}
           {course.focus_area && (
-            <div style={{ fontWeight: 400, fontSize: 11, color: "var(--faint)", marginTop: 2 }}>{course.focus_area}</div>
+            <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 2 }}>{course.focus_area}</div>
           )}
-        </td>
-        <td style={{ ...td, textTransform: "capitalize", ...dim }}>{course.priority || "—"}</td>
-        <td style={{ ...td, ...dim }}>{course.platform || "—"}</td>
-        <td style={{ ...td, ...dim }}>{course.est_hours ?? "—"}</td>
-        <td style={{ ...td, ...dim }}>{fmtDate(course.target_date)}</td>
-        <td style={td}><span style={statusPill(course.status)}>{status.label}</span></td>
-        <td style={{ ...td, textAlign: "right", color: "var(--muted)" }}>{expanded ? "︿" : "﹀"}</td>
-      </tr>
+          {meta && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>{meta}</div>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0, paddingTop: 2 }}>
+          <span style={statusPill(course.status)}>{status.label}</span>
+          <span
+            className="jrow-chevron"
+            aria-hidden="true"
+            style={{ width: 25, height: 25, borderRadius: "50%", border: "1px solid var(--line)", background: "var(--card)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--muted)" }}
+          >
+            {expanded ? "︿" : "﹀"}
+          </span>
+        </div>
+      </div>
       {expanded && (
-        <tr>
-          <td colSpan={8} style={{ padding: 0, background: "var(--bg)" }}>
-            <div style={{ padding: "12px 8px 16px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
-              {course.link && (
-                <a href={course.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none" }}>
-                  Open course{course.platform ? ` on ${course.platform}` : ""} ↗
-                </a>
-              )}
-              {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
-              {course.has_scheduled_session && onUnschedule && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onUnschedule(course); }}
-                  title="Delete this course's calendar event(s) and clear its target date"
-                  style={{ alignSelf: "flex-start", background: "none", border: "none", color: "var(--muted)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", padding: 0 }}
-                >
-                  Remove from calendar
-                </button>
-              )}
-            </div>
-          </td>
-        </tr>
+        <div style={{ padding: "2px 6px 14px 38px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {course.link && (
+            <a href={course.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none" }}>
+              Open course{course.platform ? ` on ${course.platform}` : ""} ↗
+            </a>
+          )}
+          {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
+          {course.has_scheduled_session && onUnschedule && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onUnschedule(course); }}
+              title="Delete this course's calendar event(s) and clear its target date"
+              style={{ alignSelf: "flex-start", background: "none", border: "none", color: "var(--muted)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", padding: 0 }}
+            >
+              Remove from calendar
+            </button>
+          )}
+        </div>
       )}
     </>
   );
 }
 
-// Scrolls after ~8 rows; header stays pinned while the body scrolls. Plain
-// display order — whatever `courses` arrives in (getJourney()'s own SQL
-// ORDER BY, features/learning/queries.js). th/td are spread-and-overridden
-// locally (not edited in shared.js) — TeamPage's own roster table reads
-// those same exports for a different table entirely, so this page's own
-// polish stays scoped to just this one.
+// Scrolls after roughly 6 rows so the card doesn't grow without bound as a
+// tier's course count grows. Plain display order — whatever `courses`
+// arrives in (getJourney()'s own SQL ORDER BY, features/learning/
+// queries.js). No page-specific styling here: this same component renders
+// on the Learner Dashboard's "My courses" and Team view's read-only
+// drill-down (TeamPage.jsx), so it can't assume it's sitting inside
+// JourneyPage's own layout.
 export function JourneyTable({ courses, onUnschedule }) {
   const [expandedId, setExpandedId] = useState(null);
-  const headCell = { ...th, position: "sticky", top: 0, background: "var(--bg)", borderBottom: "1px solid var(--line)" };
   const toggle = (id) => setExpandedId((cur) => (cur === id ? null : id));
 
   // Optional rows are enrichment, not part of what "core courses complete"
   // counts — grouped under their own divider, below every core row,
   // regardless of where roadmap_order happens to interleave them, so the
-  // core path reads as the primary list rather than one flat mix.
+  // core path reads as the primary list rather than one flat mix. Priority
+  // itself isn't repeated on every row anymore — the section a row sits in
+  // already says that.
   const core = courses.filter((c) => c.priority !== "optional");
   const optional = courses.filter((c) => c.priority === "optional");
 
   return (
-    <div style={{ overflow: "auto", maxHeight: HEADER_H + VISIBLE_ROWS * ROW_H, border: "1px solid var(--line)", borderRadius: 10 }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left", color: "var(--muted)" }}>
-            <th style={headCell}>#</th>
-            <th style={headCell}>Course</th>
-            <th style={headCell}>Priority</th>
-            <th style={headCell}>Platform</th>
-            <th style={headCell}>Est. hrs</th>
-            <th style={headCell}>Target</th>
-            <th style={headCell}>Status</th>
-            <th style={headCell} />
-          </tr>
-        </thead>
-        <tbody>
-          {core.map((c, i) => (
-            <JourneyRow key={c.id} course={c} index={i + 1} expanded={expandedId === c.id} onToggle={() => toggle(c.id)} onUnschedule={onUnschedule} />
-          ))}
-          {optional.length > 0 && (
-            <tr>
-              <td colSpan={8} style={{ padding: "7px 8px 4px", background: "var(--bg)", borderTop: "1px solid var(--line)", fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--faint)" }}>
-                Optional · enrichment, not required to finish this tier
-              </td>
-            </tr>
-          )}
-          {optional.map((c, i) => (
-            <JourneyRow key={c.id} course={c} index={core.length + i + 1} expanded={expandedId === c.id} onToggle={() => toggle(c.id)} onUnschedule={onUnschedule} muted />
-          ))}
-        </tbody>
-      </table>
+    <div style={{ overflow: "auto", maxHeight: 470, border: "1px solid var(--line)", borderRadius: 12, padding: "4px 10px" }}>
+      {core.map((c, i) => (
+        <JourneyRow
+          key={c.id}
+          course={c}
+          expanded={expandedId === c.id}
+          onToggle={() => toggle(c.id)}
+          onUnschedule={onUnschedule}
+          hasLine={i < core.length - 1}
+          isFirst={i === 0}
+        />
+      ))}
+      {optional.length > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 6px 3px" }}>
+            <span style={{ fontFamily: "var(--font-sora)", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--faint)" }}>Optional</span>
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--faint)", margin: "0 6px 6px" }}>Enrichment — not required to finish this tier</div>
+        </>
+      )}
+      {optional.map((c, i) => (
+        <JourneyRow
+          key={c.id}
+          course={c}
+          expanded={expandedId === c.id}
+          onToggle={() => toggle(c.id)}
+          onUnschedule={onUnschedule}
+          muted
+          hasLine={false}
+          isFirst={i === 0}
+        />
+      ))}
     </div>
   );
 }
@@ -838,15 +871,22 @@ export default function JourneyPage() {
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
               <div>
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                  <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 21, letterSpacing: -0.3, color: "var(--ink)", margin: 0 }}>Your Journey</h1>
+                  <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 22, letterSpacing: -0.3, color: "var(--ink)", margin: 0 }}>Your Journey</h1>
                   {journey.length > 0 && (
-                    <select
-                      value={selectedTrack}
-                      onChange={(e) => setSelectedTrack(e.target.value)}
-                      style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 28, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}
-                    >
-                      {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
+                    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                      <select
+                        value={selectedTrack}
+                        onChange={(e) => setSelectedTrack(e.target.value)}
+                        style={{
+                          appearance: "none", WebkitAppearance: "none", fontFamily: "inherit",
+                          border: "1px solid var(--line)", background: "var(--card)", color: "var(--ink)",
+                          borderRadius: 999, padding: "7px 30px 7px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+                        }}
+                      >
+                        {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                      <span aria-hidden="true" style={{ position: "absolute", right: 13, fontSize: 9, color: "var(--muted)", pointerEvents: "none" }}>▾</span>
+                    </div>
                   )}
                 </div>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>

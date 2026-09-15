@@ -235,6 +235,8 @@ a {
    Learner Dashboard's "My courses" and Team view's read-only drill-down,
    so a plain CSS hover lives here instead of per-row JS state. */
 .journey-row:hover { background: var(--bg); }
+.journey-row:hover .jrow-chevron { border-color: var(--blue); color: var(--blue); }
+.journey-row:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 
 /* ── Task drawer ──────────────────────────────────────────────────
    The panel comes in from the right edge it is anchored to, so the
