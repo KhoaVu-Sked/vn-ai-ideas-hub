@@ -62,11 +62,12 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
   card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isVisibleNow, effectivePosition, fmtDate,
   PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel, weeklyStreak,
-  skillConfidence, SKILL_CONFIDENCE_SCALE, avgExamAccuracy,
+  skillConfidence, SKILL_CONFIDENCE_SCALE, avgExamAccuracy, otherInProgressInSameTrack,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 import { JourneyMindMap } from "@/features/learning/MindMap";
 import { JourneyTable } from "@/features/learning/JourneyPage";
+import ConfirmModal from "@/features/learning/ConfirmModal";
 import { STATUS_META } from "@/features/ideas/constants";
 
 const cardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" };
@@ -229,6 +230,11 @@ export default function LearnerDashboardPage() {
   const [ready, setReady] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState("");
   const [coursesTrack, setCoursesTrack] = useState("");
+  // "Start this course" on a course whose track already has another one
+  // in_progress — same rule and same confirm-first UX as Your Journey's
+  // own requestStartCourse (JourneyPage.jsx): holds { courseId,
+  // conflicting } while the modal is open, null otherwise.
+  const [pendingStart, setPendingStart] = useState(null);
 
   const load = useCallback(async () => {
     setErr("");
@@ -243,13 +249,23 @@ export default function LearnerDashboardPage() {
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
 
-  // Same optimistic status flip as Your Journey's own handleStartCourse
-  // (JourneyPage.jsx) — "My courses" below renders the identical
-  // JourneyTable component, so a learner can start (or jump straight to
-  // the quiz for) any course from here too, not just from Your Journey.
-  const handleStartCourse = (courseId) => {
+  // Same three functions as Your Journey's own (JourneyPage.jsx) — "My
+  // courses" below renders the identical JourneyTable, so it needs the
+  // same start/confirm logic, not just the same status flip. See that
+  // file's own comments on requestStartCourse/startIfNoConflict for why
+  // there are two entry points instead of one.
+  const commitStartCourse = (courseId) => {
     setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, status: "in_progress" } : c)));
     api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
+  };
+  const requestStartCourse = (courseId) => {
+    const conflicting = otherInProgressInSameTrack(journey, courseId);
+    if (conflicting.length > 0) { setPendingStart({ courseId, conflicting }); return; }
+    commitStartCourse(courseId);
+  };
+  const startIfNoConflict = (courseId) => {
+    if (otherInProgressInSameTrack(journey, courseId).length > 0) return;
+    commitStartCourse(courseId);
   };
 
   // The Application card's own data — a separate, small fetch rather than
@@ -306,6 +322,10 @@ export default function LearnerDashboardPage() {
   const visiblePosition = effectivePosition(journey, position);
   const visibleJourney = journey.filter((c) => isVisibleNow(c, position, visiblePosition));
   const coursesJourney = visibleJourney.filter((c) => c.track_id === coursesTrack);
+  // The course pendingStart is asking about — looked up from the FULL
+  // journey since it's set from any visible row in "My courses", not
+  // necessarily one in coursesJourney by the time this renders.
+  const pendingStartCourse = pendingStart ? journey.find((c) => c.id === pendingStart.courseId) : null;
 
   // KPI: "Roadmap complete" — % of what's expected by now, across every
   // enrolled track (visibleJourney, unfiltered by coursesTrack — see that
@@ -425,7 +445,7 @@ export default function LearnerDashboardPage() {
                       <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 14 }}>Nothing expected yet for your stage in {coursesTrackName || "this track"}.</div>
                     ) : (
                       <div style={{ marginTop: 14 }}>
-                        <JourneyTable courses={coursesJourney} onStartCourse={handleStartCourse} />
+                        <JourneyTable courses={coursesJourney} onStartCourse={requestStartCourse} onSilentStart={startIfNoConflict} />
                       </div>
                     )}
                   </section>
@@ -519,6 +539,19 @@ export default function LearnerDashboardPage() {
           </>
         )}
       </main>
+
+      {pendingStart && (
+        <ConfirmModal
+          icon="📚"
+          tone="caution"
+          title="Start a second course in this track?"
+          body={`${pendingStart.conflicting.map((c) => `"${c.title}"`).join(" and ")} ${pendingStart.conflicting.length === 1 ? "is" : "are"} already in progress in this track. Starting "${pendingStartCourse?.title || "this course"}" too means having more than one going at once — you can always come back and finish it later instead.`}
+          confirmLabel="Start anyway"
+          cancelLabel="Not now"
+          onCancel={() => setPendingStart(null)}
+          onConfirm={() => { commitStartCourse(pendingStart.courseId); setPendingStart(null); }}
+        />
+      )}
     </div>
   );
 }

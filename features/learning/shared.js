@@ -98,6 +98,21 @@ export function isTierDone(courses, tierPosition) {
   return tier.every((c) => c.status === "complete" || c.status === "skipped");
 }
 
+// Every OTHER course already in_progress in the same track as `courseId` —
+// the default is one course in progress per track at a time, so this is
+// what a "start this course" action checks before acting. Scoped to the
+// track, not the whole account: a learner working through two different
+// tracks in parallel isn't the case this guards against, only starting a
+// second course inside the SAME track before finishing the first one.
+// Used by both Your Journey (JourneyPage.jsx) and the Learner Dashboard's
+// "My courses" (LearnerDashboardPage.jsx) — same rule, same journey shape,
+// so the check lives once here rather than copied into both.
+export function otherInProgressInSameTrack(journey, courseId) {
+  const course = journey.find((c) => c.id === courseId);
+  if (!course) return [];
+  return journey.filter((c) => c.track_id === course.track_id && c.status === "in_progress" && c.id !== courseId);
+}
+
 // Once every course in an account's own current-position tier is
 // complete/skipped, they've earned early access to the NEXT tier too —
 // capped at exactly one stage ahead, never further (an Intern who's

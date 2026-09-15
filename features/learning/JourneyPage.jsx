@@ -47,6 +47,7 @@ import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER,
   fmtDate, relTime,
   formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, isVisibleNow, effectivePosition, isTierDone,
+  otherInProgressInSameTrack,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
@@ -65,7 +66,7 @@ import ProgressBar from "@/features/learning/ProgressBar";
 // showing for this course's own status.
 const quickAction = { fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" };
 
-function JourneyRow({ course, expanded, onToggle, onUnschedule, onStartCourse, muted, hasLine, isFirst }) {
+function JourneyRow({ course, expanded, onToggle, onUnschedule, onStartCourse, onSilentStart, muted, hasLine, isFirst }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
   const meta = [
     course.platform,
@@ -126,9 +127,17 @@ function JourneyRow({ course, expanded, onToggle, onUnschedule, onStartCourse, m
               already handles "already complete — retake" and "no quiz yet"
               on its own), and starts the course on the way in if it hasn't
               been already, so status still reflects what the learner
-              actually did. onStartCourse is only passed by first-person
-              views (Your Journey, My courses) — Team's read-only
-              drill-down omits it, so neither action renders there. */}
+              actually did. onStartCourse/onSilentStart are only passed by
+              first-person views (Your Journey, My courses) — Team's
+              read-only drill-down omits both, so neither action renders
+              there. The two are deliberately different functions: clicking
+              "Start this course" is a real, considered choice, so it's the
+              one place that asks first if it would split focus across a
+              second course in this track (JourneyPage's requestStartCourse
+              — see its own comment); the quiz link starts the course
+              quietly, with no prompt, because gating quiz access behind a
+              modal would undercut "take any quiz, any time" for the sake
+              of a rule about deliberate starts, not quiz-taking. */}
           {onStartCourse && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
               {course.status !== "in_progress" && course.status !== "complete" && (
@@ -138,7 +147,7 @@ function JourneyRow({ course, expanded, onToggle, onUnschedule, onStartCourse, m
               )}
               <Link
                 href={`/learning/journey/${course.id}/quiz`}
-                onClick={(e) => { e.stopPropagation(); if (course.status !== "in_progress" && course.status !== "complete") onStartCourse(course.id); }}
+                onClick={(e) => { e.stopPropagation(); if (course.status !== "in_progress" && course.status !== "complete") onSilentStart(course.id); }}
                 style={quickAction}
               >
                 {course.status === "complete" ? "Retake the quiz →" : "Take the quiz →"}
@@ -168,7 +177,7 @@ function JourneyRow({ course, expanded, onToggle, onUnschedule, onStartCourse, m
 // on the Learner Dashboard's "My courses" and Team view's read-only
 // drill-down (TeamPage.jsx), so it can't assume it's sitting inside
 // JourneyPage's own layout.
-export function JourneyTable({ courses, onUnschedule, onStartCourse }) {
+export function JourneyTable({ courses, onUnschedule, onStartCourse, onSilentStart }) {
   const [expandedId, setExpandedId] = useState(null);
   const toggle = (id) => setExpandedId((cur) => (cur === id ? null : id));
 
@@ -191,6 +200,7 @@ export function JourneyTable({ courses, onUnschedule, onStartCourse }) {
           onToggle={() => toggle(c.id)}
           onUnschedule={onUnschedule}
           onStartCourse={onStartCourse}
+          onSilentStart={onSilentStart}
           hasLine={i < core.length - 1}
           isFirst={i === 0}
         />
@@ -212,6 +222,7 @@ export function JourneyTable({ courses, onUnschedule, onStartCourse }) {
           onToggle={() => toggle(c.id)}
           onUnschedule={onUnschedule}
           onStartCourse={onStartCourse}
+          onSilentStart={onSilentStart}
           muted
           hasLine={false}
           isFirst={i === 0}
@@ -593,11 +604,11 @@ function AccuracyRing({ pct }) {
 // fabricated number.
 // inProgressCourses: every in_progress course in the same track scope,
 // shown below the completions so the card also points at what's next, not
-// just what's done. Plural since a learner can now start more than one
-// course at a time (any row's own "Start this course"/"Take the quiz" —
-// there's no single "the one you're on" anymore) — capped at 3 so this
-// card can't grow without bound. Empty when nothing's in progress; no
-// fallback fabricated.
+// just what's done. Plural rather than a single pick: the default is one
+// course in progress per track (requestStartCourse, below, asks before
+// letting a second one start), but that's an ask, not a hard rule, so more
+// than one can still be here — capped at 3 so this card can't grow without
+// bound. Empty when nothing's in progress; no fallback fabricated.
 function KnowledgeArtifactsCard({ completions, inProgressCourses }) {
   return (
     <section style={card}>
@@ -659,6 +670,10 @@ export default function JourneyPage() {
   // — unscheduleTarget holds the course pending confirmation, or null.
   const [unscheduleTarget, setUnscheduleTarget] = useState(null);
   const [unscheduling, setUnscheduling] = useState(false);
+  // "Start this course" on a course whose track already has another one
+  // in_progress — holds { courseId, conflicting } while the confirm modal
+  // (below) is open, null otherwise. See requestStartCourse's own comment.
+  const [pendingStart, setPendingStart] = useState(null);
   // No "all tracks" option — always one specific enrolled track (its id),
   // auto-picked below once trackOptions is known; "" only until then.
   const [selectedTrack, setSelectedTrack] = useState("");
@@ -792,6 +807,10 @@ export default function JourneyPage() {
   // rather than a single pick. Both computed from filteredJourney, already
   // on hand from the journey fetch — no extra request.
   const inProgressCourses = filteredJourney.filter((c) => c.status === "in_progress").slice(0, 3);
+  // The course pendingStart is asking about, looked up from the FULL
+  // journey (not filteredJourney) since it's set from any visible row,
+  // regardless of which track happens to be selected in the dropdown.
+  const pendingStartCourse = pendingStart ? journey.find((c) => c.id === pendingStart.courseId) : null;
   const recentCompletions = filteredJourney
     .filter((c) => c.status === "complete")
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
@@ -859,7 +878,7 @@ export default function JourneyPage() {
 
   // Removes just ONE course's own Auto-Scheduled calendar event(s) and
   // clears its target date (app/api/courses/:id/clear-schedule) — status
-  // untouched. Optimistic local patch, same pattern handleStartCourse
+  // untouched. Optimistic local patch, same pattern commitStartCourse
   // already uses, rather than a full reload for a single known row.
   const doUnschedule = async (courseId) => {
     setUnscheduling(true);
@@ -876,19 +895,47 @@ export default function JourneyPage() {
     }
   };
 
-  // Flips any not_started/skipped course to in_progress — Up next's own
-  // background auto-pick (UpNextCard's effect, below) and a learner
-  // manually clicking "Start this course" or "Take the quiz" on ANY row
-  // (JourneyTable) both call this same function. There's no prerequisite
-  // chain to check first: the backend never enforced course order, only
-  // this page's own UI did (one auto-picked "next" course, one quiz link)
-  // — so this can run for any course, any time. Best-effort and silent
-  // either way: a failed status flip here just means the next real fetch
-  // (tab focus, or landing on the course's own quiz page) shows the true
-  // state, not worth a scary error banner over.
-  const handleStartCourse = (courseId) => {
+  // Flips any not_started/skipped course to in_progress — no prerequisite
+  // chain to check: the backend never enforced course order, only this
+  // page's own UI used to (one auto-picked "next" course, one quiz link).
+  // The ONLY thing gated at all is a track already having another course
+  // in_progress (requestStartCourse, below) — this function itself just
+  // does it. Best-effort and silent either way: a failed status flip here
+  // just means the next real fetch (tab focus, or landing on the course's
+  // own quiz page) shows the true state, not worth a scary error banner
+  // over.
+  const commitStartCourse = (courseId) => {
     setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, status: "in_progress" } : c)));
     api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
+  };
+
+  // "Start this course" (JourneyTable) — the one deliberate, considered
+  // click that's choosing to start something, as opposed to Up next's
+  // silent auto-pick or the quiz link's start-on-the-way-in (both call
+  // startIfNoConflict below instead: interrupting either with a modal
+  // would be the wrong call — see JourneyRow's own comment on the two).
+  // Default is one course in progress per track at a time; starting a
+  // second asks first rather than either silently blocking it (this
+  // feature is explicitly about NOT enforcing a hard sequence) or silently
+  // allowing it (easy to lose track of what you're actually mid-way
+  // through). pendingStart holds { courseId, conflicting } for the confirm
+  // modal below; null once resolved either way.
+  const requestStartCourse = (courseId) => {
+    const conflicting = otherInProgressInSameTrack(journey, courseId);
+    if (conflicting.length > 0) { setPendingStart({ courseId, conflicting }); return; }
+    commitStartCourse(courseId);
+  };
+
+  // Starts a course only if it wouldn't create a second in_progress course
+  // in its track — used exactly where asking first would be the wrong
+  // call (see requestStartCourse's own comment): if there's a conflict,
+  // this just does nothing, leaving the course not_started. For the quiz
+  // link that's harmless — completeCourse doesn't care what the prior
+  // status was, so the course still completes normally once the quiz is
+  // finished; it just won't have shown as "in progress" in the meantime.
+  const startIfNoConflict = (courseId) => {
+    if (otherInProgressInSameTrack(journey, courseId).length > 0) return;
+    commitStartCourse(courseId);
   };
 
   return (
@@ -1002,14 +1049,14 @@ export default function JourneyPage() {
                 Nothing in this track for the {POSITION_LABEL[visiblePosition] || visiblePosition} stage yet — check back as you progress.
               </div>
             ) : (
-              <JourneyTable courses={visibleJourney} onUnschedule={(course) => setUnscheduleTarget(course)} onStartCourse={handleStartCourse} />
+              <JourneyTable courses={visibleJourney} onUnschedule={(course) => setUnscheduleTarget(course)} onStartCourse={requestStartCourse} onSilentStart={startIfNoConflict} />
             )}
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
             <UpNextCard
               courses={visibleJourney}
-              onAutoStart={handleStartCourse}
+              onAutoStart={startIfNoConflict}
               onAutoSchedule={() => setAutoScheduleOpen(true)}
               calendarConnected={calendarConnected}
             />
@@ -1054,6 +1101,19 @@ export default function JourneyPage() {
           confirmLabel={unscheduling ? "Removing…" : "Remove from calendar"}
           onCancel={() => setUnscheduleTarget(null)}
           onConfirm={() => doUnschedule(unscheduleTarget.id)}
+        />
+      )}
+
+      {pendingStart && (
+        <ConfirmModal
+          icon="📚"
+          tone="caution"
+          title="Start a second course in this track?"
+          body={`${pendingStart.conflicting.map((c) => `"${c.title}"`).join(" and ")} ${pendingStart.conflicting.length === 1 ? "is" : "are"} already in progress in this track. Starting "${pendingStartCourse?.title || "this course"}" too means having more than one going at once — you can always come back and finish it later instead.`}
+          confirmLabel="Start anyway"
+          cancelLabel="Not now"
+          onCancel={() => setPendingStart(null)}
+          onConfirm={() => { commitStartCourse(pendingStart.courseId); setPendingStart(null); }}
         />
       )}
     </div>
