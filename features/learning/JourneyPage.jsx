@@ -46,20 +46,29 @@ import {
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
-function JourneyRow({ course, index, expanded, onToggle, onUnschedule }) {
+function JourneyRow({ course, index, expanded, onToggle, onUnschedule, muted }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
   // A quiet left rail on the row currently in progress — "this is the one
   // you're on" — rather than a second badge competing with the status pill.
   const rail = course.status === "in_progress" ? STATUS_META.in_progress.color : "transparent";
+  const dim = muted ? { color: "var(--faint)" } : null;
   return (
     <>
       <tr className="journey-row" onClick={onToggle} style={{ borderTop: "1px solid var(--line)", cursor: "pointer" }}>
         <td style={{ ...td, color: "var(--faint)", borderLeft: `3px solid ${rail}` }}>{index}</td>
-        <td style={{ ...td, fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{course.title}</td>
-        <td style={{ ...td, textTransform: "capitalize" }}>{course.priority || "—"}</td>
-        <td style={td}>{course.platform || "—"}</td>
-        <td style={td}>{course.est_hours ?? "—"}</td>
-        <td style={td}>{fmtDate(course.target_date)}</td>
+        <td style={{ ...td, fontWeight: 700, fontSize: 13.5, color: muted ? "var(--muted)" : "var(--ink)" }}>
+          {course.title}
+          {/* The competency this course builds — the branded title alone
+              (e.g. "AI Fluency: Framework & Foundations") doesn't say what
+              it's actually for. */}
+          {course.focus_area && (
+            <div style={{ fontWeight: 400, fontSize: 11, color: "var(--faint)", marginTop: 2 }}>{course.focus_area}</div>
+          )}
+        </td>
+        <td style={{ ...td, textTransform: "capitalize", ...dim }}>{course.priority || "—"}</td>
+        <td style={{ ...td, ...dim }}>{course.platform || "—"}</td>
+        <td style={{ ...td, ...dim }}>{course.est_hours ?? "—"}</td>
+        <td style={{ ...td, ...dim }}>{fmtDate(course.target_date)}</td>
         <td style={td}><span style={statusPill(course.status)}>{status.label}</span></td>
         <td style={{ ...td, textAlign: "right", color: "var(--muted)" }}>{expanded ? "︿" : "﹀"}</td>
       </tr>
@@ -100,6 +109,14 @@ function JourneyRow({ course, index, expanded, onToggle, onUnschedule }) {
 export function JourneyTable({ courses, onUnschedule }) {
   const [expandedId, setExpandedId] = useState(null);
   const headCell = { ...th, position: "sticky", top: 0, background: "var(--bg)", borderBottom: "1px solid var(--line)" };
+  const toggle = (id) => setExpandedId((cur) => (cur === id ? null : id));
+
+  // Optional rows are enrichment, not part of what "core courses complete"
+  // counts — grouped under their own divider, below every core row,
+  // regardless of where roadmap_order happens to interleave them, so the
+  // core path reads as the primary list rather than one flat mix.
+  const core = courses.filter((c) => c.priority !== "optional");
+  const optional = courses.filter((c) => c.priority === "optional");
 
   return (
     <div style={{ overflow: "auto", maxHeight: HEADER_H + VISIBLE_ROWS * ROW_H, border: "1px solid var(--line)", borderRadius: 10 }}>
@@ -117,15 +134,18 @@ export function JourneyTable({ courses, onUnschedule }) {
           </tr>
         </thead>
         <tbody>
-          {courses.map((c, i) => (
-            <JourneyRow
-              key={c.id}
-              course={c}
-              index={i + 1}
-              expanded={expandedId === c.id}
-              onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-              onUnschedule={onUnschedule}
-            />
+          {core.map((c, i) => (
+            <JourneyRow key={c.id} course={c} index={i + 1} expanded={expandedId === c.id} onToggle={() => toggle(c.id)} onUnschedule={onUnschedule} />
+          ))}
+          {optional.length > 0 && (
+            <tr>
+              <td colSpan={8} style={{ padding: "7px 8px 4px", background: "var(--bg)", borderTop: "1px solid var(--line)", fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--faint)" }}>
+                Optional · enrichment, not required to finish this tier
+              </td>
+            </tr>
+          )}
+          {optional.map((c, i) => (
+            <JourneyRow key={c.id} course={c} index={core.length + i + 1} expanded={expandedId === c.id} onToggle={() => toggle(c.id)} onUnschedule={onUnschedule} muted />
           ))}
         </tbody>
       </table>
@@ -252,12 +272,14 @@ function JourneyPathRail({ position, visiblePosition, atCeiling, coreComplete, c
 // the white cards below can stay quiet and just list things. Replaces the
 // old ProfileStrip; same props plus `atCeiling`, needed for the rail's own
 // "is the bonus stage also finished" state.
-function JourneyHero({ me, position, visiblePosition, atCeiling, trackTags, hasTracks, coreComplete, coreTotal, nextTierCoreComplete, nextTierCoreTotal, calendarConnected }) {
+function JourneyHero({ me, position, visiblePosition, atCeiling, trackTags, hasTracks, coreComplete, coreTotal, coreHoursComplete, coreHoursTotal, nextTierCoreComplete, nextTierCoreTotal, nextTierCoreHoursComplete, nextTierCoreHoursTotal, calendarConnected }) {
   const [scope, setScope] = useState("mine");
   const earlyAccess = Boolean(visiblePosition) && visiblePosition !== position;
   const showingNext = earlyAccess && scope === "next";
   const complete = showingNext ? nextTierCoreComplete : coreComplete;
   const total = showingNext ? nextTierCoreTotal : coreTotal;
+  const hoursComplete = showingNext ? nextTierCoreHoursComplete : coreHoursComplete;
+  const hoursTotal = showingNext ? nextTierCoreHoursTotal : coreHoursTotal;
 
   return (
     <section style={heroCard}>
@@ -308,6 +330,7 @@ function JourneyHero({ me, position, visiblePosition, atCeiling, trackTags, hasT
         <div style={{ marginTop: 18, maxWidth: 320 }}>
           <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.78)", marginBottom: 6 }}>
             <strong style={{ color: "#fff" }}>{coreComplete} of {coreTotal}</strong> core courses complete
+            {coreHoursTotal > 0 && ` (${coreHoursComplete} of ${coreHoursTotal} hrs)`}
           </div>
           <ProgressBar pct={coreTotal ? Math.round((coreComplete / coreTotal) * 100) : 0} />
         </div>
@@ -331,6 +354,7 @@ function JourneyHero({ me, position, visiblePosition, atCeiling, trackTags, hasT
             )}
             <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.78)" }}>
               <strong style={{ color: "#fff" }}>{complete} of {total}</strong> core courses complete
+              {hoursTotal > 0 && ` (${hoursComplete} of ${hoursTotal} hrs)`}
               {showingNext ? (
                 <span style={{ color: "rgba(255,255,255,0.55)" }}> · {POSITION_LABEL[visiblePosition] || visiblePosition} only</span>
               ) : (
@@ -703,6 +727,8 @@ export default function JourneyPage() {
   // own definition for why the % stays uncoupled from early access).
   const coreCourses = filteredJourney.filter((c) => c.priority === "core" && isExpectedByNow(c, position));
   const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
+  const coreHoursTotal = coreCourses.reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
+  const coreHoursComplete = coreCourses.filter((c) => c.status === "complete").reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
   // The early-access tier's OWN core courses only (expected_by_position ===
   // visiblePosition), not accumulated with the tier(s) below it the way
   // coreCourses above is ("through X"). That lower tier is already fully
@@ -712,6 +738,8 @@ export default function JourneyPage() {
   // a second, selectable scope) once visiblePosition !== position.
   const nextTierCoreCourses = filteredJourney.filter((c) => c.priority === "core" && c.expected_by_position === visiblePosition);
   const nextTierCoreComplete = nextTierCoreCourses.filter((c) => c.status === "complete").length;
+  const nextTierCoreHoursTotal = nextTierCoreCourses.reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
+  const nextTierCoreHoursComplete = nextTierCoreCourses.filter((c) => c.status === "complete").reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
   // Always exactly the one selected track's own name (or none, pre-selection).
   const trackTags = trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
@@ -797,8 +825,12 @@ export default function JourneyPage() {
               hasTracks={journey.length > 0}
               coreComplete={coreComplete}
               coreTotal={coreCourses.length}
+              coreHoursComplete={coreHoursComplete}
+              coreHoursTotal={coreHoursTotal}
               nextTierCoreComplete={nextTierCoreComplete}
               nextTierCoreTotal={nextTierCoreCourses.length}
+              nextTierCoreHoursComplete={nextTierCoreHoursComplete}
+              nextTierCoreHoursTotal={nextTierCoreHoursTotal}
               calendarConnected={calendarConnected}
             />
             <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
