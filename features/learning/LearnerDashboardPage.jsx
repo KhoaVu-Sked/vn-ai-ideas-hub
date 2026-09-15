@@ -243,6 +243,15 @@ export default function LearnerDashboardPage() {
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
 
+  // Same optimistic status flip as Your Journey's own handleStartCourse
+  // (JourneyPage.jsx) — "My courses" below renders the identical
+  // JourneyTable component, so a learner can start (or jump straight to
+  // the quiz for) any course from here too, not just from Your Journey.
+  const handleStartCourse = (courseId) => {
+    setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, status: "in_progress" } : c)));
+    api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
+  };
+
   // The Application card's own data — a separate, small fetch rather than
   // folded into /api/journey above: Your Journey (JourneyPage.jsx) calls
   // that same endpoint and has no use for ideas, so this stays out of it.
@@ -416,7 +425,7 @@ export default function LearnerDashboardPage() {
                       <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 14 }}>Nothing expected yet for your stage in {coursesTrackName || "this track"}.</div>
                     ) : (
                       <div style={{ marginTop: 14 }}>
-                        <JourneyTable courses={coursesJourney} />
+                        <JourneyTable courses={coursesJourney} onStartCourse={handleStartCourse} />
                       </div>
                     )}
                   </section>

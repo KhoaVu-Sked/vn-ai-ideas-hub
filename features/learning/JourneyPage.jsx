@@ -59,7 +59,13 @@ import ProgressBar from "@/features/learning/ProgressBar";
 // Up next/Knowledge artifacts' own `:first-child` treatment) — true once
 // per group (first core row, first optional row), since each group's own
 // heading already separates it from whatever came before.
-function JourneyRow({ course, expanded, onToggle, onUnschedule, muted, hasLine, isFirst }) {
+// A quick-action link/button styled like a plain quiet text link — matches
+// "Open course ↗" rather than introducing a heavier button, so a row's
+// expanded actions read as one consistent set regardless of which ones are
+// showing for this course's own status.
+const quickAction = { fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" };
+
+function JourneyRow({ course, expanded, onToggle, onUnschedule, onStartCourse, muted, hasLine, isFirst }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
   const meta = [
     course.platform,
@@ -112,6 +118,33 @@ function JourneyRow({ course, expanded, onToggle, onUnschedule, muted, hasLine, 
             </a>
           )}
           {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
+          {/* Any course can be started or quizzed at any time, in any order
+              — there's no prerequisite chain to enforce (the backend never
+              had one; this is the only place that used to imply otherwise).
+              Only "Start this course" needs a not-started/skipped guard;
+              the quiz itself is reachable regardless of status (QuizPage
+              already handles "already complete — retake" and "no quiz yet"
+              on its own), and starts the course on the way in if it hasn't
+              been already, so status still reflects what the learner
+              actually did. onStartCourse is only passed by first-person
+              views (Your Journey, My courses) — Team's read-only
+              drill-down omits it, so neither action renders there. */}
+          {onStartCourse && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+              {course.status !== "in_progress" && course.status !== "complete" && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); onStartCourse(course.id); }} style={quickAction}>
+                  Start this course
+                </button>
+              )}
+              <Link
+                href={`/learning/journey/${course.id}/quiz`}
+                onClick={(e) => { e.stopPropagation(); if (course.status !== "in_progress" && course.status !== "complete") onStartCourse(course.id); }}
+                style={quickAction}
+              >
+                {course.status === "complete" ? "Retake the quiz →" : "Take the quiz →"}
+              </Link>
+            </div>
+          )}
           {course.has_scheduled_session && onUnschedule && (
             <button
               type="button"
@@ -135,7 +168,7 @@ function JourneyRow({ course, expanded, onToggle, onUnschedule, muted, hasLine, 
 // on the Learner Dashboard's "My courses" and Team view's read-only
 // drill-down (TeamPage.jsx), so it can't assume it's sitting inside
 // JourneyPage's own layout.
-export function JourneyTable({ courses, onUnschedule }) {
+export function JourneyTable({ courses, onUnschedule, onStartCourse }) {
   const [expandedId, setExpandedId] = useState(null);
   const toggle = (id) => setExpandedId((cur) => (cur === id ? null : id));
 
@@ -157,6 +190,7 @@ export function JourneyTable({ courses, onUnschedule }) {
           expanded={expandedId === c.id}
           onToggle={() => toggle(c.id)}
           onUnschedule={onUnschedule}
+          onStartCourse={onStartCourse}
           hasLine={i < core.length - 1}
           isFirst={i === 0}
         />
@@ -177,6 +211,7 @@ export function JourneyTable({ courses, onUnschedule }) {
           expanded={expandedId === c.id}
           onToggle={() => toggle(c.id)}
           onUnschedule={onUnschedule}
+          onStartCourse={onStartCourse}
           muted
           hasLine={false}
           isFirst={i === 0}
@@ -439,9 +474,12 @@ const autoScheduleBtnDisabled = { ...autoScheduleBtn, background: "var(--bg)", c
 // are gone, see the comment above autoScheduleBtn).
 //
 // The soonest/next pick (upcoming[0]) auto-flips not_started -> in_progress
-// — "this is the one you're on now" — the moment it becomes the top pick,
-// not on any click. Guarded by a ref so the same course only gets the
-// start call once per mount, not on every re-render.
+// — a default "here's where to pick up" — the moment it becomes the top
+// pick, not on any click. Guarded by a ref so the same course only gets
+// the start call once per mount, not on every re-render. This is just a
+// suggestion, not the only way in: a learner can start (or jump straight
+// to the quiz for) any other course directly from its own row, and that
+// stays true whether or not it agrees with this pick.
 function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected }) {
   const eligible = courses.filter((c) => c.status !== "complete" && c.status !== "skipped");
   const dated = eligible.filter((c) => c.target_date).sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
@@ -553,11 +591,14 @@ function AccuracyRing({ pct }) {
 // null for a course completed before this existed (or completed with no
 // stats sent) — shown honestly as "No quiz data recorded" rather than a
 // fabricated number.
-// inProgressCourse: the account's current in_progress pick, same track
-// scope, shown as one more row below the completions so the card also
-// points at what's next, not just what's done. Null when nothing's in
-// progress; no fallback fabricated.
-function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
+// inProgressCourses: every in_progress course in the same track scope,
+// shown below the completions so the card also points at what's next, not
+// just what's done. Plural since a learner can now start more than one
+// course at a time (any row's own "Start this course"/"Take the quiz" —
+// there's no single "the one you're on" anymore) — capped at 3 so this
+// card can't grow without bound. Empty when nothing's in progress; no
+// fallback fabricated.
+function KnowledgeArtifactsCard({ completions, inProgressCourses }) {
   return (
     <section style={card}>
       <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: "0 0 2px" }}>Knowledge artifacts</h2>
@@ -591,17 +632,17 @@ function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
           })}
         </div>
       )}
-      {inProgressCourse && (
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>{inProgressCourse.title}</div>
+      {inProgressCourses.map((c) => (
+        <div key={c.id} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>{c.title}</div>
           <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
             In progress — waiting on the wrap-up quiz for more information
           </div>
-          <Link href={`/learning/journey/${inProgressCourse.id}/quiz`} style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
+          <Link href={`/learning/journey/${c.id}/quiz`} style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
             Take the quiz →
           </Link>
         </div>
-      )}
+      ))}
     </section>
   );
 }
@@ -743,13 +784,14 @@ export default function JourneyPage() {
   const tierJustFinished = position && ownTierCourses.length > 0 && isTierDone(journey, position);
   // Knowledge artifacts — both scoped to the track dropdown, same as the
   // rest of the page now that there's always exactly one selected track
-  // (each track auto-starts its own "Up next" #1 pick independently, so
-  // journey can genuinely hold one in_progress course per enrolled track —
-  // reading the unfiltered journey here would risk showing the OTHER
-  // track's in-progress course while a different one is selected).
-  // Both computed from filteredJourney, already on hand from the journey
-  // fetch — no extra request.
-  const inProgressCourse = filteredJourney.find((c) => c.status === "in_progress") || null;
+  // (reading the unfiltered journey here would risk showing another
+  // track's in-progress courses while a different one is selected). A
+  // learner can start more than one course at once now (any row's own
+  // "Start this course"/"Take the quiz", not just Up next's single auto
+  // pick), so this is every in_progress course in the track, capped at 3
+  // rather than a single pick. Both computed from filteredJourney, already
+  // on hand from the journey fetch — no extra request.
+  const inProgressCourses = filteredJourney.filter((c) => c.status === "in_progress").slice(0, 3);
   const recentCompletions = filteredJourney
     .filter((c) => c.status === "complete")
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
@@ -817,8 +859,8 @@ export default function JourneyPage() {
 
   // Removes just ONE course's own Auto-Scheduled calendar event(s) and
   // clears its target date (app/api/courses/:id/clear-schedule) — status
-  // untouched. Optimistic local patch, same pattern autoStartCourse already
-  // uses, rather than a full reload for a single known row.
+  // untouched. Optimistic local patch, same pattern handleStartCourse
+  // already uses, rather than a full reload for a single known row.
   const doUnschedule = async (courseId) => {
     setUnscheduling(true);
     setErr("");
@@ -834,9 +876,17 @@ export default function JourneyPage() {
     }
   };
 
-  // Best-effort and silent — this is a background auto-signal, not a user
-  // action, so a failure here shouldn't surface a scary error banner.
-  const autoStartCourse = (courseId) => {
+  // Flips any not_started/skipped course to in_progress — Up next's own
+  // background auto-pick (UpNextCard's effect, below) and a learner
+  // manually clicking "Start this course" or "Take the quiz" on ANY row
+  // (JourneyTable) both call this same function. There's no prerequisite
+  // chain to check first: the backend never enforced course order, only
+  // this page's own UI did (one auto-picked "next" course, one quiz link)
+  // — so this can run for any course, any time. Best-effort and silent
+  // either way: a failed status flip here just means the next real fetch
+  // (tab focus, or landing on the course's own quiz page) shows the true
+  // state, not worth a scary error banner over.
+  const handleStartCourse = (courseId) => {
     setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, status: "in_progress" } : c)));
     api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
   };
@@ -952,18 +1002,18 @@ export default function JourneyPage() {
                 Nothing in this track for the {POSITION_LABEL[visiblePosition] || visiblePosition} stage yet — check back as you progress.
               </div>
             ) : (
-              <JourneyTable courses={visibleJourney} onUnschedule={(course) => setUnscheduleTarget(course)} />
+              <JourneyTable courses={visibleJourney} onUnschedule={(course) => setUnscheduleTarget(course)} onStartCourse={handleStartCourse} />
             )}
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
             <UpNextCard
               courses={visibleJourney}
-              onAutoStart={autoStartCourse}
+              onAutoStart={handleStartCourse}
               onAutoSchedule={() => setAutoScheduleOpen(true)}
               calendarConnected={calendarConnected}
             />
-            <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourse={inProgressCourse} />
+            <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourses={inProgressCourses} />
           </div>
           </div>
           </>
