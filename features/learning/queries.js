@@ -300,6 +300,24 @@ export async function startCourse(accountId, courseId) {
   return { status: rows[0]?.status || null };
 }
 
+// The other half of startCourse — flips in_progress back to not_started,
+// only from in_progress (never touches a 'complete' row, so this can't be
+// used to accidentally un-complete something). Called when a learner picks
+// this course to set aside while starting a different one, once their
+// track is already at its 2-in-progress cap (JourneyPage.jsx's
+// requestStartCourse/SwapStartModal) — there's no assignment row to delete
+// here, just a status flip, since re-starting it later should pick up
+// wherever its own quiz snapshot last left off.
+export async function unstartCourse(accountId, courseId) {
+  const rows = await sql`
+    update course_assignments
+    set status = 'not_started', updated_at = now()
+    where account_id = ${accountId} and course_id = ${courseId} and status = 'in_progress'
+    returning status
+  `;
+  return { status: rows[0]?.status || null };
+}
+
 // Reset every table AI Learning itself owns for this account, not just
 // course progress — but deliberately NOT user_role: that table is general
 // account data, administered on Manage -> Users (features/admin/manage/

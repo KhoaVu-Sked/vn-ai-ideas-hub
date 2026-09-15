@@ -99,19 +99,28 @@ export function isTierDone(courses, tierPosition) {
 }
 
 // Every OTHER course already in_progress in the same track as `courseId` —
-// the default is one course in progress per track at a time, so this is
-// what a "start this course" action checks before acting. Scoped to the
-// track, not the whole account: a learner working through two different
-// tracks in parallel isn't the case this guards against, only starting a
-// second course inside the SAME track before finishing the first one.
-// Used by both Your Journey (JourneyPage.jsx) and the Learner Dashboard's
-// "My courses" (LearnerDashboardPage.jsx) — same rule, same journey shape,
-// so the check lives once here rather than copied into both.
+// scoped to the track, not the whole account: a learner working through
+// two different tracks in parallel isn't what MAX_IN_PROGRESS_PER_TRACK
+// (below) limits, only how many courses inside the SAME track are active
+// at once. Used by both Your Journey (JourneyPage.jsx) and the Learner
+// Dashboard's "My courses" (LearnerDashboardPage.jsx) — same rule, same
+// journey shape, so the check lives once here rather than copied into both.
 export function otherInProgressInSameTrack(journey, courseId) {
   const course = journey.find((c) => c.id === courseId);
   if (!course) return [];
   return journey.filter((c) => c.track_id === course.track_id && c.status === "in_progress" && c.id !== courseId);
 }
+
+// A learner can work through up to this many courses in one track at once
+// — enough room for someone who likes tackling a couple of things in
+// parallel, without letting a track's "in progress" set grow without
+// bound (Up next, Knowledge artifacts, and this cap itself all assume a
+// small, glanceable number). Starting under the cap just starts; starting
+// AT the cap means picking one of the current ones to set back to
+// not_started first (JourneyPage.jsx's requestStartCourse/SwapStartModal)
+// — there's no "start a 3rd anyway" bypass, on purpose, so this number
+// stays an actual ceiling rather than a nag a learner can click past.
+export const MAX_IN_PROGRESS_PER_TRACK = 2;
 
 // Once every course in an account's own current-position tier is
 // complete/skipped, they've earned early access to the NEXT tier too —

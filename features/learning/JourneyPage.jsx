@@ -43,11 +43,12 @@ import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import AutoScheduleModal from "@/features/learning/AutoScheduleModal";
 import ConfirmModal from "@/features/learning/ConfirmModal";
+import SwapStartModal from "@/features/learning/SwapStartModal";
 import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER,
   fmtDate, relTime,
   formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, isVisibleNow, effectivePosition, isTierDone,
-  otherInProgressInSameTrack,
+  otherInProgressInSameTrack, MAX_IN_PROGRESS_PER_TRACK,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
@@ -132,12 +133,13 @@ function JourneyRow({ course, expanded, onToggle, onUnschedule, onStartCourse, o
               read-only drill-down omits both, so neither action renders
               there. The two are deliberately different functions: clicking
               "Start this course" is a real, considered choice, so it's the
-              one place that asks first if it would split focus across a
-              second course in this track (JourneyPage's requestStartCourse
-              — see its own comment); the quiz link starts the course
-              quietly, with no prompt, because gating quiz access behind a
-              modal would undercut "take any quiz, any time" for the sake
-              of a rule about deliberate starts, not quiz-taking. */}
+              one place that asks which course to set aside once a track's
+              already at its MAX_IN_PROGRESS_PER_TRACK cap (JourneyPage's
+              requestStartCourse/SwapStartModal — see its own comment); the
+              quiz link starts the course quietly, with no prompt, because
+              gating quiz access behind a modal would undercut "take any
+              quiz, any time" for the sake of a rule about deliberate
+              starts, not quiz-taking. */}
           {onStartCourse && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
               {course.status !== "in_progress" && course.status !== "complete" && (
@@ -604,11 +606,11 @@ function AccuracyRing({ pct }) {
 // fabricated number.
 // inProgressCourses: every in_progress course in the same track scope,
 // shown below the completions so the card also points at what's next, not
-// just what's done. Plural rather than a single pick: the default is one
-// course in progress per track (requestStartCourse, below, asks before
-// letting a second one start), but that's an ask, not a hard rule, so more
-// than one can still be here — capped at 3 so this card can't grow without
-// bound. Empty when nothing's in progress; no fallback fabricated.
+// just what's done. Plural since up to MAX_IN_PROGRESS_PER_TRACK (2, see
+// shared.js) can genuinely be in progress in one track at once — capped at
+// 3 here mainly as a display ceiling, not because more than that is
+// actually expected. Empty when nothing's in progress; no fallback
+// fabricated.
 function KnowledgeArtifactsCard({ completions, inProgressCourses }) {
   return (
     <section style={card}>
@@ -670,10 +672,11 @@ export default function JourneyPage() {
   // — unscheduleTarget holds the course pending confirmation, or null.
   const [unscheduleTarget, setUnscheduleTarget] = useState(null);
   const [unscheduling, setUnscheduling] = useState(false);
-  // "Start this course" on a course whose track already has another one
-  // in_progress — holds { courseId, conflicting } while the confirm modal
+  // "Start this course" on a course whose track is already at its
+  // MAX_IN_PROGRESS_PER_TRACK cap — holds { courseId, current } (the
+  // courses the learner can pick from to set aside) while SwapStartModal
   // (below) is open, null otherwise. See requestStartCourse's own comment.
-  const [pendingStart, setPendingStart] = useState(null);
+  const [pendingSwap, setPendingSwap] = useState(null);
   // No "all tracks" option — always one specific enrolled track (its id),
   // auto-picked below once trackOptions is known; "" only until then.
   const [selectedTrack, setSelectedTrack] = useState("");
@@ -807,10 +810,10 @@ export default function JourneyPage() {
   // rather than a single pick. Both computed from filteredJourney, already
   // on hand from the journey fetch — no extra request.
   const inProgressCourses = filteredJourney.filter((c) => c.status === "in_progress").slice(0, 3);
-  // The course pendingStart is asking about, looked up from the FULL
+  // The course pendingSwap is asking about, looked up from the FULL
   // journey (not filteredJourney) since it's set from any visible row,
   // regardless of which track happens to be selected in the dropdown.
-  const pendingStartCourse = pendingStart ? journey.find((c) => c.id === pendingStart.courseId) : null;
+  const pendingSwapCourse = pendingSwap ? journey.find((c) => c.id === pendingSwap.courseId) : null;
   const recentCompletions = filteredJourney
     .filter((c) => c.status === "complete")
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
@@ -898,12 +901,13 @@ export default function JourneyPage() {
   // Flips any not_started/skipped course to in_progress — no prerequisite
   // chain to check: the backend never enforced course order, only this
   // page's own UI used to (one auto-picked "next" course, one quiz link).
-  // The ONLY thing gated at all is a track already having another course
-  // in_progress (requestStartCourse, below) — this function itself just
-  // does it. Best-effort and silent either way: a failed status flip here
-  // just means the next real fetch (tab focus, or landing on the course's
-  // own quiz page) shows the true state, not worth a scary error banner
-  // over.
+  // The ONLY thing gated at all is MAX_IN_PROGRESS_PER_TRACK
+  // (requestStartCourse, below) — this function itself just does it, and
+  // is also reused by resolveSwap to start the NEW course once the old one
+  // has been set aside. Best-effort and silent either way: a failed status
+  // flip here just means the next real fetch (tab focus, or landing on
+  // the course's own quiz page) shows the true state, not worth a scary
+  // error banner over.
   const commitStartCourse = (courseId) => {
     setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, status: "in_progress" } : c)));
     api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
@@ -914,28 +918,53 @@ export default function JourneyPage() {
   // silent auto-pick or the quiz link's start-on-the-way-in (both call
   // startIfNoConflict below instead: interrupting either with a modal
   // would be the wrong call — see JourneyRow's own comment on the two).
-  // Default is one course in progress per track at a time; starting a
-  // second asks first rather than either silently blocking it (this
-  // feature is explicitly about NOT enforcing a hard sequence) or silently
-  // allowing it (easy to lose track of what you're actually mid-way
-  // through). pendingStart holds { courseId, conflicting } for the confirm
-  // modal below; null once resolved either way.
+  // Starting fits under MAX_IN_PROGRESS_PER_TRACK (2): just starts, no
+  // modal — up to 2 in progress is the normal, expected case for a learner
+  // who likes working through a couple of things at once, not an edge
+  // case to nag about. Starting a 3rd means the track's already full:
+  // rather than silently blocking it OR silently letting a track's
+  // "in progress" set grow without bound, this asks which of the current
+  // ones to set aside (SwapStartModal) — a real choice, since there's no
+  // "start a 3rd anyway" bypass. pendingSwap holds { courseId, current }
+  // while that's open; null once resolved either way (picked, or
+  // cancelled).
   const requestStartCourse = (courseId) => {
-    const conflicting = otherInProgressInSameTrack(journey, courseId);
-    if (conflicting.length > 0) { setPendingStart({ courseId, conflicting }); return; }
+    const current = otherInProgressInSameTrack(journey, courseId);
+    if (current.length < MAX_IN_PROGRESS_PER_TRACK) { commitStartCourse(courseId); return; }
+    setPendingSwap({ courseId, current });
+  };
+
+  // Starts a course only if its track has room under the cap already —
+  // used exactly where asking first would be the wrong call (see
+  // requestStartCourse's own comment): at the cap, this just does
+  // nothing, leaving the course not_started. For the quiz link that's
+  // harmless — completeCourse doesn't care what the prior status was, so
+  // the course still completes normally once the quiz is finished; it
+  // just won't have shown as "in progress" in the meantime, and never
+  // needs a course swapped out to make room for it.
+  const startIfNoConflict = (courseId) => {
+    if (otherInProgressInSameTrack(journey, courseId).length >= MAX_IN_PROGRESS_PER_TRACK) return;
     commitStartCourse(courseId);
   };
 
-  // Starts a course only if it wouldn't create a second in_progress course
-  // in its track — used exactly where asking first would be the wrong
-  // call (see requestStartCourse's own comment): if there's a conflict,
-  // this just does nothing, leaving the course not_started. For the quiz
-  // link that's harmless — completeCourse doesn't care what the prior
-  // status was, so the course still completes normally once the quiz is
-  // finished; it just won't have shown as "in progress" in the meantime.
-  const startIfNoConflict = (courseId) => {
-    if (otherInProgressInSameTrack(journey, courseId).length > 0) return;
-    commitStartCourse(courseId);
+  // Resolves SwapStartModal's pick: the chosen course goes back to
+  // not_started, freeing up the room pendingSwap's own course then starts
+  // into. Two independent, best-effort API calls (same silent-failure
+  // reasoning as commitStartCourse above) rather than one combined
+  // endpoint — each is already its own single-purpose route
+  // (/unstart, /start), and there's nothing that needs them to succeed or
+  // fail together.
+  const resolveSwap = (retireCourseId) => {
+    if (!pendingSwap) return;
+    const { courseId } = pendingSwap;
+    setJourney((cs) => cs.map((c) => {
+      if (c.id === retireCourseId) return { ...c, status: "not_started" };
+      if (c.id === courseId) return { ...c, status: "in_progress" };
+      return c;
+    }));
+    api(`/api/courses/${retireCourseId}/unstart`, { method: "POST" }).catch(() => {});
+    api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
+    setPendingSwap(null);
   };
 
   return (
@@ -1104,16 +1133,12 @@ export default function JourneyPage() {
         />
       )}
 
-      {pendingStart && (
-        <ConfirmModal
-          icon="📚"
-          tone="caution"
-          title="Start a second course in this track?"
-          body={`${pendingStart.conflicting.map((c) => `"${c.title}"`).join(" and ")} ${pendingStart.conflicting.length === 1 ? "is" : "are"} already in progress in this track. Starting "${pendingStartCourse?.title || "this course"}" too means having more than one going at once — you can always come back and finish it later instead.`}
-          confirmLabel="Start anyway"
-          cancelLabel="Not now"
-          onCancel={() => setPendingStart(null)}
-          onConfirm={() => { commitStartCourse(pendingStart.courseId); setPendingStart(null); }}
+      {pendingSwap && (
+        <SwapStartModal
+          newCourseTitle={pendingSwapCourse?.title || "this course"}
+          current={pendingSwap.current}
+          onPick={resolveSwap}
+          onCancel={() => setPendingSwap(null)}
         />
       )}
     </div>

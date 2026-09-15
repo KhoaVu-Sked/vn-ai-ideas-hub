@@ -13,7 +13,9 @@
 // modal in this feature (TrackPreview 200, AutoScheduleModal 220, the Get
 // Started wizard 150) since a confirm like this is always the last,
 // topmost word on whatever action triggered it.
-const TONE = {
+// Exported so SwapStartModal.jsx can badge its own icon with the same
+// "caution" colors rather than a second, driftable copy of the same pair.
+export const TONE = {
   caution: { bg: "#fff4e0", fg: "#a15c00" },
   danger: { bg: "#fdeaea", fg: "#c92a2a" },
 };
