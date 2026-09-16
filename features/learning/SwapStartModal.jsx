@@ -9,8 +9,16 @@
 import { TONE } from "@/features/learning/ConfirmModal";
 
 const cancelBtn = { border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "var(--body)", cursor: "pointer" };
+const optionBtn = { textAlign: "left", border: "1px solid var(--line)", background: "var(--bg)", borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontFamily: "inherit" };
+// The "just focus on this one" option is a different KIND of choice than
+// the per-course swaps above it (drop everything currently active, not
+// trade one course for another), so it gets the accent blue rather than
+// the same neutral treatment — a learner who'd rather single-thread this
+// track shouldn't have to read it as one option among identical-looking
+// others.
+const soloBtn = { ...optionBtn, background: "#e8f0ff", borderColor: "#cddcff" };
 
-export default function SwapStartModal({ newCourseTitle, current, onPick, onCancel }) {
+export default function SwapStartModal({ newCourseTitle, current, onResolve, onCancel }) {
   const t = TONE.caution;
   return (
     <div
@@ -27,22 +35,28 @@ export default function SwapStartModal({ newCourseTitle, current, onPick, onCanc
               Make room for "{newCourseTitle}"?
             </div>
             <p style={{ fontSize: 13, color: "var(--body)", margin: 0, lineHeight: 1.5 }}>
-              You're already working on {current.length} courses in this track. Pick one to set back to Not started — nothing is lost, and you can pick it back up any time.
+              You're already working on {current.length} courses in this track. Set one aside to keep working on the other, or set both aside and focus on just this one — nothing is lost either way, and you can pick anything back up any time.
             </p>
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
           {current.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => onPick(c.id)}
-              style={{ textAlign: "left", border: "1px solid var(--line)", background: "var(--bg)", borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontFamily: "inherit" }}
-            >
+            <button key={c.id} type="button" onClick={() => onResolve([c.id])} style={optionBtn}>
               <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)" }}>Set aside "{c.title}"</div>
               <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>Back to Not started</div>
             </button>
           ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0 10px" }}>
+          <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--faint)" }}>or</span>
+          <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+        </div>
+        <div style={{ marginBottom: 18 }}>
+          <button type="button" onClick={() => onResolve(current.map((c) => c.id))} style={soloBtn}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--blue)" }}>Just focus on "{newCourseTitle}"</div>
+            <div style={{ fontSize: 11.5, color: "var(--blue)", marginTop: 2, opacity: 0.8 }}>Set both aside — back to Not started</div>
+          </button>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button type="button" onClick={onCancel} style={cancelBtn}>Never mind</button>

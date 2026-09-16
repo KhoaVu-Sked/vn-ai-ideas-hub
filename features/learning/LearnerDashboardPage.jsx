@@ -267,15 +267,16 @@ export default function LearnerDashboardPage() {
     if (otherInProgressInSameTrack(journey, courseId).length >= MAX_IN_PROGRESS_PER_TRACK) return;
     commitStartCourse(courseId);
   };
-  const resolveSwap = (retireCourseId) => {
+  const resolveSwap = (retireIds) => {
     if (!pendingSwap) return;
     const { courseId } = pendingSwap;
+    const retire = new Set(retireIds);
     setJourney((cs) => cs.map((c) => {
-      if (c.id === retireCourseId) return { ...c, status: "not_started" };
+      if (retire.has(c.id)) return { ...c, status: "not_started" };
       if (c.id === courseId) return { ...c, status: "in_progress" };
       return c;
     }));
-    api(`/api/courses/${retireCourseId}/unstart`, { method: "POST" }).catch(() => {});
+    retireIds.forEach((id) => { api(`/api/courses/${id}/unstart`, { method: "POST" }).catch(() => {}); });
     api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
     setPendingSwap(null);
   };
@@ -556,7 +557,7 @@ export default function LearnerDashboardPage() {
         <SwapStartModal
           newCourseTitle={pendingSwapCourse?.title || "this course"}
           current={pendingSwap.current}
-          onPick={resolveSwap}
+          onResolve={resolveSwap}
           onCancel={() => setPendingSwap(null)}
         />
       )}

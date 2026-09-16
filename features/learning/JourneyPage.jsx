@@ -179,6 +179,15 @@ function JourneyRow({ course, expanded, onToggle, onUnschedule, onStartCourse, o
 // on the Learner Dashboard's "My courses" and Team view's read-only
 // drill-down (TeamPage.jsx), so it can't assume it's sitting inside
 // JourneyPage's own layout.
+// A course actively being worked on is the one thing worth surfacing
+// without scrolling — pulled to the front of its own group (core/optional
+// stay separate groups; this doesn't cross that line) via a STABLE sort,
+// so in_progress rows keep their relative order among themselves and
+// everything else keeps its original roadmap_order among itself too. Not
+// a mutation of roadmap_order (courses.roadmap_order, the authored
+// curriculum sequence) — purely how this one render lays the rows out.
+const withInProgressFirst = (list) => [...list].sort((a, b) => (a.status === "in_progress" ? 0 : 1) - (b.status === "in_progress" ? 0 : 1));
+
 export function JourneyTable({ courses, onUnschedule, onStartCourse, onSilentStart }) {
   const [expandedId, setExpandedId] = useState(null);
   const toggle = (id) => setExpandedId((cur) => (cur === id ? null : id));
@@ -189,8 +198,8 @@ export function JourneyTable({ courses, onUnschedule, onStartCourse, onSilentSta
   // core path reads as the primary list rather than one flat mix. Priority
   // itself isn't repeated on every row anymore — the section a row sits in
   // already says that.
-  const core = courses.filter((c) => c.priority !== "optional");
-  const optional = courses.filter((c) => c.priority === "optional");
+  const core = withInProgressFirst(courses.filter((c) => c.priority !== "optional"));
+  const optional = withInProgressFirst(courses.filter((c) => c.priority === "optional"));
 
   return (
     <div style={{ overflow: "auto", maxHeight: 470, border: "1px solid var(--line)", borderRadius: 12, padding: "4px 10px" }}>
@@ -947,22 +956,26 @@ export default function JourneyPage() {
     commitStartCourse(courseId);
   };
 
-  // Resolves SwapStartModal's pick: the chosen course goes back to
+  // Resolves SwapStartModal's pick: every course in retireIds goes back to
   // not_started, freeing up the room pendingSwap's own course then starts
-  // into. Two independent, best-effort API calls (same silent-failure
-  // reasoning as commitStartCourse above) rather than one combined
-  // endpoint — each is already its own single-purpose route
+  // into. retireIds is either one course (a 1-for-1 swap — the other stays
+  // in progress) or all of pendingSwap.current (the modal's "just focus on
+  // this one" option) — same mechanics either way, just how many get set
+  // aside. Best-effort, independent API calls per course (same
+  // silent-failure reasoning as commitStartCourse above) rather than one
+  // combined endpoint — each is already its own single-purpose route
   // (/unstart, /start), and there's nothing that needs them to succeed or
   // fail together.
-  const resolveSwap = (retireCourseId) => {
+  const resolveSwap = (retireIds) => {
     if (!pendingSwap) return;
     const { courseId } = pendingSwap;
+    const retire = new Set(retireIds);
     setJourney((cs) => cs.map((c) => {
-      if (c.id === retireCourseId) return { ...c, status: "not_started" };
+      if (retire.has(c.id)) return { ...c, status: "not_started" };
       if (c.id === courseId) return { ...c, status: "in_progress" };
       return c;
     }));
-    api(`/api/courses/${retireCourseId}/unstart`, { method: "POST" }).catch(() => {});
+    retireIds.forEach((id) => { api(`/api/courses/${id}/unstart`, { method: "POST" }).catch(() => {}); });
     api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
     setPendingSwap(null);
   };
@@ -1137,7 +1150,7 @@ export default function JourneyPage() {
         <SwapStartModal
           newCourseTitle={pendingSwapCourse?.title || "this course"}
           current={pendingSwap.current}
-          onPick={resolveSwap}
+          onResolve={resolveSwap}
           onCancel={() => setPendingSwap(null)}
         />
       )}
