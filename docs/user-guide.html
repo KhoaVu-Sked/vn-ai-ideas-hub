@@ -311,6 +311,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
       <li><a href="#s15">The Learning Hub</a></li>
       <li><a href="#s16">Your Journey</a></li>
       <li><a href="#s17">My Dashboard</a></li>
+      <li><a href="#s18">Tools</a></li>
       <li><a href="#s13">Reference</a></li>
       <li><a href="#s14">Getting help</a></li>
     </ol>
@@ -422,7 +423,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <div class="note">
         <span class="note__tag">Two hubs, one header</span>
-        <p>TS Hub has two halves, and <b>/</b> asks which one you want. The header then shows only that hub&rsquo;s own navigation: the Ideas Hub gets <b>Board</b> and the search box, the Learning Hub gets <b>Learning Hub</b>, <b>My Dashboard</b> and <b>Team</b>. A button on the right crosses to the other side, so you rarely need to go back to <b>/</b>.</p>
+        <p>TS Hub has three parts, and <b>/</b> asks which one you want. The header then shows only that part&rsquo;s own navigation: the Ideas Hub gets <b>Board</b> and the search box, the Learning Hub gets <b>Learning Hub</b>, <b>My Dashboard</b> and <b>Team</b>, and <b>Tools</b> gets its own list. A button on the right crosses back to the Ideas Hub, so you rarely need to go back to <b>/</b>.</p>
         <p>For administrators, <b>Tasks</b>, <b>Activity</b> and <b>Manage</b> appear in both. Those pages show the Ideas Hub header.</p>
       </div>
 
@@ -434,6 +435,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
             <tr><td><b>Board</b></td><td>All ideas as cards, grouped by status. Ideas Hub only.</td></tr>
             <tr><td><b>Search</b></td><td>Filters the board by idea name as you type. Ideas Hub only.</td></tr>
             <tr><td><b>🎓 Learning Hub</b></td><td>Crosses over to the Learning Hub. Sits beside the search box.</td></tr>
+            <tr><td><b>Tools</b></td><td>Small utilities, reached from the home page. See section 15.</td></tr>
             <tr><td><b>+</b></td><td>Opens the Submit an idea form. Ideas Hub only.</td></tr>
             <tr><td><b>💡 Go to the Ideas Hub</b></td><td>The highlighted button that crosses back. Learning Hub only.</td></tr>
             <tr><td><b>Your avatar</b></td><td>My profile, and Sign out.</td></tr>
@@ -1323,9 +1325,51 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <p>The dashboard also cannot tell you <i>which</i> course or skill an idea came from. Nothing in the app links the two, so the Application card shows the idea and its status, and no attribution.</p>
     </section>
+    <!-- 15 ──────────────────────────────────────────────────── -->
+    <section id="s18">
+      <p class="sec-num">Section 15</p>
+      <h2>Tools</h2>
+      <p class="lede">Small utilities that run on your own account.</p>
+
+      <p>The third choice on the home page is <b>Tools</b>. Each one works on your own data using your own Google account, and none of them keep what they find on this app&rsquo;s server.</p>
+
+      <h3>Drive Sharing Check</h3>
+
+      <p>Finds files in your Google Drive shared by link or with the whole organisation, and lets you narrow that access back down. Originally built by Thao Lai as a standalone tool.</p>
+
+      <p>You connect your Google account separately from signing in to TS Hub. That is deliberate: asking for your Drive at sign-in would prompt everyone who opens the ideas board, whether or not they ever use this.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:150px">Level</th><th>What it means</th></tr></thead>
+          <tbody>
+            <tr><td><b>Critical</b></td><td>Anyone with the link can open it. If Google can also index it, the listing says so.</td></tr>
+            <tr><td><b>Warning</b></td><td>Everyone at your organisation can change it.</td></tr>
+            <tr><td><b>Info</b></td><td>Everyone at your organisation can see it, but not change it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>A file&rsquo;s level comes from its widest sharing, so one over-exposed setting decides it however tidy the rest are.</p>
+
+      <div class="note note--warn">
+        <span class="note__tag">It will not touch other people&rsquo;s files</span>
+        <p>Files someone else owns are listed and classified, but offer <b>Remind owner</b> rather than a change &mdash; it opens an email naming the file and the problem. Google would refuse the change anyway, but the real reason is that quietly re-sharing another team&rsquo;s document is not this tool&rsquo;s call to make.</p>
+      </div>
+
+      <p><b>Change</b>, on your own files, restricts access to named people, limits it to your organisation, or leaves it open at a level you pick. Access it creates is never made discoverable by search. The first time you change something Google asks for broader permission &mdash; scanning alone never needs it.</p>
+
+      <p><b>Watched folders</b> emails you when sharing inside a folder changes, including folders other people own. The watching is a Google Apps Script you install once under your own account, so it runs on Google&rsquo;s timer rather than this app&rsquo;s server, and no token of yours is stored anywhere.</p>
+
+      <div class="note">
+        <span class="note__tag">What it never does</span>
+        <p>It reads file names and sharing settings. It never reads what is inside a file, and nothing it finds is sent to this app or kept centrally.</p>
+      </div>
+    </section>
+
 
     <section id="s13">
-      <p class="sec-num">Section 15</p>
+      <p class="sec-num">Section 16</p>
       <h2>Reference</h2>
 
       <h3>Limits and timings</h3>
@@ -1358,7 +1402,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
     <!-- 14 ──────────────────────────────────────────────────── -->
     <section id="s14">
-      <p class="sec-num">Section 16</p>
+      <p class="sec-num">Section 17</p>
       <h2>Getting help</h2>
 
       <p>A <b>Send feedback</b> button sits in the bottom-right corner of every page. Use it for anything — a bug, a confusing label, a missing feature. It records which page you were on, so you do not need to explain where you were.</p>

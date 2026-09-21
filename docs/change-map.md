@@ -77,6 +77,36 @@ The guide described *Accepted by idea lead* and *Under discussion* for months
 after the board replaced them. `bun run check` knows a few retired phrases —
 add to that list when you retire more.
 
+### Anything in the Drive tool
+
+`features/tools/drive/` runs in the browser with the user's own Google token and
+keeps nothing. That is the entire security position of the tool it was ported
+from: a central list of every over-shared file at Skedulo would itself be worth
+attacking, so one must not come to exist.
+
+| Also true | Why |
+|---|---|
+| No API route may import it | `bun run check` fails if one does |
+| No server file may call the Drive API | same check |
+| The token may not be persisted | no `localStorage`, no cookie, no database |
+
+If a change here produces a migration, the change is wrong.
+
+### The Drive tool's shared constants
+
+`features/tools/drive/constants.js` and `apps-script/Code.gs` are separate
+programs that must agree. They never talk directly — there is no server between
+them — so they meet through two files in the user's own Drive, found by name.
+
+`LINK_Q`, `DOMAIN_Q`, `OWNED`, `SETTINGS_NAME`, `STATUS_NAME` are duplicated.
+Nothing at runtime notices when they drift: a typo in a query returns zero rows
+and the scan reports all clear. `bun run check` compares them by decoded value,
+because `Code.gs` writes the em dash as `\u2014` and `constants.js` uses a
+literal one.
+
+There is a third copy — Thao Lai's original tool, still live. This checker
+cannot see that one.
+
 ### A shared component
 
 `components/` is used by more than one feature; `features/<name>/` is not.

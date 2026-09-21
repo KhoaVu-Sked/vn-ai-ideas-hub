@@ -294,6 +294,45 @@ const fail = (check, detail, why) => problems.push({ check, detail, why });
   }
 }
 
+// ── 6. The page and the Apps Script watcher must agree ────────────
+// features/tools/drive/constants.js and apps-script/Code.gs are separate
+// programs. They never talk to each other — there is no server between them —
+// so they meet through two files in the user's own Drive, found by name.
+//
+// Nothing at runtime notices when they drift. A typo in a query returns zero
+// rows and no error, and the scan reports all clear. Get a name wrong and the
+// two halves simply stop finding each other.
+//
+// Compared by decoded value, not by source text: Code.gs writes the em dash as
+// \u2014 inside single quotes and constants.js uses a literal one in double
+// quotes. Same string, different bytes.
+{
+  const SHARED = ["LINK_Q", "DOMAIN_Q", "OWNED", "SETTINGS_NAME", "STATUS_NAME"];
+  const decode = (raw) =>
+    raw.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+       .replace(/\\(['"\\])/g, "$1");
+  const valueOf = (src, name) => {
+    const m = src.match(new RegExp(`(?:const|var|let|export const)\\s+${name}\\s*=\\s*(["'])([\\s\\S]*?)\\1`));
+    return m ? decode(m[2]) : null;
+  };
+
+  const page = read("features/tools/drive/constants.js");
+  const gs = read("apps-script/Code.gs");
+  if (page && gs) {
+    for (const name of SHARED) {
+      const a = valueOf(page, name);
+      const b = valueOf(gs, name);
+      if (a === null || b === null) {
+        fail("drive-drift", name,
+          `missing from ${a === null ? "features/tools/drive/constants.js" : "apps-script/Code.gs"}`);
+      } else if (a !== b) {
+        fail("drive-drift", name,
+          `page has ${JSON.stringify(a)}, Code.gs has ${JSON.stringify(b)} — the two halves will stop agreeing`);
+      }
+    }
+  }
+}
+
 function sqlBearingFiles() {
   const out = [];
   const walk = (dir) => {

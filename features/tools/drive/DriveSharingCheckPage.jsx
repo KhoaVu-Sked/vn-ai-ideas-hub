@@ -8,6 +8,7 @@ import { planOperations, applyPlan, remindMailto } from "@/features/tools/drive/
 import { canWrite } from "@/features/tools/drive/scopes";
 import { SCOPE_WRITE } from "@/features/tools/drive/constants";
 import AccessDialog from "@/features/tools/drive/AccessDialog";
+import WatchedFolders from "@/features/tools/drive/WatchedFolders";
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 };
 
@@ -190,6 +191,11 @@ export default function DriveSharingCheckPage() {
                 ))}
               </div>
             )}
+            <WatchedFolders
+              token={token}
+              canEdit={canWrite(grantedScope)}
+              onNeedScope={() => authorise(SCOPE_WRITE)}
+            />
           </>
         )}
 
