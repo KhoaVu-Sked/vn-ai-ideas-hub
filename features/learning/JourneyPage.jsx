@@ -8,17 +8,31 @@
 // roadmap intended), not replaced with anything — courses.roadmap_order is
 // what getJourney() (features/learning/queries.js) now sorts by instead.
 // Restricted to what's expected of this account BY NOW: an Intern only
-// sees the Intern tier, a Junior sees Intern + Junior, and so on
-// (isExpectedByNow, shared.js — the same rule the % completion numbers
-// use). Finishing every course in your own tier earns early access to
-// ONE stage ahead — never more (effectivePosition, shared.js: Intern who's
-// done -> sees through Junior, Junior who's done -> sees through Middle,
+// sees the Intern tier, a Junior only sees the Junior tier (not Intern +
+// Junior — Intern is assumed already fulfilled, that's what got them
+// promoted) (isExpectedByNow, shared.js — the same rule the % completion
+// numbers use). Finishing every course in your own tier earns early access
+// to ONE stage ahead — never more (effectivePosition, shared.js: Intern
+// who's done -> also sees Junior, Junior who's done -> also sees Middle,
 // "max +1 stage"). The full roadmap, including tiers beyond that, is still
 // visible on the Mind map (Learner Dashboard) — that view is meant to show
 // the road ahead, this one is meant to show what's actually on your plate
 // right now (plus whatever you've just earned).
+//
+// The hero band below (JourneyHero/JourneyPathRail) renders the same
+// position/visiblePosition/atCeiling facts as a connected 5-stage path
+// rather than a lone progress bar — "Your Journey" names a real, ordered
+// sequence, so a stepped path earns its place here in a way a generic
+// numbered decoration wouldn't. JourneyTable carries the same idea into
+// the course list itself: each core course is a stop on a connected path
+// (a status-colored dot + line, the same language as the hero rail and Up
+// next's own mini path), with optional courses set apart and no line
+// running through them. Reused as-is on the Learner Dashboard's "My
+// courses" and Team view's read-only drill-down (TeamPage.jsx), so all
+// three read as the same product rather than one polished page and two
+// leftover tables.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
@@ -29,195 +43,436 @@ import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import AutoScheduleModal from "@/features/learning/AutoScheduleModal";
 import ConfirmModal from "@/features/learning/ConfirmModal";
+import SwapStartModal from "@/features/learning/SwapStartModal";
 import {
-  card, errBanner, STATUS_META, statusPill, POSITION_LABEL, HEADER_H, ROW_H, VISIBLE_ROWS, th, td,
+  card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER,
   fmtDate, relTime,
-  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, effectivePosition, isTierDone,
+  formatMonthDay, DEFAULT_ANNUAL_REVIEW_MONTH_DAY, isExpectedByNow, isVisibleNow, effectivePosition, isTierDone,
+  otherInProgressInSameTrack, MAX_IN_PROGRESS_PER_TRACK,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
 
-function JourneyRow({ course, index, expanded, onToggle, onUnschedule }) {
+// One stop on the course-list path — a status-colored dot connected by a
+// line to the next stop, echoing the hero's own tier rail and Up next's
+// mini path at the scale of the full list. `hasLine` is false for the last
+// core row and for every optional row: optional courses sit outside the
+// required path, so nothing runs through them. `isFirst` drops the top
+// divider a row would otherwise draw against the one above it (matching
+// Up next/Knowledge artifacts' own `:first-child` treatment) — true once
+// per group (first core row, first optional row), since each group's own
+// heading already separates it from whatever came before.
+// A quick-action link/button styled like a plain quiet text link — matches
+// "Open course ↗" rather than introducing a heavier button, so a row's
+// expanded actions read as one consistent set regardless of which ones are
+// showing for this course's own status.
+const quickAction = { fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" };
+
+function JourneyRow({ course, expanded, onToggle, onUnschedule, onStartCourse, onSilentStart, muted, hasLine, isFirst }) {
   const status = STATUS_META[course.status] || STATUS_META.not_started;
+  const meta = [
+    course.platform,
+    course.est_hours != null ? `${course.est_hours} hrs` : null,
+    course.target_date ? `Target ${fmtDate(course.target_date)}` : "No target set",
+  ].filter(Boolean).join(" · ");
+
   return (
     <>
-      <tr onClick={onToggle} style={{ borderTop: "1px solid var(--line)", cursor: "pointer" }}>
-        <td style={{ ...td, color: "var(--faint)" }}>{index}</td>
-        <td style={{ ...td, fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{course.title}</td>
-        <td style={{ ...td, textTransform: "capitalize" }}>{course.priority || "—"}</td>
-        <td style={td}>{course.platform || "—"}</td>
-        <td style={td}>{course.est_hours ?? "—"}</td>
-        <td style={td}>{fmtDate(course.target_date)}</td>
-        <td style={td}><span style={statusPill(course.status)}>{status.label}</span></td>
-        <td style={{ ...td, textAlign: "right", color: "var(--muted)" }}>{expanded ? "︿" : "﹀"}</td>
-      </tr>
+      <div
+        className="journey-row"
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
+        style={{ display: "flex", gap: 12, padding: "13px 6px", borderRadius: 10, cursor: "pointer", borderTop: isFirst ? "none" : "1px solid var(--line)" }}
+      >
+        <div style={{ width: 16, display: "flex", flexDirection: "column", alignItems: "center", alignSelf: "stretch", paddingTop: 5, flexShrink: 0 }}>
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: status.color, flexShrink: 0 }} />
+          {hasLine && <span style={{ width: 2, flex: 1, background: "var(--line)", marginTop: 4 }} />}
+        </div>
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 1 }}>
+          <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, color: muted ? "var(--muted)" : "var(--ink)" }}>
+            {course.title}
+          </div>
+          {/* The competency this course builds — the branded title alone
+              (e.g. "AI Fluency: Framework & Foundations") doesn't say what
+              it's actually for. */}
+          {course.focus_area && (
+            <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 2 }}>{course.focus_area}</div>
+          )}
+          {meta && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>{meta}</div>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0, paddingTop: 2 }}>
+          <span style={statusPill(course.status)}>{status.label}</span>
+          <span
+            className="jrow-chevron"
+            aria-hidden="true"
+            style={{ width: 25, height: 25, borderRadius: "50%", border: "1px solid var(--line)", background: "var(--card)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--muted)" }}
+          >
+            {expanded ? "︿" : "﹀"}
+          </span>
+        </div>
+      </div>
       {expanded && (
-        <tr>
-          <td colSpan={8} style={{ padding: 0, background: "var(--bg)" }}>
-            <div style={{ padding: "12px 8px 16px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
-              {course.link && (
-                <a href={course.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none" }}>
-                  Open course{course.platform ? ` on ${course.platform}` : ""} ↗
-                </a>
-              )}
-              {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
-              {course.has_scheduled_session && onUnschedule && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onUnschedule(course); }}
-                  title="Delete this course's calendar event(s) and clear its target date"
-                  style={{ alignSelf: "flex-start", background: "none", border: "none", color: "var(--muted)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", padding: 0 }}
-                >
-                  Remove from calendar
+        <div style={{ padding: "2px 6px 14px 38px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {course.link && (
+            <a href={course.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "var(--blue)", fontWeight: 700, textDecoration: "none" }}>
+              Open course{course.platform ? ` on ${course.platform}` : ""} ↗
+            </a>
+          )}
+          {course.outcome && <div style={{ fontSize: 12.5, color: "var(--body)" }}><strong>After this course:</strong> {course.outcome}</div>}
+          {/* Any course can be started or quizzed at any time, in any order
+              — there's no prerequisite chain to enforce (the backend never
+              had one; this is the only place that used to imply otherwise).
+              Only "Start this course" needs a not-started/skipped guard;
+              the quiz itself is reachable regardless of status (QuizPage
+              already handles "already complete — retake" and "no quiz yet"
+              on its own), and starts the course on the way in if it hasn't
+              been already, so status still reflects what the learner
+              actually did. onStartCourse/onSilentStart are only passed by
+              first-person views (Your Journey, My courses) — Team's
+              read-only drill-down omits both, so neither action renders
+              there. The two are deliberately different functions: clicking
+              "Start this course" is a real, considered choice, so it's the
+              one place that asks which course to set aside once a track's
+              already at its MAX_IN_PROGRESS_PER_TRACK cap (JourneyPage's
+              requestStartCourse/SwapStartModal — see its own comment); the
+              quiz link starts the course quietly, with no prompt, because
+              gating quiz access behind a modal would undercut "take any
+              quiz, any time" for the sake of a rule about deliberate
+              starts, not quiz-taking. */}
+          {onStartCourse && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+              {course.status !== "in_progress" && course.status !== "complete" && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); onStartCourse(course.id); }} style={quickAction}>
+                  Start this course
                 </button>
               )}
+              <Link
+                href={`/learning/journey/${course.id}/quiz`}
+                onClick={(e) => { e.stopPropagation(); if (course.status !== "in_progress" && course.status !== "complete") onSilentStart(course.id); }}
+                style={quickAction}
+              >
+                {course.status === "complete" ? "Retake the quiz →" : "Take the quiz →"}
+              </Link>
             </div>
-          </td>
-        </tr>
+          )}
+          {course.has_scheduled_session && onUnschedule && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onUnschedule(course); }}
+              title="Delete this course's calendar event(s) and clear its target date"
+              style={{ alignSelf: "flex-start", background: "none", border: "none", color: "var(--muted)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", padding: 0 }}
+            >
+              Remove from calendar
+            </button>
+          )}
+        </div>
       )}
     </>
   );
 }
 
-// Scrolls after ~8 rows; header stays pinned while the body scrolls. Plain
-// display order — whatever `courses` arrives in (getJourney()'s own SQL
-// ORDER BY, features/learning/queries.js).
-export function JourneyTable({ courses, onUnschedule }) {
+// Scrolls after roughly 6 rows so the card doesn't grow without bound as a
+// tier's course count grows. Plain display order — whatever `courses`
+// arrives in (getJourney()'s own SQL ORDER BY, features/learning/
+// queries.js). No page-specific styling here: this same component renders
+// on the Learner Dashboard's "My courses" and Team view's read-only
+// drill-down (TeamPage.jsx), so it can't assume it's sitting inside
+// JourneyPage's own layout.
+// A course actively being worked on is the one thing worth surfacing
+// without scrolling — pulled to the front of its own group (core/optional
+// stay separate groups; this doesn't cross that line) via a STABLE sort,
+// so in_progress rows keep their relative order among themselves and
+// everything else keeps its original roadmap_order among itself too. Not
+// a mutation of roadmap_order (courses.roadmap_order, the authored
+// curriculum sequence) — purely how this one render lays the rows out.
+const withInProgressFirst = (list) => [...list].sort((a, b) => (a.status === "in_progress" ? 0 : 1) - (b.status === "in_progress" ? 0 : 1));
+
+export function JourneyTable({ courses, onUnschedule, onStartCourse, onSilentStart }) {
   const [expandedId, setExpandedId] = useState(null);
+  const toggle = (id) => setExpandedId((cur) => (cur === id ? null : id));
+
+  // Optional rows are enrichment, not part of what "core courses complete"
+  // counts — grouped under their own divider, below every core row,
+  // regardless of where roadmap_order happens to interleave them, so the
+  // core path reads as the primary list rather than one flat mix. Priority
+  // itself isn't repeated on every row anymore — the section a row sits in
+  // already says that.
+  const core = withInProgressFirst(courses.filter((c) => c.priority !== "optional"));
+  const optional = withInProgressFirst(courses.filter((c) => c.priority === "optional"));
 
   return (
-    <div style={{ overflow: "auto", maxHeight: HEADER_H + VISIBLE_ROWS * ROW_H, border: "1px solid var(--line)", borderRadius: 10 }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left", color: "var(--muted)" }}>
-            <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>#</th>
-            <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Course</th>
-            <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Priority</th>
-            <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Platform</th>
-            <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Est. hrs</th>
-            <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Target</th>
-            <th style={{ ...th, position: "sticky", top: 0, background: "var(--card)" }}>Status</th>
-            <th style={{ position: "sticky", top: 0, background: "var(--card)" }} />
-          </tr>
-        </thead>
-        <tbody>
-          {courses.map((c, i) => (
-            <JourneyRow
-              key={c.id}
-              course={c}
-              index={i + 1}
-              expanded={expandedId === c.id}
-              onToggle={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-              onUnschedule={onUnschedule}
-            />
-          ))}
-        </tbody>
-      </table>
+    <div style={{ overflow: "auto", maxHeight: 470, border: "1px solid var(--line)", borderRadius: 12, padding: "4px 10px" }}>
+      {core.map((c, i) => (
+        <JourneyRow
+          key={c.id}
+          course={c}
+          expanded={expandedId === c.id}
+          onToggle={() => toggle(c.id)}
+          onUnschedule={onUnschedule}
+          onStartCourse={onStartCourse}
+          onSilentStart={onSilentStart}
+          hasLine={i < core.length - 1}
+          isFirst={i === 0}
+        />
+      ))}
+      {optional.length > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 6px 3px" }}>
+            <span style={{ fontFamily: "var(--font-sora)", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--faint)" }}>Optional</span>
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--faint)", margin: "0 6px 6px" }}>Enrichment — not required to finish this tier</div>
+        </>
+      )}
+      {optional.map((c, i) => (
+        <JourneyRow
+          key={c.id}
+          course={c}
+          expanded={expandedId === c.id}
+          onToggle={() => toggle(c.id)}
+          onUnschedule={onUnschedule}
+          onStartCourse={onStartCourse}
+          onSilentStart={onSilentStart}
+          muted
+          hasLine={false}
+          isFirst={i === 0}
+        />
+      ))}
     </div>
   );
 }
 
-// Name, position badge, track tag(s) (one per enrolled track shown when the
-// TRACK filter dropdown is on "All tracks", just the one otherwise), and
-// core-course progress. "N/A" instead of a progress bar when the account
-// isn't enrolled in any track yet — not just when the current filter
-// happens to have zero core courses.
+// ── Journey hero: avatar/name/track + the tier path (below) ──────────────
+const heroCard = {
+  position: "relative",
+  overflow: "hidden",
+  borderRadius: 16,
+  padding: "22px 24px 24px",
+  marginBottom: 18,
+  // A soft blue glow bleeding in from one corner, over a navy base — the
+  // same navy the app's other dark surface (KpiHolder's accent tile,
+  // LearnerDashboardPage.jsx) and the Learning Hub's own gradient CTA
+  // (.start-journey-btn, globals.css) already use, so this reads as an
+  // extension of an established brand moment rather than a new one.
+  // Deliberately dark enough everywhere for white text — no gradient stop
+  // bright enough to fight the copy sitting on top of it.
+  background: "radial-gradient(820px circle at 100% -12%, rgba(0,126,230,0.5), transparent 55%), linear-gradient(165deg, #04306b 0%, var(--navy) 78%)",
+};
+const segBtn = (active) => ({
+  border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+  background: active ? "#fff" : "transparent", color: active ? "var(--navy)" : "rgba(255,255,255,0.85)",
+});
+const calendarPillBase = { display: "inline-flex", alignItems: "center", gap: 5, borderRadius: 999, padding: "5px 12px", fontSize: 11, fontWeight: 700 };
+
+// One stop on the tier rail. `state` is "done" (assumed fulfilled, or
+// actually finished), "current" (in progress — ring shows `pct`), or
+// "locked" (not visible yet — the road ahead). `bonus` marks the one
+// early-access stage, tinted with --header-blue instead of white so it
+// reads as the "extra" stop, not a second copy of the main path.
+function StageNode({ label, state, pct, bonus }) {
+  const isDone = state === "done";
+  const isLocked = state === "locked";
+  const ringColor = bonus ? "var(--header-blue)" : "#fff";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 60 }}>
+      <div style={{
+        width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        background: isDone ? "#fff" : isLocked ? "transparent" : `conic-gradient(${ringColor} ${pct}%, rgba(255,255,255,0.22) 0)`,
+        border: isLocked ? "1.5px dashed rgba(255,255,255,0.35)" : "none",
+      }}>
+        {isDone ? (
+          <span aria-hidden="true" style={{ color: "var(--navy)", fontSize: 16, fontWeight: 900 }}>✓</span>
+        ) : isLocked ? null : (
+          <div style={{
+            width: 30, height: 30, borderRadius: "50%", background: "var(--navy)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 10.5, color: "#fff",
+          }}>{pct}%</div>
+        )}
+      </div>
+      <div style={{ marginTop: 7, fontSize: 11, fontWeight: 700, textAlign: "center", color: isLocked ? "rgba(255,255,255,0.42)" : "#fff" }}>{label}</div>
+      {bonus && !isLocked && <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.2, color: "var(--header-blue)", marginTop: 1 }}>bonus</div>}
+    </div>
+  );
+}
+
+// The 5-stage seniority ladder (POSITION_ORDER) as one connected path,
+// standing in for the plain progress bar this corner used to hold. Earned
+// specifically because "Your Journey" names a real, ordered sequence with
+// a real "you are here" — the kind of content a stepped visual is meant
+// for, not a generic decoration applied regardless of subject.
 //
-// A SEPARATE small selector (own local state, not the track filter above)
-// appears only once early access is earned (visiblePosition !== position —
-// effectivePosition, shared.js): "my level" shows the same cumulative
-// "through X" number as always; "early access" swaps to the next tier's
-// OWN core courses (nextTierCoreComplete/Total, computed by the parent) so
-// the learner can monitor the bonus material on its own terms, not folded
-// into a number that's already sitting near 100% because the tier below it
-// is what earned the early access in the first place.
-function ProfileStrip({ me, position, visiblePosition, trackTags, hasTracks, coreComplete, coreTotal, nextTierCoreComplete, nextTierCoreTotal, calendarConnected }) {
+// Node state per tier:
+//   - before `position`: assumed already fulfilled (isExpectedByNow,
+//     shared.js) — rendered done without re-checking course data.
+//   - at `position`: current, ring shows coreComplete/coreTotal (this
+//     account's own tier only — see coreCourses' own comment below for why
+//     that stays uncoupled from early access). Flips to done once early
+//     access has actually been earned (visiblePosition !== position — the
+//     real, cross-track signal that this tier is finished), or, at the top
+//     of the ladder where there's no next tier to unlock into, once its
+//     own ring alone reaches 100%.
+//   - at `visiblePosition`, only once early access is earned: the bonus
+//     stage, ring shows nextTierCoreComplete/nextTierCoreTotal. Flips to
+//     done once atCeiling (that stage is ALSO finished).
+//   - anything further out: locked.
+function JourneyPathRail({ position, visiblePosition, atCeiling, coreComplete, coreTotal, nextTierCoreComplete, nextTierCoreTotal }) {
+  const posIdx = POSITION_ORDER.indexOf(position);
+  if (posIdx === -1) return null;
+  const earlyAccess = Boolean(visiblePosition) && visiblePosition !== position;
+  const earlyIdx = earlyAccess ? POSITION_ORDER.indexOf(visiblePosition) : -1;
+  const unlockedThrough = earlyIdx >= 0 ? earlyIdx : posIdx;
+  const pct = coreTotal ? Math.round((coreComplete / coreTotal) * 100) : 0;
+  const nextPct = nextTierCoreTotal ? Math.round((nextTierCoreComplete / nextTierCoreTotal) * 100) : 0;
+  const atTop = posIdx === POSITION_ORDER.length - 1;
+  const currentFinished = earlyAccess || (atTop && coreTotal > 0 && coreComplete === coreTotal);
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", marginTop: 20 }}>
+      {POSITION_ORDER.map((stage, i) => {
+        const state = i < posIdx ? "done"
+          : i === posIdx ? (currentFinished ? "done" : "current")
+          : i === earlyIdx ? (atCeiling ? "done" : "current")
+          : "locked";
+        return (
+          <Fragment key={stage}>
+            {i > 0 && (
+              <div style={{
+                flex: "1 1 16px", minWidth: 12, height: 2, marginTop: 19,
+                background: i <= unlockedThrough ? "rgba(255,255,255,0.55)" : "none",
+                borderTop: i <= unlockedThrough ? "none" : "1.5px dashed rgba(255,255,255,0.3)",
+              }} />
+            )}
+            <StageNode
+              label={POSITION_LABEL[stage] || stage}
+              state={state}
+              pct={i === posIdx ? pct : i === earlyIdx ? nextPct : 0}
+              bonus={i === earlyIdx}
+            />
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// Avatar, name, position/track tags, Calendar-connect, and the tier path —
+// everything this page knows about "where you are" in one dark band, so
+// the white cards below can stay quiet and just list things. Replaces the
+// old ProfileStrip; same props plus `atCeiling`, needed for the rail's own
+// "is the bonus stage also finished" state.
+function JourneyHero({ me, position, visiblePosition, atCeiling, trackTags, hasTracks, coreComplete, coreTotal, coreHoursComplete, coreHoursTotal, nextTierCoreComplete, nextTierCoreTotal, nextTierCoreHoursComplete, nextTierCoreHoursTotal, calendarConnected }) {
   const [scope, setScope] = useState("mine");
   const earlyAccess = Boolean(visiblePosition) && visiblePosition !== position;
   const showingNext = earlyAccess && scope === "next";
   const complete = showingNext ? nextTierCoreComplete : coreComplete;
   const total = showingNext ? nextTierCoreTotal : coreTotal;
-  const pct = total ? Math.round((complete / total) * 100) : 0;
+  const hoursComplete = showingNext ? nextTierCoreHoursComplete : coreHoursComplete;
+  const hoursTotal = showingNext ? nextTierCoreHoursTotal : coreHoursTotal;
+
   return (
-    <section style={{ ...card, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <Avatar person={me} size={44} />
-        <div>
-          <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 17, color: "var(--ink)" }}>{me.name || me.username}</div>
-          {(position || trackTags.length > 0) && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-              {position && (
-                <span style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: "#ece9fb", color: "#5c4ea3" }}>
-                  {POSITION_LABEL[position] || position}
-                </span>
-              )}
-              {trackTags.map((name) => (
-                <span key={name} style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: "#e8f0ff", color: "var(--blue)" }}>{name}</span>
-              ))}
-            </div>
-          )}
-          {/* Permanent home for Calendar-connect — Get Started's own
-              Calendar step is skippable, so this is where "do it later"
-              actually happens. Same /api/calendar/connect route Auto
-              Schedule's own connect flow uses, but back to the Learning Hub
-              landing page (?returnTo=/learning) rather than reopening
-              Auto Schedule here — this button isn't part of that flow. */}
-          <div style={{ marginTop: 8 }}>
-            {calendarConnected ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #bfe3c9", background: "#e6f4ea", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#1f7a3c" }}>
-                ✓ Google Calendar connected
-              </span>
-            ) : (
-              <a href="/api/calendar/connect?returnTo=/learning" style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cddcff", background: "#e8f0ff", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
-                📅 Connect Google Calendar
-              </a>
+    <section style={heroCard}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <Avatar person={me} size={46} />
+          <div>
+            <div style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, letterSpacing: -0.2, color: "#fff" }}>{me.name || me.username}</div>
+            {(position || trackTags.length > 0) && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                {position && (
+                  <span style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: "#ece9fb", color: "#5c4ea3" }}>
+                    {POSITION_LABEL[position] || position}
+                  </span>
+                )}
+                {trackTags.map((name) => (
+                  <span key={name} style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "3px 10px", background: "#e8f0ff", color: "var(--blue)" }}>{name}</span>
+                ))}
+              </div>
             )}
           </div>
         </div>
-      </div>
-      <div style={{ minWidth: 220, textAlign: "right" }}>
-        {hasTracks ? (
-          <>
-            {earlyAccess && (
-              <select
-                value={scope}
-                onChange={(e) => setScope(e.target.value)}
-                title="You've unlocked early access to the next stage — pick which one to monitor here"
-                style={{ marginBottom: 6, border: "1px solid var(--line)", background: "var(--bg)", borderRadius: 8, padding: "3px 8px", fontSize: 11.5, fontWeight: 700, color: "var(--ink)" }}
-              >
-                <option value="mine">{POSITION_LABEL[position] || position}</option>
-                <option value="next">{POSITION_LABEL[visiblePosition] || visiblePosition} · early access</option>
-              </select>
-            )}
-            <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>
-              <strong style={{ color: "var(--ink)" }}>{complete} of {total}</strong> core courses complete
-              {showingNext ? (
-                <span style={{ color: "var(--faint)" }}> · {POSITION_LABEL[visiblePosition] || visiblePosition} only</span>
-              ) : (
-                position && <span style={{ color: "var(--faint)" }}> · through {POSITION_LABEL[position] || position}</span>
-              )}
-            </div>
-            <ProgressBar pct={pct} />
-          </>
+        {/* Permanent home for Calendar-connect — Get Started's own Calendar
+            step is skippable, so this is where "do it later" actually
+            happens. Same /api/calendar/connect route Auto Schedule's own
+            connect flow uses, but back to the Learning Hub landing page
+            rather than reopening Auto Schedule here. */}
+        {calendarConnected ? (
+          <span style={{ ...calendarPillBase, border: "1px solid rgba(255,255,255,0.32)", background: "rgba(255,255,255,0.12)", color: "#fff" }}>
+            ✓ Google Calendar connected
+          </span>
         ) : (
-          <div style={{ fontSize: 13, color: "var(--muted)", fontWeight: 700 }}>N/A</div>
+          <a href="/api/calendar/connect?returnTo=/learning" style={{ ...calendarPillBase, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.16)", color: "#fff", textDecoration: "none" }}>
+            📅 Connect Google Calendar
+          </a>
         )}
       </div>
+
+      {!hasTracks ? (
+        <div style={{ marginTop: 18, fontSize: 12.5, color: "rgba(255,255,255,0.78)" }}>
+          Enroll in a track from the Learning Hub to start tracking your progress here.
+        </div>
+      ) : !position ? (
+        // No position assigned yet (admin hasn't set one) — the rail has
+        // nothing to index into, so fall back to the plain bar this hero
+        // replaces everywhere else. Rare in practice; every real account
+        // gets a position at Get Started.
+        <div style={{ marginTop: 18, maxWidth: 320 }}>
+          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.78)", marginBottom: 6 }}>
+            <strong style={{ color: "#fff" }}>{coreComplete} of {coreTotal}</strong> core courses complete
+            {coreHoursTotal > 0 && ` (${coreHoursComplete} of ${coreHoursTotal} hrs)`}
+          </div>
+          <ProgressBar pct={coreTotal ? Math.round((coreComplete / coreTotal) * 100) : 0} />
+        </div>
+      ) : (
+        <>
+          <JourneyPathRail
+            position={position}
+            visiblePosition={visiblePosition}
+            atCeiling={atCeiling}
+            coreComplete={coreComplete}
+            coreTotal={coreTotal}
+            nextTierCoreComplete={nextTierCoreComplete}
+            nextTierCoreTotal={nextTierCoreTotal}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16, flexWrap: "wrap" }}>
+            {earlyAccess && (
+              <div style={{ display: "inline-flex", borderRadius: 999, background: "rgba(255,255,255,0.14)", padding: 3, gap: 2 }}>
+                <button type="button" onClick={() => setScope("mine")} style={segBtn(scope === "mine")}>{POSITION_LABEL[position] || position}</button>
+                <button type="button" onClick={() => setScope("next")} style={segBtn(scope === "next")}>{POSITION_LABEL[visiblePosition] || visiblePosition} · bonus</button>
+              </div>
+            )}
+            <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.78)" }}>
+              <strong style={{ color: "#fff" }}>{complete} of {total}</strong> core courses complete
+              {hoursTotal > 0 && ` (${hoursComplete} of ${hoursTotal} hrs)`}
+              {showingNext ? (
+                <span style={{ color: "rgba(255,255,255,0.55)" }}> · {POSITION_LABEL[visiblePosition] || visiblePosition} only</span>
+              ) : (
+                position && <span style={{ color: "rgba(255,255,255,0.55)" }}> · {POSITION_LABEL[position] || position} only</span>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }
 
-// Milestone banners (tierJustFinished/atCeiling, below) — same light-blue
-// accent combo Up next's own header used to share with this before Auto
-// Schedule became the card's one and only action, not the generic green a
-// progress-app reflex reaches for by default. Skedulo's own brand palette
-// (CLAUDE.md) is navy/blue; it has no green in it, so a green "success"
-// banner would be the one thing on this page that isn't actually on-brand.
-const milestoneBanner = { background: "#e8f0ff", border: "1px solid #cddcff", color: "var(--navy)", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14 };
+// Milestone banners (tierJustFinished/atCeiling, below) — an icon badge
+// plus text rather than a flat tinted box with an inline emoji, so the
+// same "something to notice" shape as ConfirmModal's own icon badge
+// carries through here too. Still the light-blue/navy combo the original
+// comment chose over green: Skedulo's own brand palette (CLAUDE.md) has no
+// green in it, so a green "success" banner would be the one thing on this
+// page that isn't actually on-brand.
+const milestoneBanner = { display: "flex", alignItems: "flex-start", gap: 12, background: "#eef3ff", border: "1px solid #cddcff", borderRadius: 10, padding: "12px 14px", marginBottom: 14 };
+const milestoneIcon = { width: 34, height: 34, borderRadius: "50%", background: "#dce7ff", color: "var(--navy)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 };
 // Up next's "Calendar not connected" notice — a heads-up, not an error, so
 // it reuses STATUS_META's own "skipped" amber (shared.js) rather than
 // errBanner's red or milestoneBanner's blue: this app's one existing
 // "attention, not alarming" color, not a new one invented for this.
-const calendarWarnBanner = { background: "#fff4e0", border: "1px solid #ffdf9e", color: "#a15c00", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, fontWeight: 600, marginBottom: 14, lineHeight: 1.5 };
+const calendarWarnBanner = { display: "flex", alignItems: "flex-start", gap: 12, background: "#fff4e0", border: "1px solid #ffdf9e", borderRadius: 10, padding: "12px 14px", marginBottom: 14 };
+const calendarWarnIcon = { width: 34, height: 34, borderRadius: "50%", background: "#ffe8b8", color: "#a15c00", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 };
 // Auto Schedule is the ONLY action Up next has now — no Refresh (redundant
 // with useRevalidateOnFocus, which already re-fetches this whole page on
 // tab-focus) and no manual target-date editing (this app doesn't track
@@ -241,9 +496,12 @@ const autoScheduleBtnDisabled = { ...autoScheduleBtn, background: "var(--bg)", c
 // are gone, see the comment above autoScheduleBtn).
 //
 // The soonest/next pick (upcoming[0]) auto-flips not_started -> in_progress
-// — "this is the one you're on now" — the moment it becomes the top pick,
-// not on any click. Guarded by a ref so the same course only gets the
-// start call once per mount, not on every re-render.
+// — a default "here's where to pick up" — the moment it becomes the top
+// pick, not on any click. Guarded by a ref so the same course only gets
+// the start call once per mount, not on every re-render. This is just a
+// suggestion, not the only way in: a learner can start (or jump straight
+// to the quiz for) any other course directly from its own row, and that
+// stays true whether or not it agrees with this pick.
 function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected }) {
   const eligible = courses.filter((c) => c.status !== "complete" && c.status !== "skipped");
   const dated = eligible.filter((c) => c.target_date).sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
@@ -288,7 +546,10 @@ function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected })
       </div>
       {!calendarConnected && (
         <div style={calendarWarnBanner}>
-          📅 Google Calendar isn't connected, so Auto Schedule can't book study time or set target dates for you — connect from your profile above to turn it on.
+          <span aria-hidden="true" style={calendarWarnIcon}>📅</span>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: "#8a5200", lineHeight: 1.5 }}>
+            Google Calendar isn't connected, so Auto Schedule can't book study time or set target dates for you — connect from your profile above to turn it on.
+          </div>
         </div>
       )}
       {upcoming.length === 0 ? (
@@ -300,13 +561,22 @@ function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected })
           {upcoming.map((c, i) => {
             const status = STATUS_META[c.status] || STATUS_META.not_started;
             return (
-              <div key={c.id} style={{ padding: i > 0 ? "12px 0 0" : "0 0 12px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)", marginBottom: 6 }}>{c.title}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={statusPill(c.status)}>{status.label}</span>
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                    {c.target_date ? `Target ${fmtDate(c.target_date)}` : "No target set"}{c.est_hours != null ? ` · ${c.est_hours} hrs` : ""}
-                  </span>
+              <div key={c.id} style={{ display: "flex", gap: 10, padding: i > 0 ? "12px 0 0" : "0 0 12px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
+                {/* A short path segment down the sidebar — the same
+                    "connected stops" idea the hero's tier rail uses, at
+                    the scale of two upcoming courses. */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", alignSelf: "stretch", paddingTop: 3 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: status.color, flexShrink: 0 }} />
+                  {i < upcoming.length - 1 && <span style={{ width: 2, flex: 1, background: "var(--line)", marginTop: 4 }} />}
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)", marginBottom: 6 }}>{c.title}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={statusPill(c.status)}>{status.label}</span>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                      {c.target_date ? `Target ${fmtDate(c.target_date)}` : "No target set"}{c.est_hours != null ? ` · ${c.est_hours} hrs` : ""}
+                    </span>
+                  </div>
                 </div>
               </div>
             );
@@ -314,6 +584,22 @@ function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected })
         </div>
       )}
     </section>
+  );
+}
+
+// A small radial readout for one course's first-try quiz accuracy —
+// warranted here specifically because accuracy already IS a ratio, not a
+// decorative dial invented for a number that wasn't one.
+function AccuracyRing({ pct }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{ width: 30, height: 30, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `conic-gradient(var(--blue) ${pct}%, var(--line) 0)` }}
+    >
+      <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--card)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 8, color: "var(--ink)" }}>
+        {pct}
+      </div>
+    </div>
   );
 }
 
@@ -327,11 +613,14 @@ function UpNextCard({ courses, onAutoStart, onAutoSchedule, calendarConnected })
 // null for a course completed before this existed (or completed with no
 // stats sent) — shown honestly as "No quiz data recorded" rather than a
 // fabricated number.
-// inProgressCourse: the account's current in_progress pick, same track
-// scope, shown as one more row below the completions so the card also
-// points at what's next, not just what's done. Null when nothing's in
-// progress; no fallback fabricated.
-function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
+// inProgressCourses: every in_progress course in the same track scope,
+// shown below the completions so the card also points at what's next, not
+// just what's done. Plural since up to MAX_IN_PROGRESS_PER_TRACK (2, see
+// shared.js) can genuinely be in progress in one track at once — capped at
+// 3 here mainly as a display ceiling, not because more than that is
+// actually expected. Empty when nothing's in progress; no fallback
+// fabricated.
+function KnowledgeArtifactsCard({ completions, inProgressCourses }) {
   return (
     <section style={card}>
       <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: "0 0 2px" }}>Knowledge artifacts</h2>
@@ -348,29 +637,34 @@ function KnowledgeArtifactsCard({ completions, inProgressCourse }) {
               ? Math.round((c.quiz_correct_first_try / c.quiz_total_questions) * 100)
               : null;
             return (
-              <div key={c.id} style={{ padding: i > 0 ? "10px 0 0" : "0 0 10px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>{c.title}</div>
-                <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
-                  {hasStats
-                    ? `${c.quiz_total_questions} question${c.quiz_total_questions === 1 ? "" : "s"} · ${relTime(c.completed_at)} · ${accuracy}% accuracy`
-                    : `No quiz data recorded · ${relTime(c.completed_at)}`}
+              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: i > 0 ? "10px 0 0" : "0 0 10px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
+                {hasStats
+                  ? <AccuracyRing pct={accuracy} />
+                  : <div aria-hidden="true" style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--bg)", flexShrink: 0 }} />}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>{c.title}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
+                    {hasStats
+                      ? `${c.quiz_total_questions} question${c.quiz_total_questions === 1 ? "" : "s"} · ${relTime(c.completed_at)} · ${accuracy}% accuracy`
+                      : `No quiz data recorded · ${relTime(c.completed_at)}`}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
-      {inProgressCourse && (
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>{inProgressCourse.title}</div>
+      {inProgressCourses.map((c) => (
+        <div key={c.id} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>{c.title}</div>
           <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
             In progress — waiting on the wrap-up quiz for more information
           </div>
-          <Link href={`/learning/journey/${inProgressCourse.id}/quiz`} style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
+          <Link href={`/learning/journey/${c.id}/quiz`} style={{ fontSize: 11.5, fontWeight: 700, color: "var(--blue)", textDecoration: "none" }}>
             Take the quiz →
           </Link>
         </div>
-      )}
+      ))}
     </section>
   );
 }
@@ -387,6 +681,11 @@ export default function JourneyPage() {
   // — unscheduleTarget holds the course pending confirmation, or null.
   const [unscheduleTarget, setUnscheduleTarget] = useState(null);
   const [unscheduling, setUnscheduling] = useState(false);
+  // "Start this course" on a course whose track is already at its
+  // MAX_IN_PROGRESS_PER_TRACK cap — holds { courseId, current } (the
+  // courses the learner can pick from to set aside) while SwapStartModal
+  // (below) is open, null otherwise. See requestStartCourse's own comment.
+  const [pendingSwap, setPendingSwap] = useState(null);
   // No "all tracks" option — always one specific enrolled track (its id),
   // auto-picked below once trackOptions is known; "" only until then.
   const [selectedTrack, setSelectedTrack] = useState("");
@@ -463,15 +762,16 @@ export default function JourneyPage() {
     if (!trackOptions.some((t) => t.id === selectedTrack)) setSelectedTrack(trackOptions[0]?.id || "");
   }, [journey]); // eslint-disable-line react-hooks/exhaustive-deps
   const filteredJourney = journey.filter((c) => c.track_id === selectedTrack);
-  // The List (and Up next, below) only show courses in tiers at or below
-  // this account's current position — an Intern sees the Intern tier, a
-  // Junior sees Intern + Junior, and so on (isExpectedByNow, shared.js).
-  // Once every course in the account's OWN tier is complete/skipped,
-  // they've earned one stage of early access too (effectivePosition —
-  // "max +1 stage": Intern -> Junior, Junior -> Middle, never further),
-  // computed off the FULL journey (every enrolled track), not
-  // filteredJourney — whether you've finished your stage shouldn't depend
-  // on which track happens to be selected in the dropdown.
+  // The List (and Up next, below) only show courses in this account's own
+  // current tier — an Intern sees the Intern tier, a Junior sees only the
+  // Junior tier (isExpectedByNow/isVisibleNow, shared.js) — the tiers below
+  // it are assumed already fulfilled, not something still owed. Once every
+  // course in the account's OWN tier is complete/skipped, they've earned one
+  // stage of early access too (effectivePosition — "max +1 stage": Intern ->
+  // also Junior, Junior -> also Middle, never further), computed off the
+  // FULL journey (every enrolled track), not filteredJourney — whether
+  // you've finished your stage shouldn't depend on which track happens to be
+  // selected in the dropdown.
   //
   // Deliberately NOT used for the % completion numbers below (coreCourses
   // stays on the raw, officially-assigned position) — % completion is a
@@ -484,7 +784,7 @@ export default function JourneyPage() {
   // tracks you're ENROLLED in is a different fact from which courses are
   // relevant to see right now.
   const visiblePosition = effectivePosition(journey, position);
-  const visibleJourney = filteredJourney.filter((c) => isExpectedByNow(c, visiblePosition));
+  const visibleJourney = filteredJourney.filter((c) => isVisibleNow(c, position, visiblePosition));
   // The "max +1 stage" cap is flat, not recursive (effectivePosition,
   // shared.js) — so someone who finishes the +1 stage TOO hits a wall:
   // nothing new becomes visible until an admin reassigns their position.
@@ -496,7 +796,7 @@ export default function JourneyPage() {
   // once you're already at the top of the ladder — effectivePosition caps
   // at the last position rather than going past it, so finishing Principal
   // never makes visiblePosition diverge from position). Shared by the
-  // congrats banner below and, identically, by ProfileStrip's own selector.
+  // congrats banner below and, identically, by JourneyHero's own selector.
   const earlyAccess = position && visiblePosition !== position;
   // The congrats banner below fires the moment the account's OWN official
   // tier alone is done — real courses required, not vacuously true for an
@@ -511,13 +811,18 @@ export default function JourneyPage() {
   const tierJustFinished = position && ownTierCourses.length > 0 && isTierDone(journey, position);
   // Knowledge artifacts — both scoped to the track dropdown, same as the
   // rest of the page now that there's always exactly one selected track
-  // (each track auto-starts its own "Up next" #1 pick independently, so
-  // journey can genuinely hold one in_progress course per enrolled track —
-  // reading the unfiltered journey here would risk showing the OTHER
-  // track's in-progress course while a different one is selected).
-  // Both computed from filteredJourney, already on hand from the journey
-  // fetch — no extra request.
-  const inProgressCourse = filteredJourney.find((c) => c.status === "in_progress") || null;
+  // (reading the unfiltered journey here would risk showing another
+  // track's in-progress courses while a different one is selected). A
+  // learner can start more than one course at once now (any row's own
+  // "Start this course"/"Take the quiz", not just Up next's single auto
+  // pick), so this is every in_progress course in the track, capped at 3
+  // rather than a single pick. Both computed from filteredJourney, already
+  // on hand from the journey fetch — no extra request.
+  const inProgressCourses = filteredJourney.filter((c) => c.status === "in_progress").slice(0, 3);
+  // The course pendingSwap is asking about, looked up from the FULL
+  // journey (not filteredJourney) since it's set from any visible row,
+  // regardless of which track happens to be selected in the dropdown.
+  const pendingSwapCourse = pendingSwap ? journey.find((c) => c.id === pendingSwap.courseId) : null;
   const recentCompletions = filteredJourney
     .filter((c) => c.status === "complete")
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
@@ -528,15 +833,19 @@ export default function JourneyPage() {
   // own definition for why the % stays uncoupled from early access).
   const coreCourses = filteredJourney.filter((c) => c.priority === "core" && isExpectedByNow(c, position));
   const coreComplete = coreCourses.filter((c) => c.status === "complete").length;
+  const coreHoursTotal = coreCourses.reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
+  const coreHoursComplete = coreCourses.filter((c) => c.status === "complete").reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
   // The early-access tier's OWN core courses only (expected_by_position ===
   // visiblePosition), not accumulated with the tier(s) below it the way
   // coreCourses above is ("through X"). That lower tier is already fully
   // done — early access only unlocks once it is — so folding it back in
   // would just show ~100% again and tell the learner nothing about the
-  // bonus material they just unlocked. ProfileStrip only surfaces this
-  // (as a second, selectable view) once visiblePosition !== position.
+  // bonus material they just unlocked. JourneyHero only surfaces this (as
+  // a second, selectable scope) once visiblePosition !== position.
   const nextTierCoreCourses = filteredJourney.filter((c) => c.priority === "core" && c.expected_by_position === visiblePosition);
   const nextTierCoreComplete = nextTierCoreCourses.filter((c) => c.status === "complete").length;
+  const nextTierCoreHoursTotal = nextTierCoreCourses.reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
+  const nextTierCoreHoursComplete = nextTierCoreCourses.filter((c) => c.status === "complete").reduce((sum, c) => sum + (Number(c.est_hours) || 0), 0);
   // Always exactly the one selected track's own name (or none, pre-selection).
   const trackTags = trackOptions.filter((t) => t.id === selectedTrack).map((t) => t.name);
 
@@ -581,8 +890,8 @@ export default function JourneyPage() {
 
   // Removes just ONE course's own Auto-Scheduled calendar event(s) and
   // clears its target date (app/api/courses/:id/clear-schedule) — status
-  // untouched. Optimistic local patch, same pattern autoStartCourse already
-  // uses, rather than a full reload for a single known row.
+  // untouched. Optimistic local patch, same pattern commitStartCourse
+  // already uses, rather than a full reload for a single known row.
   const doUnschedule = async (courseId) => {
     setUnscheduling(true);
     setErr("");
@@ -598,11 +907,77 @@ export default function JourneyPage() {
     }
   };
 
-  // Best-effort and silent — this is a background auto-signal, not a user
-  // action, so a failure here shouldn't surface a scary error banner.
-  const autoStartCourse = (courseId) => {
+  // Flips any not_started/skipped course to in_progress — no prerequisite
+  // chain to check: the backend never enforced course order, only this
+  // page's own UI used to (one auto-picked "next" course, one quiz link).
+  // The ONLY thing gated at all is MAX_IN_PROGRESS_PER_TRACK
+  // (requestStartCourse, below) — this function itself just does it, and
+  // is also reused by resolveSwap to start the NEW course once the old one
+  // has been set aside. Best-effort and silent either way: a failed status
+  // flip here just means the next real fetch (tab focus, or landing on
+  // the course's own quiz page) shows the true state, not worth a scary
+  // error banner over.
+  const commitStartCourse = (courseId) => {
     setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, status: "in_progress" } : c)));
     api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
+  };
+
+  // "Start this course" (JourneyTable) — the one deliberate, considered
+  // click that's choosing to start something, as opposed to Up next's
+  // silent auto-pick or the quiz link's start-on-the-way-in (both call
+  // startIfNoConflict below instead: interrupting either with a modal
+  // would be the wrong call — see JourneyRow's own comment on the two).
+  // Starting fits under MAX_IN_PROGRESS_PER_TRACK (2): just starts, no
+  // modal — up to 2 in progress is the normal, expected case for a learner
+  // who likes working through a couple of things at once, not an edge
+  // case to nag about. Starting a 3rd means the track's already full:
+  // rather than silently blocking it OR silently letting a track's
+  // "in progress" set grow without bound, this asks which of the current
+  // ones to set aside (SwapStartModal) — a real choice, since there's no
+  // "start a 3rd anyway" bypass. pendingSwap holds { courseId, current }
+  // while that's open; null once resolved either way (picked, or
+  // cancelled).
+  const requestStartCourse = (courseId) => {
+    const current = otherInProgressInSameTrack(journey, courseId);
+    if (current.length < MAX_IN_PROGRESS_PER_TRACK) { commitStartCourse(courseId); return; }
+    setPendingSwap({ courseId, current });
+  };
+
+  // Starts a course only if its track has room under the cap already —
+  // used exactly where asking first would be the wrong call (see
+  // requestStartCourse's own comment): at the cap, this just does
+  // nothing, leaving the course not_started. For the quiz link that's
+  // harmless — completeCourse doesn't care what the prior status was, so
+  // the course still completes normally once the quiz is finished; it
+  // just won't have shown as "in progress" in the meantime, and never
+  // needs a course swapped out to make room for it.
+  const startIfNoConflict = (courseId) => {
+    if (otherInProgressInSameTrack(journey, courseId).length >= MAX_IN_PROGRESS_PER_TRACK) return;
+    commitStartCourse(courseId);
+  };
+
+  // Resolves SwapStartModal's pick: every course in retireIds goes back to
+  // not_started, freeing up the room pendingSwap's own course then starts
+  // into. retireIds is either one course (a 1-for-1 swap — the other stays
+  // in progress) or all of pendingSwap.current (the modal's "just focus on
+  // this one" option) — same mechanics either way, just how many get set
+  // aside. Best-effort, independent API calls per course (same
+  // silent-failure reasoning as commitStartCourse above) rather than one
+  // combined endpoint — each is already its own single-purpose route
+  // (/unstart, /start), and there's nothing that needs them to succeed or
+  // fail together.
+  const resolveSwap = (retireIds) => {
+    if (!pendingSwap) return;
+    const { courseId } = pendingSwap;
+    const retire = new Set(retireIds);
+    setJourney((cs) => cs.map((c) => {
+      if (retire.has(c.id)) return { ...c, status: "not_started" };
+      if (c.id === courseId) return { ...c, status: "in_progress" };
+      return c;
+    }));
+    retireIds.forEach((id) => { api(`/api/courses/${id}/unstart`, { method: "POST" }).catch(() => {}); });
+    api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
+    setPendingSwap(null);
   };
 
   return (
@@ -613,16 +988,21 @@ export default function JourneyPage() {
           <Loading label="Loading your journey" />
         ) : (
           <>
-            <ProfileStrip
+            <JourneyHero
               me={me}
               position={position}
               visiblePosition={visiblePosition}
+              atCeiling={atCeiling}
               trackTags={trackTags}
               hasTracks={journey.length > 0}
               coreComplete={coreComplete}
               coreTotal={coreCourses.length}
+              coreHoursComplete={coreHoursComplete}
+              coreHoursTotal={coreHoursTotal}
               nextTierCoreComplete={nextTierCoreComplete}
               nextTierCoreTotal={nextTierCoreCourses.length}
+              nextTierCoreHoursComplete={nextTierCoreHoursComplete}
+              nextTierCoreHoursTotal={nextTierCoreHoursTotal}
               calendarConnected={calendarConnected}
             />
             <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -630,22 +1010,29 @@ export default function JourneyPage() {
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
               <div>
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                  <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: 0 }}>Your Journey</h1>
+                  <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 22, letterSpacing: -0.3, color: "var(--ink)", margin: 0 }}>Your Journey</h1>
                   {journey.length > 0 && (
-                    <select
-                      value={selectedTrack}
-                      onChange={(e) => setSelectedTrack(e.target.value)}
-                      style={{ border: "1px solid var(--line)", background: "var(--card)", borderRadius: 8, padding: "0 10px", height: 28, fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}
-                    >
-                      {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
+                    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                      <select
+                        value={selectedTrack}
+                        onChange={(e) => setSelectedTrack(e.target.value)}
+                        style={{
+                          appearance: "none", WebkitAppearance: "none", fontFamily: "inherit",
+                          border: "1px solid var(--line)", background: "var(--card)", color: "var(--ink)",
+                          borderRadius: 999, padding: "7px 30px 7px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+                        }}
+                      >
+                        {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                      <span aria-hidden="true" style={{ position: "absolute", right: 13, fontSize: 9, color: "var(--muted)", pointerEvents: "none" }}>▾</span>
+                    </div>
                   )}
                 </div>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
                   {position
                     ? visiblePosition !== position
-                      ? `Showing Intern through ${POSITION_LABEL[visiblePosition] || visiblePosition} — you've finished ${POSITION_LABEL[position] || position} and unlocked early access to the next stage — in ${trackTags[0] || "this track"}.`
-                      : `Showing Intern through ${POSITION_LABEL[position] || position} — your current stage — in ${trackTags[0] || "this track"}.`
+                      ? `Showing ${POSITION_LABEL[position] || position} — you've finished it and unlocked early access to ${POSITION_LABEL[visiblePosition] || visiblePosition} — in ${trackTags[0] || "this track"}.`
+                      : `Showing ${POSITION_LABEL[position] || position} — your current stage — in ${trackTags[0] || "this track"}.`
                     : `Ordered intern → principal, in ${trackTags[0] || "this track"}.`}
                 </p>
               </div>
@@ -669,11 +1056,14 @@ export default function JourneyPage() {
               // once atCeiling (below) is also true, so this doesn't stack
               // with that later, more-complete message.
               <div style={milestoneBanner}>
-                {earlyAccess ? (
-                  <>🎉 You've completed every course in {POSITION_LABEL[position] || position} — you're all set for your annual review on {formatMonthDay(annualReviewDate)}. Early access to {POSITION_LABEL[visiblePosition] || visiblePosition} is open now — your {POSITION_LABEL[position] || position} completion rate for this review stays exactly as it is, whatever you do next.</>
-                ) : (
-                  <>🎉 You've completed every course in {POSITION_LABEL[position] || position} — you've reached the top of the ladder, and you're all set for your annual review on {formatMonthDay(annualReviewDate)}.</>
-                )}
+                <span aria-hidden="true" style={milestoneIcon}>🎉</span>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--navy)", lineHeight: 1.5 }}>
+                  {earlyAccess ? (
+                    <>You've completed every course in {POSITION_LABEL[position] || position} — you're all set for your annual review on {formatMonthDay(annualReviewDate)}. Early access to {POSITION_LABEL[visiblePosition] || visiblePosition} is open now — your {POSITION_LABEL[position] || position} completion rate for this review stays exactly as it is, whatever you do next.</>
+                  ) : (
+                    <>You've completed every course in {POSITION_LABEL[position] || position} — you've reached the top of the ladder, and you're all set for your annual review on {formatMonthDay(annualReviewDate)}.</>
+                  )}
+                </div>
               </div>
             )}
             {atCeiling && (
@@ -682,7 +1072,10 @@ export default function JourneyPage() {
               // learner would just see the same fully-complete list with no
               // explanation of why nothing new ever shows up.
               <div style={milestoneBanner}>
-                🎉 You've completed everything visible through {POSITION_LABEL[visiblePosition] || visiblePosition} — the next stage unlocks once your manager updates your level.
+                <span aria-hidden="true" style={milestoneIcon}>🎉</span>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--navy)", lineHeight: 1.5 }}>
+                  You've completed everything visible through {POSITION_LABEL[visiblePosition] || visiblePosition} — the next stage unlocks once your manager updates your level.
+                </div>
               </div>
             )}
             {journey.length === 0 ? (
@@ -698,18 +1091,18 @@ export default function JourneyPage() {
                 Nothing in this track for the {POSITION_LABEL[visiblePosition] || visiblePosition} stage yet — check back as you progress.
               </div>
             ) : (
-              <JourneyTable courses={visibleJourney} onUnschedule={(course) => setUnscheduleTarget(course)} />
+              <JourneyTable courses={visibleJourney} onUnschedule={(course) => setUnscheduleTarget(course)} onStartCourse={requestStartCourse} onSilentStart={startIfNoConflict} />
             )}
           </section>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: "1 1 260px", minWidth: 260 }}>
             <UpNextCard
               courses={visibleJourney}
-              onAutoStart={autoStartCourse}
+              onAutoStart={startIfNoConflict}
               onAutoSchedule={() => setAutoScheduleOpen(true)}
               calendarConnected={calendarConnected}
             />
-            <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourse={inProgressCourse} />
+            <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourses={inProgressCourses} />
           </div>
           </div>
           </>
@@ -750,6 +1143,15 @@ export default function JourneyPage() {
           confirmLabel={unscheduling ? "Removing…" : "Remove from calendar"}
           onCancel={() => setUnscheduleTarget(null)}
           onConfirm={() => doUnschedule(unscheduleTarget.id)}
+        />
+      )}
+
+      {pendingSwap && (
+        <SwapStartModal
+          newCourseTitle={pendingSwapCourse?.title || "this course"}
+          current={pendingSwap.current}
+          onResolve={resolveSwap}
+          onCancel={() => setPendingSwap(null)}
         />
       )}
     </div>

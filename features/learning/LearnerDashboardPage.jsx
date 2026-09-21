@@ -60,13 +60,14 @@ import { useSession } from "@/features/auth/SessionProvider";
 import { api } from "@/lib/apiClient";
 import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import {
-  card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isExpectedByNow, effectivePosition, fmtDate,
+  card, eyebrow, errBanner, POSITION_LABEL, POSITION_ORDER, isVisibleNow, effectivePosition, fmtDate,
   PROGRESS_LEVEL_ORDER, PROGRESS_LEVEL_LABEL, progressLevelForPosition, rolesForProgressLevel, weeklyStreak,
-  skillConfidence, SKILL_CONFIDENCE_SCALE, avgExamAccuracy,
+  skillConfidence, SKILL_CONFIDENCE_SCALE, avgExamAccuracy, otherInProgressInSameTrack, MAX_IN_PROGRESS_PER_TRACK,
 } from "@/features/learning/shared";
 import ProgressBar from "@/features/learning/ProgressBar";
-import { JourneyMindMap, SkipConfirmModal } from "@/features/learning/MindMap";
+import { JourneyMindMap } from "@/features/learning/MindMap";
 import { JourneyTable } from "@/features/learning/JourneyPage";
+import SwapStartModal from "@/features/learning/SwapStartModal";
 import { STATUS_META } from "@/features/ideas/constants";
 
 const cardTitle = { fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" };
@@ -229,9 +230,11 @@ export default function LearnerDashboardPage() {
   const [ready, setReady] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState("");
   const [coursesTrack, setCoursesTrack] = useState("");
-  const [skipTarget, setSkipTarget] = useState(null);
-  const [skipping, setSkipping] = useState(false);
-  const [skipErr, setSkipErr] = useState("");
+  // "Start this course" on a course whose track is already at its
+  // MAX_IN_PROGRESS_PER_TRACK cap — same rule and same swap UX as Your
+  // Journey's own requestStartCourse (JourneyPage.jsx): holds { courseId,
+  // current } while SwapStartModal is open, null otherwise.
+  const [pendingSwap, setPendingSwap] = useState(null);
 
   const load = useCallback(async () => {
     setErr("");
@@ -245,6 +248,38 @@ export default function LearnerDashboardPage() {
 
   useEffect(() => { if (me) load(); }, [me, load]);
   useRevalidateOnFocus(() => { if (me) load(); });
+
+  // Same functions as Your Journey's own (JourneyPage.jsx) — "My courses"
+  // below renders the identical JourneyTable, so it needs the same
+  // start/swap logic, not just the same status flip. See that file's own
+  // comments on requestStartCourse/startIfNoConflict/resolveSwap for why
+  // there are three of these instead of one.
+  const commitStartCourse = (courseId) => {
+    setJourney((cs) => cs.map((c) => (c.id === courseId ? { ...c, status: "in_progress" } : c)));
+    api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
+  };
+  const requestStartCourse = (courseId) => {
+    const current = otherInProgressInSameTrack(journey, courseId);
+    if (current.length < MAX_IN_PROGRESS_PER_TRACK) { commitStartCourse(courseId); return; }
+    setPendingSwap({ courseId, current });
+  };
+  const startIfNoConflict = (courseId) => {
+    if (otherInProgressInSameTrack(journey, courseId).length >= MAX_IN_PROGRESS_PER_TRACK) return;
+    commitStartCourse(courseId);
+  };
+  const resolveSwap = (retireIds) => {
+    if (!pendingSwap) return;
+    const { courseId } = pendingSwap;
+    const retire = new Set(retireIds);
+    setJourney((cs) => cs.map((c) => {
+      if (retire.has(c.id)) return { ...c, status: "not_started" };
+      if (c.id === courseId) return { ...c, status: "in_progress" };
+      return c;
+    }));
+    retireIds.forEach((id) => { api(`/api/courses/${id}/unstart`, { method: "POST" }).catch(() => {}); });
+    api(`/api/courses/${courseId}/start`, { method: "POST" }).catch(() => {});
+    setPendingSwap(null);
+  };
 
   // The Application card's own data — a separate, small fetch rather than
   // folded into /api/journey above: Your Journey (JourneyPage.jsx) calls
@@ -290,16 +325,20 @@ export default function LearnerDashboardPage() {
     return { level, label: PROGRESS_LEVEL_LABEL[level], roleLabel: roles.join(" & "), total: courses.length, complete: courses.filter((c) => c.status === "complete").length };
   }).filter((l) => l.total > 0);
 
-  // visibleJourney: what's expected by now (own tier, or one stage of early
-  // access once that tier's fully done — effectivePosition/isExpectedByNow,
-  // shared.js), across every enrolled track — the KPI row and What's next
-  // (below) both stay scoped to this, unfiltered by track, same as before.
-  // "My courses" itself (JourneyTable, below) narrows this further to just
-  // coursesTrack — its own filter, independent of the Mind map's
-  // selectedTrack and of the KPIs above it.
+  // visibleJourney: what's expected by now (own tier only, plus one stage of
+  // early access once that tier's fully done — effectivePosition/
+  // isVisibleNow, shared.js), across every enrolled track — the KPI row and
+  // What's next (below) both stay scoped to this, unfiltered by track, same
+  // as before. "My courses" itself (JourneyTable, below) narrows this
+  // further to just coursesTrack — its own filter, independent of the Mind
+  // map's selectedTrack and of the KPIs above it.
   const visiblePosition = effectivePosition(journey, position);
-  const visibleJourney = journey.filter((c) => isExpectedByNow(c, visiblePosition));
+  const visibleJourney = journey.filter((c) => isVisibleNow(c, position, visiblePosition));
   const coursesJourney = visibleJourney.filter((c) => c.track_id === coursesTrack);
+  // The course pendingSwap is asking about — looked up from the FULL
+  // journey since it's set from any visible row in "My courses", not
+  // necessarily one in coursesJourney by the time this renders.
+  const pendingSwapCourse = pendingSwap ? journey.find((c) => c.id === pendingSwap.courseId) : null;
 
   // KPI: "Roadmap complete" — % of what's expected by now, across every
   // enrolled track (visibleJourney, unfiltered by coursesTrack — see that
@@ -370,21 +409,6 @@ export default function LearnerDashboardPage() {
   const myOwnIdeas = ideas.filter((i) => (i.my_roles || []).includes("Initiator"));
   const shippedIdeas = myOwnIdeas.filter((i) => i.status === "Launched").length;
 
-  // Same skip-a-tier action the Mind map has always had — moved here with it.
-  const confirmSkip = async () => {
-    setSkipping(true);
-    setSkipErr("");
-    try {
-      await api(`/api/courses/${skipTarget.id}/skip`, { method: "POST" });
-      await load();
-      setSkipTarget(null);
-    } catch (e) {
-      setSkipErr(e.message);
-    } finally {
-      setSkipping(false);
-    }
-  };
-
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 40 }}>
       <AppHeader crumb="My Dashboard" />
@@ -434,7 +458,7 @@ export default function LearnerDashboardPage() {
                       <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 14 }}>Nothing expected yet for your stage in {coursesTrackName || "this track"}.</div>
                     ) : (
                       <div style={{ marginTop: 14 }}>
-                        <JourneyTable courses={coursesJourney} />
+                        <JourneyTable courses={coursesJourney} onStartCourse={requestStartCourse} onSilentStart={startIfNoConflict} />
                       </div>
                     )}
                   </section>
@@ -520,7 +544,7 @@ export default function LearnerDashboardPage() {
                   {filteredJourney.length === 0 ? (
                     <div style={{ fontSize: 13, color: "var(--muted)" }}>No courses in this track.</div>
                   ) : (
-                    <JourneyMindMap courses={filteredJourney} onRequestSkip={(c) => { setSkipErr(""); setSkipTarget(c); }} />
+                    <JourneyMindMap courses={filteredJourney} />
                   )}
                 </section>
               </>
@@ -529,13 +553,12 @@ export default function LearnerDashboardPage() {
         )}
       </main>
 
-      {skipTarget && (
-        <SkipConfirmModal
-          course={skipTarget}
-          busy={skipping}
-          err={skipErr}
-          onCancel={() => setSkipTarget(null)}
-          onConfirm={confirmSkip}
+      {pendingSwap && (
+        <SwapStartModal
+          newCourseTitle={pendingSwapCourse?.title || "this course"}
+          current={pendingSwap.current}
+          onResolve={resolveSwap}
+          onCancel={() => setPendingSwap(null)}
         />
       )}
     </div>

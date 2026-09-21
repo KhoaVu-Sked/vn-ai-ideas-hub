@@ -251,9 +251,9 @@ function RoleStep({ onPicked, refresh }) {
     setErr("");
     try {
       await api("/api/onboarding/position", { method: "POST", body: JSON.stringify({ position }) });
-      // Step 4 (AutoScheduleStep) fixes its "to" range to this same position
-      // — refresh so me.position is current by the time it's reached,
-      // rather than whatever it was when this wizard first opened.
+      // Step 4 (AutoScheduleStep) fixes its From/To range to this same
+      // position — refresh so me.position is current by the time it's
+      // reached, rather than whatever it was when this wizard first opened.
       await refresh();
       onPicked();
     } catch (e) {
@@ -402,12 +402,13 @@ function TracksStep({ tracks, onPreview, onEnrollMany, onContinue }) {
 }
 
 // Step 4 — only reached when Calendar's already connected (see
-// OnboardingWizard below); the range is fixed (Intern through the position
-// just picked in step 1), not the editable From/To AutoScheduleModal shows
-// elsewhere, on purpose: this is a one-time "catch up your whole roadmap so
-// far" action for a brand-new account, not the same day-to-day tool Up
-// next's own wand is. Session length and the Complete-by date both stay
-// adjustable — only the position range is fixed. Reuses the same
+// OnboardingWizard below); the range is fixed to just the position picked in
+// step 1 (From === To — that tier's own courses only, same scoping the rest
+// of the app now uses, not a catch-up-from-Intern range), not the editable
+// From/To AutoScheduleModal shows elsewhere, on purpose: this is a one-time
+// "book time for your own tier" action for a brand-new account, not the same
+// day-to-day tool Up next's own wand is. Session length and the Complete-by
+// date both stay adjustable — only the position range is fixed. Reuses the same
 // /api/courses/auto-schedule endpoint and not_connected handling
 // AutoScheduleModal does — see that file for the full editable version.
 function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }) {
@@ -430,7 +431,7 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
     try {
       const res = await api("/api/courses/auto-schedule", {
         method: "POST",
-        body: JSON.stringify({ from_position: POSITION_ORDER[0], to_position: currentPosition || POSITION_ORDER[0], timeline_months, session_hours: sessionHours, confirm_overflow: confirmOverflow }),
+        body: JSON.stringify({ from_position: currentPosition || POSITION_ORDER[0], to_position: currentPosition || POSITION_ORDER[0], timeline_months, session_hours: sessionHours, confirm_overflow: confirmOverflow }),
       });
       if (res.warning === "timeline_exceeded") setOverflowWarning(res);
       else onSaved(res);
@@ -482,10 +483,10 @@ function AutoScheduleStep({ currentPosition, annualReviewDate, onSaved, onSkip }
     <>
       <AutoScheduleTitle />
       <p style={wizardSubtext}>
-        Splits every not-yet-done course from {POSITION_LABEL[POSITION_ORDER[0]]} through your own {POSITION_LABEL[currentPosition] || POSITION_LABEL[POSITION_ORDER[0]]} level into study sessions, working around your existing meetings. This range is fixed for setup — you can plan any other range later from Your Journey's own 🪄 button.
+        Splits every not-yet-done course in your own {POSITION_LABEL[currentPosition] || POSITION_LABEL[POSITION_ORDER[0]]} level into study sessions, working around your existing meetings. This range is fixed for setup — you can plan any other range later from Your Journey's own 🪄 button.
       </p>
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-        <div style={wizardField}>From<div style={wizardLockedValue}>{POSITION_LABEL[POSITION_ORDER[0]]}</div></div>
+        <div style={wizardField}>From<div style={wizardLockedValue}>{POSITION_LABEL[currentPosition] || POSITION_LABEL[POSITION_ORDER[0]]}</div></div>
         <div style={wizardField}>To<div style={wizardLockedValue}>{POSITION_LABEL[currentPosition] || POSITION_LABEL[POSITION_ORDER[0]]}</div></div>
       </div>
       <div style={{ marginBottom: 14 }}>

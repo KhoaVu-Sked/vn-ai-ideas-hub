@@ -114,10 +114,16 @@ delete from course_assignments
 where account_id in (select id from accounts where username in ('thao', 'thu', 'haanh'));
 
 -- 5) Every course in every tier BELOW an account's own position — complete.
--- array_position() against the same ladder features/learning/queries.js
--- uses (features/accounts/constants.js's POSITIONS) is what ranks tiers;
--- days_base staggers completion so lower (older) tiers read as completed
--- longer ago than higher ones, rather than everything timestamping "Today".
+-- Backstory only, not something the app itself still shows or counts: since
+-- fix-scoped-track (features/learning/shared.js's isExpectedByNow/
+-- isVisibleNow), a learner's List/progress/Mind-map-lock scope no longer
+-- reaches below their own tier — this just makes the Mind map's lower
+-- columns read as a plausible "already done on the way up" history instead
+-- of a suspicious wall of "Not started". array_position() against the same
+-- ladder features/learning/queries.js uses (features/accounts/constants.js's
+-- POSITIONS) is what ranks tiers; days_base staggers completion so lower
+-- (older) tiers read as completed longer ago than higher ones, rather than
+-- everything timestamping "Today".
 -- Quiz stats are backfilled from the real course_quiz_questions counts —
 -- courses with none seeded (5 of 20 — Section 2.1) get null stats, same as
 -- a genuine completion would, so Knowledge artifacts shows "No quiz data
