@@ -104,7 +104,7 @@ export default function DriveSharingCheckPage() {
               Connect your Google account to scan your Drive. This is separate from signing in to TS Hub,
               and it asks for read-only access.
             </p>
-            <button onClick={authorise} disabled={!ready}
+            <button onClick={() => authorise()} disabled={!ready}
               style={{ background: "var(--blue)", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13.5, fontWeight: 700, cursor: ready ? "pointer" : "wait" }}>
               {ready ? "Connect Google Drive" : "Loading…"}
             </button>

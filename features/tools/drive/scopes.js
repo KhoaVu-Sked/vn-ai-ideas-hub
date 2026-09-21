@@ -20,3 +20,14 @@ export function canWrite(grantedScopeString) {
   // files. drive.file is limited to files this app itself created or opened.
   return scopesInclude(grantedScopeString, "https://www.googleapis.com/auth/drive");
 }
+
+// Which scope a request should ask for.
+//
+// Exists because `onClick={authorise}` hands the handler a React
+// SyntheticEvent as its first argument. That became the scope, reached
+// Google's library as an object, and surfaced as "c.trim is not a function"
+// from inside minified library code — a stack trace pointing nowhere near the
+// cause. Anything that is not a non-empty string is not a scope.
+export function pickScope(wanted, fallback) {
+  return typeof wanted === "string" && wanted.trim() ? wanted : fallback;
+}

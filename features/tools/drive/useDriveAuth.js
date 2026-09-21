@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SCOPE_READ } from "./constants";
+import { pickScope } from "./scopes";
 
 const GIS_SRC = "https://accounts.google.com/gsi/client";
 
@@ -56,7 +57,7 @@ export default function useDriveAuth(scope = SCOPE_READ) {
     if (!ready || !window.google?.accounts?.oauth2) return;
     // A new client per scope: Google caches the scope on the token client, so
     // reusing one silently re-requests the scope it was built with.
-    const asking = wantScope || scope;
+    const asking = pickScope(wantScope, scope);
     if (!clientRef.current || clientRef.current.__scope !== asking) {
       clientRef.current = window.google.accounts.oauth2.initTokenClient({
         client_id: clientId,

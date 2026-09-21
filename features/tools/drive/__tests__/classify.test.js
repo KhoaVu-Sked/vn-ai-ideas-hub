@@ -100,3 +100,19 @@ test("empty or missing scope strings grant nothing", () => {
   expect(canWrite("")).toBe(false);
   expect(canWrite(null)).toBe(false);
 });
+
+// ── the scope argument ────────────────────────────────────────────
+// A React onClick hands its handler an event. That event became the scope and
+// reached Google as an object, which failed as "c.trim is not a function"
+// from inside minified library code.
+test("a click event is not mistaken for a scope", () => {
+  const { pickScope } = require("../scopes");
+  const fallback = "https://www.googleapis.com/auth/drive.metadata.readonly";
+  const syntheticEvent = { type: "click", target: {}, preventDefault() {} };
+  expect(pickScope(syntheticEvent, fallback)).toBe(fallback);
+  expect(pickScope(undefined, fallback)).toBe(fallback);
+  expect(pickScope("", fallback)).toBe(fallback);
+  expect(pickScope("   ", fallback)).toBe(fallback);
+  expect(pickScope("https://www.googleapis.com/auth/drive", fallback))
+    .toBe("https://www.googleapis.com/auth/drive");
+});
