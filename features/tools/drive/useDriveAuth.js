@@ -51,13 +51,16 @@ export default function useDriveAuth(scope = SCOPE_READ) {
     return () => { cancelled = true; };
   }, [clientId]);
 
-  const authorise = useCallback(() => {
+  const authorise = useCallback((wantScope) => {
     setErr("");
     if (!ready || !window.google?.accounts?.oauth2) return;
-    if (!clientRef.current) {
+    // A new client per scope: Google caches the scope on the token client, so
+    // reusing one silently re-requests the scope it was built with.
+    const asking = wantScope || scope;
+    if (!clientRef.current || clientRef.current.__scope !== asking) {
       clientRef.current = window.google.accounts.oauth2.initTokenClient({
         client_id: clientId,
-        scope,
+        scope: asking,
         callback: (res) => {
           if (res.error) {
             // Google refuses an unregistered origin with the same shape as a
@@ -72,6 +75,7 @@ export default function useDriveAuth(scope = SCOPE_READ) {
           setGrantedScope(res.scope || "");
         },
       });
+      clientRef.current.__scope = asking;
     }
     clientRef.current.requestAccessToken();
   }, [ready, clientId, scope]);

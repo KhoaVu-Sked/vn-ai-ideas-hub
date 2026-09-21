@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import useDriveAuth from "@/features/tools/drive/useDriveAuth";
-import { scanDrive } from "@/features/tools/drive/scan";
+import { scanDrive, fetchAccountEmail } from "@/features/tools/drive/scan";
+import { planOperations, applyPlan, remindMailto } from "@/features/tools/drive/fix";
+import { canWrite } from "@/features/tools/drive/scopes";
+import { SCOPE_WRITE } from "@/features/tools/drive/constants";
+import AccessDialog from "@/features/tools/drive/AccessDialog";
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 };
 
@@ -16,8 +20,20 @@ const LEVEL = {
 const ORDER = { Critical: 0, Warning: 1, Info: 2, OK: 3 };
 
 export default function DriveSharingCheckPage() {
-  const { token, ready, err, configured, authorise, signOut } = useDriveAuth();
+  const { token, grantedScope, ready, err, configured, authorise, signOut } = useDriveAuth();
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(null);   // the file whose dialog is open
+  const [applying, setApplying] = useState(false);
+  const [note, setNote] = useState("");
+  const [me, setMe] = useState("");
+
+  // Resolved once per connection, not stored.
+  useEffect(() => {
+    if (!token) { setMe(""); return; }
+    let cancelled = false;
+    fetchAccountEmail(token).then((e) => { if (!cancelled) setMe(e); });
+    return () => { cancelled = true; };
+  }, [token]);
   const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
   const [scanErr, setScanErr] = useState("");
@@ -32,6 +48,29 @@ export default function DriveSharingCheckPage() {
         : e.message || "The scan could not finish.");
     } finally {
       setBusy(false); setProgress(null);
+    }
+  };
+
+  const openChange = (f) => {
+    setNote("");
+    // Ask for write access here rather than at connect time. Someone who only
+    // wants to look never grants it.
+    if (!canWrite(grantedScope)) { authorise(SCOPE_WRITE); return; }
+    setEditing(f);
+  };
+
+  const applyChange = async (target) => {
+    setApplying(true); setNote("");
+    try {
+      const { ops, summary } = planOperations(editing, target, me);
+      if (ops.length) await applyPlan(editing.id, ops, token);
+      setNote(`${editing.name} — ${summary}`);
+      setEditing(null);
+      await run();                      // re-scan, so the list reflects Drive rather than hope
+    } catch (e) {
+      setNote(e.message || "The change could not be applied.");
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -95,6 +134,10 @@ export default function DriveSharingCheckPage() {
               </span>
             </div>
 
+            {note && (
+              <div style={{ ...card, fontSize: 13, marginBottom: 14, color: "var(--body)" }}>{note}</div>
+            )}
+
             {scanErr && (
               <div style={{ ...card, background: "#fff4f4", borderColor: "#ffc9c9", color: "#c92a2a", fontSize: 13.5, marginBottom: 14 }}>{scanErr}</div>
             )}
@@ -130,11 +173,34 @@ export default function DriveSharingCheckPage() {
                         </span>
                       )}
                     </span>
+                    {f.fixable ? (
+                      <button onClick={() => openChange(f)}
+                        style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--blue)", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                        Change
+                      </button>
+                    ) : (
+                      remindMailto(f, me) && (
+                        <a href={remindMailto(f, me)}
+                          style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--muted)", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
+                          Remind owner
+                        </a>
+                      )
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </>
+        )}
+
+        {editing && (
+          <AccessDialog
+            file={editing}
+            me={me}
+            busy={applying}
+            onCancel={() => setEditing(null)}
+            onApply={applyChange}
+          />
         )}
       </main>
     </>

@@ -58,6 +58,17 @@ async function listAll(query, token, onProgress) {
 // Two queries rather than one `or`: Drive's search is happier with them apart,
 // and it keeps the link-shared and domain-shared counts separable for the
 // summary without re-deriving them from the classification.
+// Who Google thinks is signed in. Needed for the domain on a domain grant and
+// to sign a reminder; it is not stored anywhere.
+export async function fetchAccountEmail(token) {
+  const res = await fetch(`${DRIVE_API}/about?fields=user(emailAddress)`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return "";
+  const data = await res.json().catch(() => ({}));
+  return data?.user?.emailAddress || "";
+}
+
 export async function scanDrive(token, onProgress = () => {}) {
   const link = await listAll(`${OWNED} and ${LINK_Q}`, token, (n) => onProgress({ stage: "link", found: n }));
   const domain = await listAll(`${OWNED} and ${DOMAIN_Q}`, token, (n) => onProgress({ stage: "domain", found: n }));
