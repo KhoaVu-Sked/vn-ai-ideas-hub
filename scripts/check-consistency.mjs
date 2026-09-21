@@ -248,6 +248,52 @@ const fail = (check, detail, why) => problems.push({ check, detail, why });
   }
 }
 
+// ── 5. The Drive tool must never reach the server ─────────────────
+// features/tools/drive/ talks to Google from the browser with the user's own
+// token, and keeps nothing. That is the whole security position of the tool it
+// was ported from: a central list of every over-shared file at Skedulo would
+// itself be worth attacking, so one must not come to exist.
+//
+// The dangerous version of this rule is the polite one in a comment. Someone
+// adds an endpoint to cache a scan, for entirely sensible reasons, and the
+// property is gone with nothing to notice. So it is checked.
+{
+  const serverFiles = [];
+  const walkApi = (dir) => {
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) walkApi(p);
+      else if (/\.(js|jsx)$/.test(e.name)) serverFiles.push(p);
+    }
+  };
+  walkApi("app/api");
+
+  for (const file of serverFiles) {
+    const src = read(file);
+    if (/from\s+["']@\/features\/tools\/drive/.test(src)) {
+      fail("drive-on-server", file,
+        "imports features/tools/drive — that code is browser-only by design");
+    }
+    if (/googleapis\.com\/drive\//.test(src)) {
+      fail("drive-on-server", file,
+        "calls the Drive API from the server — the user's browser must make that call");
+    }
+  }
+
+  // The token must not be written anywhere that outlives the tab. Comments are
+  // stripped first: the file that explains why it does not use localStorage
+  // should not be reported for saying the word.
+  const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  for (const file of sqlBearingFiles().filter((f) => f.startsWith("features/tools/drive/"))) {
+    const src = stripComments(read(file));
+    if (/\b(localStorage|sessionStorage|indexedDB)\b|document\.cookie/.test(src)) {
+      fail("drive-token-stored", file,
+        "persists something in the browser — the Drive token must live in memory only");
+    }
+  }
+}
+
 function sqlBearingFiles() {
   const out = [];
   const walk = (dir) => {

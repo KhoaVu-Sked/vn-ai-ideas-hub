@@ -25,6 +25,13 @@ const HUBS = [
     cta: "Open the Learning Hub",
     glyph: "🎓",
   },
+  {
+    href: "/tools",
+    name: "Tools",
+    line: "Small utilities that run on your own account, starting with a check for over-shared Drive files.",
+    cta: "Open Tools",
+    glyph: "🧰",
+  },
 ];
 
 export default function HubChooserPage() {
