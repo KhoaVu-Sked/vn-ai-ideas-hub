@@ -26,7 +26,10 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
   const pathname = usePathname() || "/";
   // "/" is the chooser: brand and avatar only. Offering hub links there would
   // pre-answer the question that page exists to ask.
-  const hub = pathname === "/" ? null : pathname.startsWith("/learning") ? "learning" : "ideas";
+  const hub = pathname === "/" ? null
+    : pathname.startsWith("/learning") ? "learning"
+    : pathname.startsWith("/tools") ? "tools"
+    : "ideas";
   const { user: me } = useSession();
   const [openMenu, setOpenMenu] = useState(null); // 'manage' | 'avatar'
   const [term, setTerm] = useState(search ?? "");
@@ -43,7 +46,8 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
   const admin = me?.role === "admin";
   const inIdeas = hub === "ideas";
   const inLearning = hub === "learning";
-  const hubAdmin = Boolean(hub) && admin; // Tasks/Activity/Manage: shared by both hubs, admin only
+  const inTools = hub === "tools";
+  const hubAdmin = Boolean(hub) && admin; // Tasks/Activity/Manage: shared by every hub, admin only
   const signOut = async () => { try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; } };
 
   const runSearch = (v) => {
@@ -74,6 +78,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
         {inLearning && <Link href={me?.onboarded ? "/learning/journey" : "/learning"} className="hdr-nav">Learning Hub</Link>}
         {inLearning && me?.onboarded && <Link href="/learning/dashboard" className="hdr-nav">My Dashboard</Link>}
         {inLearning && admin && <Link href="/learning/team" className="hdr-nav">Team</Link>}
+        {inTools && <Link href="/tools" className="hdr-nav">All tools</Link>}
         {hubAdmin && <Link href="/tasks" className="hdr-nav">Tasks</Link>}
         {hubAdmin && <Link href="/activity" className="hdr-nav">Activity</Link>}
         {hubAdmin && (
@@ -90,7 +95,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
 
       <span className="app-header__spacer" />
 
-      {inLearning && (
+      {(inLearning || inTools) && (
         <Link href="/ideas" className="hdr-cross hdr-cross--hot">💡 Go to the Ideas Hub</Link>
       )}
 
