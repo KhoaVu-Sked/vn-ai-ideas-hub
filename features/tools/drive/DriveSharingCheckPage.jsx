@@ -323,7 +323,12 @@ export default function DriveSharingCheckPage() {
                       </span>
                       {!f.fixable && (
                         <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 4 }}>
-                          Not yours to change — ask the owner
+                          {/* Owning a file and being allowed to reshare it are
+                              different permissions. Saying "ask the owner" on a
+                              row that also says you own it reads as a bug. */}
+                          {f.ownedByMe
+                            ? "Yours, but this account cannot change its sharing"
+                            : "Not yours to change — ask the owner"}
                         </span>
                       )}
                     </span>

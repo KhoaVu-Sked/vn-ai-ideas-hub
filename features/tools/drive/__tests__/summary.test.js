@@ -121,3 +121,18 @@ test("a complete scan claims neither", () => {
   expect(s.approximate).toBe(false);
   expect(s.partial).toBe(false);
 });
+
+test("a truncated scan withholds OK rather than overstating it", () => {
+  // flagged is a floor when the scan stopped early, so scanned - flagged is an
+  // upper bound. Printing it as a total claims more of the Drive is fine than
+  // anyone knows — the one direction this figure must never err in.
+  const s = summarise([f("Critical")], { scanned: 900, findingsTruncated: true });
+  expect(s.OK).toBeNull();
+  expect(s.partial).toBe(true);
+});
+
+test("OK is still reported when only the count stopped early", () => {
+  const s = summarise([f("Critical")], { scanned: 900, truncated: true });
+  expect(s.OK).toBe(899);
+  expect(s.approximate).toBe(true);
+});

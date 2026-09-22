@@ -37,7 +37,13 @@ export function summarise(findings, totals = {}) {
 
   // A scan that stopped early can report fewer owned files than findings, and a
   // negative OK count on screen would be nonsense rather than information.
-  const ok = scanned === null ? null : Math.max(0, scanned - flagged);
+  //
+  // A truncated *findings* scan is worse than imprecise: flagged is then a floor,
+  // so scanned - flagged is an upper bound, and printing it as a total overstates
+  // how much of the Drive is fine. That is the one direction this number must
+  // never err in, so it is withheld instead.
+  const partial = totals.findingsTruncated === true;
+  const ok = scanned === null || partial ? null : Math.max(0, scanned - flagged);
 
   return {
     ...counts,
@@ -45,7 +51,7 @@ export function summarise(findings, totals = {}) {
     flagged,
     scanned,
     approximate: totals.truncated === true,
-    partial: totals.findingsTruncated === true,
+    partial,
     notMine: list.filter((f) => f && f.fixable !== true).length,
   };
 }

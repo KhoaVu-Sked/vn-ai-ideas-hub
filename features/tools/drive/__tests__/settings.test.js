@@ -22,7 +22,7 @@ test("junk in the file yields usable defaults rather than throwing", () => {
     const s = normaliseSettings(input);
     expect(s.watchlist).toEqual([]);
     expect(s.paused).toBe(false);
-    expect(s.schedule).toEqual({ frequency: "weekly", dayOfWeek: "MONDAY", hour: 9 });
+    expect(s.schedule).toBeNull();
   }
 });
 
@@ -70,19 +70,29 @@ test("invisible characters in a pasted link do not truncate the id", () => {
   }
 });
 
-test("a settings file written before the schedule was editable still works", () => {
-  // These files are sitting in people's Drives right now. Code.gs only read the
-  // object form, so the string silently set nothing; dropping it here instead
-  // would reset an existing watcher the first time the page was opened.
-  expect(normaliseSchedule("daily")).toEqual({ frequency: "daily", dayOfWeek: "MONDAY", hour: 9 });
-  expect(normaliseSettings({ schedule: "hourly" }).schedule.frequency).toBe("hourly");
+test("the legacy bare string is unset, not a choice", () => {
+  // The old normaliser stamped "weekly" into every settings file whether anyone
+  // asked or not. Reading it as a decision would write a schedule back on the
+  // next save, and Code.gs would tear down a trigger hand-set in CONFIG and
+  // reinstall it as weekly.
+  expect(normaliseSchedule("daily")).toBeNull();
+  expect(normaliseSchedule("weekly")).toBeNull();
+  expect(normaliseSettings({ schedule: "hourly" }).schedule).toBeNull();
 });
 
-test("a frequency Code.gs does not know falls back to weekly", () => {
-  // Code.gs matches these strings exactly, so an invented one would leave the
-  // watcher on its built-in schedule with the UI claiming otherwise.
-  expect(normaliseSchedule({ frequency: "fortnightly" }).frequency).toBe("weekly");
-  expect(normaliseSchedule({ frequency: "every5min" }).frequency).toBe("weekly");
+test("a frequency Code.gs does not know is unset, never silently weekly", () => {
+  // installTrigger throws on an unknown frequency and reconcileTrigger_ logs it
+  // away, so the old trigger keeps running. Claiming weekly here would put a
+  // cadence on screen that nothing installed.
+  expect(normaliseSchedule({ frequency: "fortnightly" })).toBeNull();
+  expect(normaliseSchedule({ frequency: "every5min" })).toBeNull();
+});
+
+test("a real choice survives normalising, round trip", () => {
+  expect(normaliseSchedule({ frequency: "daily", hour: 7 }))
+    .toEqual({ frequency: "daily", dayOfWeek: "MONDAY", hour: 7 });
+  expect(normaliseSettings({ schedule: { frequency: "every15min" } }).schedule.frequency)
+    .toBe("every15min");
 });
 
 test("every frequency offered is one the watcher understands", () => {
@@ -100,8 +110,8 @@ test("an hour outside the day is refused, not clamped to something odd", () => {
 });
 
 test("a day name is accepted in any case and checked against the real list", () => {
-  expect(normaliseSchedule({ dayOfWeek: "friday" }).dayOfWeek).toBe("FRIDAY");
-  expect(normaliseSchedule({ dayOfWeek: "Caturday" }).dayOfWeek).toBe("MONDAY");
+  expect(normaliseSchedule({ frequency: "weekly", dayOfWeek: "friday" }).dayOfWeek).toBe("FRIDAY");
+  expect(normaliseSchedule({ frequency: "weekly", dayOfWeek: "Caturday" }).dayOfWeek).toBe("MONDAY");
   expect(DAYS.length).toBe(7);
 });
 
@@ -137,7 +147,10 @@ test("a schedule reads back the way the watcher describes itself", () => {
   expect(describeSchedule({ frequency: "daily", hour: 17 })).toBe("Every day at 17:00");
   expect(describeSchedule({ frequency: "hourly" })).toBe("Every hour");
   expect(describeSchedule({ frequency: "every15min" })).toBe("Every 15 minutes");
-  expect(describeSchedule(null)).toBe("Every Monday at 09:00");
+  // Nothing chosen is its own sentence. Naming a cadence here would describe a
+  // schedule this tool has not set and cannot see.
+  expect(describeSchedule(null)).toBe("On whatever schedule the script itself is set to");
+  expect(describeSchedule("weekly")).toBe("On whatever schedule the script itself is set to");
 });
 
 test("only a URL counts as a pasted link, not any id-shaped name", () => {

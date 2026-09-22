@@ -62,10 +62,18 @@ const CONFIG = {
 
   /**
    * When the scheduled check runs. Change these, then run installTrigger.
-   *   frequency: 'weekly' or 'daily'
+   *   frequency: 'weekly', 'daily', 'hourly', or one of the sub-hourly values
+   *              'every5min' / 'every10min' / 'every15min' / 'every30min'.
+   *              Sub-hourly is 96–288 runs a day and spends Google's daily
+   *              script-runtime allowance accordingly.
    *   dayOfWeek: for weekly — MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY,
-   *              SATURDAY or SUNDAY. Ignored when daily.
+   *              SATURDAY or SUNDAY. Ignored otherwise.
    *   hour:      0–23, in the script's timezone (Project Settings → Time zone).
+   *              Used by weekly and daily only.
+   *
+   * The browser tool can set all of this now. It writes the schedule into the
+   * settings file only once someone actually picks one there; until then this
+   * block stands and is left alone.
    */
   schedule: {
     frequency: 'weekly',

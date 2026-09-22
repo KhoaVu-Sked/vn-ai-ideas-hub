@@ -9,22 +9,23 @@
 // the file itself is only a marker, which is why the watcher needs no read
 // access to file bodies.
 
-import { DRIVE_API, SETTINGS_NAME } from "./constants";
+import { DRIVE_API, SETTINGS_NAME, FREQUENCY_VALUES, DAY_VALUES } from "./constants";
 import { canFix } from "./classify";
 import { escapeQueryValue } from "./search";
 
-// How often the watcher runs. These strings are Code.gs's vocabulary — it
-// matches them exactly, and an unrecognised one falls back to weekly there, so
-// a value invented here would silently change nothing.
-export const FREQUENCIES = [
-  { value: "every15min", label: "Every 15 minutes", note: "Fastest warning. Uses the most of Google's daily script time." },
-  { value: "every30min", label: "Every 30 minutes" },
-  { value: "hourly", label: "Every hour" },
-  { value: "daily", label: "Every day" },
-  { value: "weekly", label: "Every week" },
-];
+// Labels for the values in constants.js, which is where the vocabulary itself
+// lives so that `bun run check` can compare it against Code.gs.
+const LABELS = {
+  every15min: "Every 15 minutes",
+  every30min: "Every 30 minutes",
+  hourly: "Every hour",
+  daily: "Every day",
+  weekly: "Every week",
+};
 
-export const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+export const FREQUENCIES = FREQUENCY_VALUES.map((value) => ({ value, label: LABELS[value] || value }));
+
+export const DAYS = DAY_VALUES;
 
 const DEFAULT_SCHEDULE = { frequency: "weekly", dayOfWeek: "MONDAY", hour: 9 };
 
@@ -33,29 +34,39 @@ export const usesHour = (frequency) => frequency === "weekly" || frequency === "
 export const usesDay = (frequency) => frequency === "weekly";
 
 /**
- * Settings written before the schedule was editable stored it as a bare string.
- * It is read so the panel shows what the file actually holds, but note that the
- * watcher ignores that form on purpose: the old normaliser wrote "weekly" into
- * every file regardless, so treating it as a choice would reset a schedule
- * hand-set in Code.gs. Saving from this panel writes the object form, which is
- * the only one the watcher acts on.
+ * A schedule, or null for "nobody has chosen one here".
+ *
+ * The null matters more than it looks. Code.gs rebuilds its trigger whenever
+ * the settings file's schedule differs from the installed one, so writing a
+ * concrete schedule on every save — pausing, adding a folder, editing the
+ * address — would tear down a schedule someone had hand-set in CONFIG and
+ * reinstall it as weekly. The old bare-string form is exactly that trap: the
+ * previous normaliser stamped "weekly" into every file whether or not anyone
+ * asked for it, so it is read as "unset", not as a choice.
+ *
+ * Only an object with a frequency this tool offers counts as a real choice,
+ * and only setSchedule writes one.
  */
 export function normaliseSchedule(raw) {
-  const known = FREQUENCIES.map((f) => f.value);
-  const src = typeof raw === "string" ? { frequency: raw } : (raw && typeof raw === "object" ? raw : {});
+  if (!raw || typeof raw !== "object") return null;
 
-  const frequency = known.includes(src.frequency) ? src.frequency : DEFAULT_SCHEDULE.frequency;
-  const dayOfWeek = DAYS.includes(String(src.dayOfWeek || "").toUpperCase())
-    ? String(src.dayOfWeek).toUpperCase()
+  const known = FREQUENCIES.map((f) => f.value);
+  if (!known.includes(raw.frequency)) return null;
+
+  const dayOfWeek = DAYS.includes(String(raw.dayOfWeek || "").toUpperCase())
+    ? String(raw.dayOfWeek).toUpperCase()
     : DEFAULT_SCHEDULE.dayOfWeek;
 
-  const rawHour = Number(src.hour);
+  const rawHour = Number(raw.hour);
   const hour = Number.isFinite(rawHour) && rawHour >= 0 && rawHour <= 23
     ? Math.trunc(rawHour)
     : DEFAULT_SCHEDULE.hour;
 
-  return { frequency, dayOfWeek, hour };
+  return { frequency: raw.frequency, dayOfWeek, hour };
 }
+
+// What the selects start on before anyone has chosen. Displayed, never saved.
+export const SCHEDULE_PLACEHOLDER = DEFAULT_SCHEDULE;
 
 // Absent keys must not inherit whatever was there before. This is a bug the
 // source tool actually shipped: a settings file saved without `paused` left the
@@ -84,10 +95,14 @@ export function notifyEmailProblem(value) {
   return bad ? `${bad} is not an email address.` : null;
 }
 
-// Reads back the way the watcher's own email footer describes itself, so the
-// two never appear to disagree about what was configured.
+/**
+ * Reads back the way the watcher's own email footer describes itself, so the
+ * two never appear to disagree about what was configured. Null is its own
+ * sentence: the panel must not claim a cadence it has not set.
+ */
 export function describeSchedule(schedule) {
   const s = normaliseSchedule(schedule);
+  if (!s) return "On whatever schedule the script itself is set to";
   const option = FREQUENCIES.find((f) => f.value === s.frequency);
   const at = ` at ${String(s.hour).padStart(2, "0")}:00`;
   if (s.frequency === "weekly") {
@@ -120,7 +135,12 @@ export async function readSettings(token) {
 }
 
 export async function writeSettings(token, settings) {
-  const body = JSON.stringify({ ...normaliseSettings(settings), savedAt: new Date().toISOString() });
+  const payload = { ...normaliseSettings(settings), savedAt: new Date().toISOString() };
+  // An unchosen schedule is absent from the file, not written as a default.
+  // Present-but-default is indistinguishable from a decision to Code.gs, and it
+  // would reinstall the trigger over whatever CONFIG says.
+  if (payload.schedule === null) delete payload.schedule;
+  const body = JSON.stringify(payload);
   const existing = await findSettingsFile(token);
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 

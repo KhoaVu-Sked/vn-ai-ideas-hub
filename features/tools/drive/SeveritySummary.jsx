@@ -91,7 +91,7 @@ export default function SeveritySummary({ summary, active, onToggle }) {
       {(summary.approximate || summary.partial) && (
         <p style={{ margin: "10px 0 0", fontSize: 11.5, color: "var(--faint)", lineHeight: 1.5 }}>
           {summary.partial
-            ? "This Drive is large enough that the scan stopped early. Every count here is a floor, not a total."
+            ? "This Drive is large enough that the scan stopped early, so the counts above are a floor and how much is fine cannot be worked out from them."
             : "This Drive is large enough that counting stopped early, so the OK figure is a floor rather than a total. The flagged counts are complete."}
         </p>
       )}

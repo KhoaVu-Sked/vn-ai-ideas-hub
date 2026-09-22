@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   readSettings, writeSettings, lookupFolder, folderIdFrom, looksLikeDriveUrl,
-  normaliseSchedule, notifyEmailProblem, describeSchedule,
+  normaliseSchedule, notifyEmailProblem, describeSchedule, SCHEDULE_PLACEHOLDER,
   FREQUENCIES, DAYS, usesHour, usesDay,
 } from "@/features/tools/drive/settings";
 import { searchFolders } from "@/features/tools/drive/search";
@@ -75,21 +75,25 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
     if (!term || looksLikeDriveUrl(term)) { setHits([]); setSearching(false); return undefined; }
 
     const controller = new AbortController();
+    let cancelled = false;
     setSearching(true);
     const timer = setTimeout(async () => {
       try {
         const found = await searchFolders(token, term, { signal: controller.signal });
+        if (cancelled) return;
         setHits(found);
         setActive(-1);
         setOpen(true);
       } catch (e) {
-        if (e.name !== "AbortError") setHits([]);
+        if (!cancelled && e.name !== "AbortError") setHits([]);
       } finally {
-        setSearching(false);
+        // Only the live search may clear the indicator. An aborted one settling
+        // late would hide it while its replacement was still in flight.
+        if (!cancelled) setSearching(false);
       }
     }, DEBOUNCE_MS);
 
-    return () => { clearTimeout(timer); controller.abort(); };
+    return () => { cancelled = true; clearTimeout(timer); controller.abort(); };
   }, [input, token, canEdit]);
 
   // Clicking away closes the suggestions without choosing one.
@@ -127,11 +131,19 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
     // was typed. Hover styling is CSS's job, in .drive-suggest button:hover.
     if (open && active >= 0 && hits[active]) return watch(hits[active]);
 
+    // Typed text with results waiting is a name, even when it happens to be
+    // id-shaped — plenty of folder names are. Treating it as an id here sent
+    // ProjectDocuments2026 to lookupFolder and failed with "no folder found"
+    // while the folder itself sat in the list underneath.
+    if (!looksLikeDriveUrl(input) && hits.length) {
+      if (hits.length === 1) return watch(hits[0]);
+      setMsg("Pick a folder from the list.");
+      return;
+    }
+
     const id = folderIdFrom(input);
     if (!id) {
-      setMsg(hits.length
-        ? "Pick a folder from the list, or paste a Drive folder link."
-        : "That does not look like a Drive folder link or id.");
+      setMsg("That does not look like a Drive folder link or id.");
       return;
     }
     if (settings.watchlist.includes(id)) { setMsg("That folder is already watched."); return; }
@@ -153,9 +165,11 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
     else if (e.key === "Escape") { setOpen(false); setActive(-1); }
   };
 
+  // Choosing anything here is what turns "unset" into a schedule, so the patch
+  // is applied over the placeholder rather than over null.
   const setSchedule = (patch) => {
-    const schedule = normaliseSchedule({ ...settings.schedule, ...patch });
-    save({ ...settings, schedule });
+    const base = settings.schedule || SCHEDULE_PLACEHOLDER;
+    save({ ...settings, schedule: normaliseSchedule({ ...base, ...patch }) });
   };
 
   if (!canEdit) {
@@ -176,7 +190,8 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
 
   if (!settings) return null;
 
-  const schedule = normaliseSchedule(settings.schedule);
+  const chosen = normaliseSchedule(settings.schedule);
+  const schedule = chosen || SCHEDULE_PLACEHOLDER;
   const emailProblem = notifyEmailProblem(emailDraft);
 
   return (
@@ -268,16 +283,20 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
           <select
-            value={schedule.frequency}
+            value={chosen ? schedule.frequency : ""}
             disabled={busy}
             onChange={(e) => setSchedule({ frequency: e.target.value })}
             aria-label="How often the watcher checks"
             style={field}
           >
+            {/* Until someone picks, the file holds no schedule and the script's
+                own setting stands. Showing a frequency here before that would
+                claim a cadence this panel has not set. */}
+            {!chosen && <option value="">Leave as the script has it</option>}
             {FREQUENCIES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
 
-          {usesDay(schedule.frequency) && (
+          {chosen && usesDay(schedule.frequency) && (
             <select value={schedule.dayOfWeek} disabled={busy}
               onChange={(e) => setSchedule({ dayOfWeek: e.target.value })}
               aria-label="Which day" style={field}>
@@ -287,7 +306,7 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
             </select>
           )}
 
-          {usesHour(schedule.frequency) && (
+          {chosen && usesHour(schedule.frequency) && (
             <select value={schedule.hour} disabled={busy}
               onChange={(e) => setSchedule({ hour: Number(e.target.value) })}
               aria-label="What time" style={field}>
@@ -320,8 +339,9 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
         )}
 
         <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.6 }}>
-          {describeSchedule(schedule)}. Email goes out only when something has actually changed since
-          the last check, so a quiet week is silent rather than reassuring.
+          {describeSchedule(settings.schedule)}, in the timezone set on the Apps Script project rather
+          than yours. Email goes out only when something has actually changed since the last check,
+          so a quiet week is silent rather than reassuring.
         </p>
       </div>
 
