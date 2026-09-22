@@ -544,7 +544,7 @@ export default function LearnerDashboardPage() {
                     <div>
                       <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", margin: "0 0 4px" }}>Mind map</h1>
                       <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
-                        Ordered intern → principal.
+                        Every level in this track. Open one to see its courses.
                       </p>
                     </div>
                     <select value={selectedTrack} onChange={(e) => setSelectedTrack(e.target.value)} style={trackSelect}>

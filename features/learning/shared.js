@@ -146,13 +146,6 @@ export function effectivePosition(courses, position) {
 export const th = { padding: "6px 8px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "left" };
 export const td = { padding: "10px 8px", fontSize: 12.5, color: "var(--body)" };
 
-// Row/header sizing shared by the List view's scrollable table (JourneyPage)
-// and the Mind map's per-column scroll height (MindMap) — same visible-rows
-// budget in both places.
-export const VISIBLE_ROWS = 8;
-export const ROW_H = 42;
-export const HEADER_H = 34;
-
 // target_date is a date-only value (no time-of-day) — always parsed and
 // displayed in UTC so the calendar date shown matches what was actually set,
 // regardless of the viewer's browser timezone. Without the explicit UTC
