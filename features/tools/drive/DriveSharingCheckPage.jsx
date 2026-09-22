@@ -9,6 +9,7 @@ import { canWrite } from "@/features/tools/drive/scopes";
 import { SCOPE_WRITE } from "@/features/tools/drive/constants";
 import AccessDialog from "@/features/tools/drive/AccessDialog";
 import WatchedFolders from "@/features/tools/drive/WatchedFolders";
+import { pageOf, pageForNewSize, PER_PAGE_OPTIONS, DEFAULT_PER_PAGE } from "@/features/tools/drive/paginate";
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 };
 
@@ -19,6 +20,49 @@ const LEVEL = {
   OK:       { bg: "#e6f4ea", fg: "#1f7a3c" },
 };
 const ORDER = { Critical: 0, Warning: 1, Info: 2, OK: 3 };
+
+/* The list is long — that is the whole reason it is paged — so the controls sit
+   at both ends. With 50 rows on screen, a pager only at the top means scrolling
+   back up to leave the page you just finished reading. */
+function Pager({ shown, perPage, onPage, onResize, edge }) {
+  if (shown.total <= PER_PAGE_OPTIONS[0]) return null;
+  const step = { border: "1px solid var(--line)", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: 12.5, fontWeight: 700 };
+  const back = shown.page <= 1;
+  const next = shown.page >= shown.pages;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+      flexWrap: "wrap", padding: "10px 15px",
+      [edge === "top" ? "borderBottom" : "borderTop"]: "1px solid var(--line)",
+    }}>
+      <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+        Showing {shown.from}–{shown.to} of {shown.total}
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <label style={{ fontSize: 12.5, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+          Per page
+          <select value={perPage} onChange={(e) => onResize(Number(e.target.value))}
+            style={{ fontSize: 12.5, padding: "4px 6px", borderRadius: 7, border: "1px solid var(--line)", background: "#fff", color: "var(--ink)" }}>
+            {PER_PAGE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => onPage(shown.page - 1)} disabled={back} aria-label="Previous page"
+            style={{ ...step, color: back ? "var(--faint)" : "var(--blue)", cursor: back ? "default" : "pointer" }}>
+            Back
+          </button>
+          <span style={{ fontSize: 12.5, color: "var(--muted)", whiteSpace: "nowrap" }}>
+            {shown.page} / {shown.pages}
+          </span>
+          <button onClick={() => onPage(shown.page + 1)} disabled={next} aria-label="Next page"
+            style={{ ...step, color: next ? "var(--faint)" : "var(--blue)", cursor: next ? "default" : "pointer" }}>
+            Next
+          </button>
+        </span>
+      </span>
+    </div>
+  );
+}
 
 export default function DriveSharingCheckPage() {
   const { token, grantedScope, ready, err, configured, authorise, signOut } = useDriveAuth();
@@ -38,9 +82,12 @@ export default function DriveSharingCheckPage() {
   const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
   const [scanErr, setScanErr] = useState("");
+  const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
+  const [page, setPage] = useState(1);
 
   const run = async () => {
-    setBusy(true); setScanErr(""); setResult(null); setProgress({ stage: "link", found: 0 });
+    setBusy(true); setScanErr(""); setResult(null); setPage(1);
+    setProgress({ stage: "link", found: 0 });
     try {
       setResult(await scanDrive(token, setProgress));
     } catch (e) {
@@ -78,6 +125,11 @@ export default function DriveSharingCheckPage() {
   const rows = result ? [...result.findings].sort(
     (a, b) => (ORDER[a.level] - ORDER[b.level]) || a.name.localeCompare(b.name),
   ) : [];
+
+  // pageOf clamps, so the page number never has to be corrected here — a second
+  // scan returning fewer findings lands on the last real page by itself.
+  const shown = pageOf(rows, page, perPage);
+  const resize = (next) => { setPage(pageForNewSize(shown.page, perPage, next)); setPerPage(next); };
 
   return (
     <>
@@ -157,7 +209,8 @@ export default function DriveSharingCheckPage() {
 
             {rows.length > 0 && (
               <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-                {rows.map((f, i) => (
+                <Pager shown={shown} perPage={perPage} onPage={setPage} onResize={resize} edge="top" />
+                {shown.items.map((f, i) => (
                   <div key={f.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 15px", borderTop: i ? "1px solid var(--line)" : "none" }}>
                     <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap", ...{ background: LEVEL[f.level].bg, color: LEVEL[f.level].fg } }}>
                       {f.level}
@@ -189,6 +242,7 @@ export default function DriveSharingCheckPage() {
                     )}
                   </div>
                 ))}
+                <Pager shown={shown} perPage={perPage} onPage={setPage} onResize={resize} edge="bottom" />
               </div>
             )}
             <WatchedFolders
