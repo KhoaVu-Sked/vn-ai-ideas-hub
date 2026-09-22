@@ -90,10 +90,22 @@ export async function lookupFolder(token, id) {
 
 // Accepts a bare id or a Drive folder URL, because people paste whichever they
 // have to hand.
+//
+// A Drive id is at least 15 characters, and the length is load-bearing in both
+// directions. Too short means a typo or a truncated paste, and a short id is
+// worse than none: the folder is accepted, watched, and then matches nothing,
+// with no error anywhere to explain the silence.
+const DRIVE_ID = "[A-Za-z0-9_-]{15,}";
+
 export function folderIdFrom(input) {
-  const s = String(input || "").trim();
+  // trim() does not remove zero-width or non-breaking spaces. They survive a
+  // copy out of a chat message or a document, show nothing on screen, and stop
+  // the id pattern dead at the point they appear — so a pasted link silently
+  // becomes a truncated id rather than being refused.
+  const s = String(input || "").replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "").trim();
   if (!s) return null;
-  const m = s.match(/\/folders\/([A-Za-z0-9_-]+)/) || s.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  const m = s.match(new RegExp("/folders/(" + DRIVE_ID + ")"))
+    || s.match(new RegExp("[?&]id=(" + DRIVE_ID + ")"));
   if (m) return m[1];
-  return /^[A-Za-z0-9_-]{10,}$/.test(s) ? s : null;
+  return new RegExp("^" + DRIVE_ID + "$").test(s) ? s : null;
 }

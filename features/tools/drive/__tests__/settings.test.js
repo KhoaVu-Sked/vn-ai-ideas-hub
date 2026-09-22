@@ -41,3 +41,28 @@ test("something that is not a folder reference is refused", () => {
   expect(folderIdFrom("short")).toBe(null);
   expect(folderIdFrom("https://example.com/nothing")).toBe(null);
 });
+
+test("a link carrying a short id is refused rather than watched", () => {
+  // The URL branch used to take whatever followed /folders/, so a truncated
+  // link produced a one-character id. The folder was then accepted, watched,
+  // and matched nothing — the scan reports all clear and nobody learns why.
+  expect(folderIdFrom("https://drive.google.com/drive/folders/F")).toBe(null);
+  expect(folderIdFrom("https://drive.google.com/drive/folders/1AbCdEfGhIjKlM")).toBe(null);
+  expect(folderIdFrom("https://drive.google.com/open?id=F")).toBe(null);
+});
+
+test("fifteen characters is an id, fourteen is not", () => {
+  expect(folderIdFrom("123456789012345")).toBe("123456789012345");
+  expect(folderIdFrom("12345678901234")).toBe(null);
+});
+
+test("invisible characters in a pasted link do not truncate the id", () => {
+  // Zero-width and non-breaking spaces survive trim(), show nothing on screen,
+  // and stop the id pattern where they sit — turning a good link into a short
+  // id that is accepted and then matches nothing.
+  const id = "1AbCdEfGhIjKlMnOpQ";
+  for (const ch of ["\u200B", "\u200C", "\u200D", "\uFEFF", "\u00A0"]) {
+    expect(folderIdFrom(`https://drive.google.com/drive/folders/1AbCdEf${ch}GhIjKlMnOpQ`)).toBe(id);
+    expect(folderIdFrom(`${ch}${id}${ch}`)).toBe(id);
+  }
+});
