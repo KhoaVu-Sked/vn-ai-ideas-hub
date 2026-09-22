@@ -393,3 +393,80 @@ a {
   0%   { transform: scale(1); opacity: 0.45; }
   100% { transform: scale(1.4); opacity: 0; }
 }
+
+/* ── Drive Sharing Check results ──────────────────────────────────
+   Each row carries six things: severity, name, folder trail, the sharing
+   sentence, owner and created date, plus an action.
+
+   This app has no width-based media queries anywhere — globals.css otherwise
+   holds only prefers-reduced-motion — so introducing the first breakpoint is a
+   convention change, not a layout detail. The row is built to not need one: the
+   rail and the action hold their width, the content column takes what is left,
+   and the owner/created pair wraps inside it when there is no room. */
+.drive-row {
+  display: grid;
+  grid-template-columns: 3px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0 14px;
+  padding: 11px 15px 11px 0;
+}
+/* Only between rows. :first-of-type cannot express this — the pager above the
+   list is a div too, so it, not the first row, is the first of its type, and
+   the first row drew a rule directly under the pager's own bottom border. */
+.drive-row + .drive-row { border-top: 1px solid var(--line); }
+.drive-rail { align-self: stretch; border-radius: 0 3px 3px 0; min-height: 40px; }
+
+/* Owner and created. Labelled rather than run together, so neither is mistaken
+   for the other on a row where the owner is a date-shaped address. */
+.drive-meta {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 3px 14px; margin-top: 5px;
+  font-size: 12px; color: var(--body);
+}
+.drive-meta > span { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; }
+.drive-meta i { font-style: normal; color: var(--faint); }
+.drive-meta b { font-weight: 400; overflow-wrap: anywhere; }
+
+/* A trail of folders, each one its own link. Wraps mid-trail on a narrow
+   screen rather than pushing the row wider than the card. */
+.drive-trail { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; margin-top: 3px; }
+.drive-trail a { font-size: 12px; color: var(--muted); text-decoration: none; }
+.drive-trail a:hover { color: var(--blue); text-decoration: underline; }
+.drive-trail span { font-size: 12px; color: var(--faint); }
+
+/* The severity bar. Each band is a filter toggle, so it is a real button with
+   a real focus ring — it is the primary way into a filtered list. */
+.drive-band {
+  border: none; padding: 0; cursor: pointer;
+  height: 100%; min-width: 3px;
+  transition: opacity 120ms ease;
+}
+.drive-band:hover { opacity: 0.82; }
+.drive-band:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.drive-chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  border: 1px solid var(--line); background: var(--card);
+  border-radius: 999px; padding: 5px 12px 5px 10px;
+  font-size: 12.5px; color: var(--muted); cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.drive-chip:hover { border-color: var(--faint); }
+.drive-chip[aria-pressed="true"] { border-color: currentColor; background: var(--bg); }
+.drive-chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.drive-chip b { font-size: 15px; font-weight: 800; }
+
+/* Folder search suggestions. Positioned against the input's wrapper. */
+.drive-suggest {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(11, 30, 73, 0.14);
+  max-height: 264px; overflow-y: auto; padding: 4px;
+}
+.drive-suggest button {
+  display: block; width: 100%; text-align: left;
+  border: none; background: none; border-radius: 7px;
+  padding: 8px 10px; cursor: pointer; font: inherit;
+}
+.drive-suggest button:hover, .drive-suggest button[data-active="true"] { background: var(--bg); }
+.drive-suggest button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
