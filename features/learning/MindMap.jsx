@@ -75,19 +75,21 @@ function blockHeight(rows) {
   return Math.max(54, rows * ROW_H + 20);
 }
 
-// Splits the tiers into a right and a left column (right takes the first half,
-// so the ladder still reads top-to-bottom down one side and then the other),
-// centres each column vertically, and returns where every hub lands plus how
+// Splits the tiers into a left and a right column. The LEFT column takes the
+// earlier half of the ladder, so the whole thing reads the way the ladder runs
+// — Intern at the top left, Principal at the bottom right — rather than
+// starting the sequence on the far side of the centre and working backwards.
+// Each column is centred vertically; returns where every hub lands plus how
 // tall the stage has to be to hold them.
 function layout(groups, openKey, visibleRows) {
   const half = Math.ceil(groups.length / 2);
-  const sides = { right: groups.slice(0, half), left: groups.slice(half) };
+  const sides = { left: groups.slice(0, half), right: groups.slice(half) };
   const rowsFor = (g) => (g.key === openKey ? visibleRows : 0);
   const sideHeight = (s) => sides[s].reduce((sum, g) => sum + blockHeight(rowsFor(g)), 0);
-  const height = Math.max(MIN_H, Math.max(sideHeight("right"), sideHeight("left")) + PAD_Y * 2);
+  const height = Math.max(MIN_H, Math.max(sideHeight("left"), sideHeight("right")) + PAD_Y * 2);
 
   const place = {};
-  ["right", "left"].forEach((s) => {
+  ["left", "right"].forEach((s) => {
     let y = (height - sideHeight(s)) / 2;
     sides[s].forEach((g) => {
       const h = blockHeight(rowsFor(g));
