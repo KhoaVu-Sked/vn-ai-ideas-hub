@@ -5,16 +5,27 @@
 // Learner Dashboard (features/learning/LearnerDashboardPage.jsx).
 //
 // Shape: the track sits in the middle, each seniority tier branches off it
-// (right side first, then left, so the two halves balance), and opening a
-// tier fans that tier's own courses out beside it. One tier open at a time —
-// the rest dim rather than disappear, so the whole roadmap stays readable
-// while one part of it is in focus.
+// (earlier tiers on the left, so the ladder reads the way it runs), and
+// opening a tier fans out three levels deep —
+//
+//     Intern  ->  what you can do after  ->  the course that gets you there
+//
+// The middle level is the course's own `outcome` copy, which is the reason
+// to take it; the course itself is the endpoint, and links out to the real
+// thing. A course with no outcome written skips the middle level rather than
+// inventing one — its own node takes that place instead.
+//
+// One tier open at a time — the rest dim rather than disappear, so the whole
+// roadmap stays readable while one part of it is in focus. The centre slides
+// away from whichever side is open, which is what buys the three-deep chain
+// enough room to fit without the stage having to scroll.
 //
 // Two independent encodings, deliberately kept apart: the branch COLOUR is
-// the tier (a fixed hue per rung of the ladder), and the dot on each leaf is
-// that course's own STATUS (shared.js's STATUS_META, the same vocabulary the
-// List view and every status pill in this feature already use). Mixing the
-// two into one colour would make neither readable.
+// the tier (a fixed hue per rung of the ladder), and the dot is that course's
+// own STATUS (shared.js's STATUS_META, the same vocabulary the List view and
+// every status pill in this feature already use). Mixing the two into one
+// colour would make neither readable. The dot sits on the outcome node, where
+// it answers "can I do this yet?" rather than just labelling a row.
 //
 // Laid out in fixed pixels inside a horizontally scrollable stage rather than
 // scaling with the container: the node pills are text, and text that scales
@@ -42,16 +53,23 @@ const OTHER_COLOR = "#5e687a";
 
 const STAGE_W = 1000;
 const CENTER_R = 59;       // centre disc radius — branches start at its edge
-const HUB_DX = 172;        // centre -> tier hub
-const LEAF_DX = 132;       // tier hub -> its course leaves
-const LEAF_W = 190;
-const ROW_H = 40;
+const HUB_DX = 158;        // centre -> tier hub
+const OUT_DX = 150;        // tier hub -> "what you can do after"
+const COURSE_DX = 190;     // outcome -> the course itself
+const OUT_W = 172;
+const COURSE_W = 148;
+const ROW_H = 56;
 const MIN_H = 330;
 const PAD_Y = 30;
-// How many leaves a tier shows before offering "+N more" — a tier can hold 30+
-// courses (Core Competency's own tiers do), and a stage tall enough for all of
-// them by default would bury the rest of the map.
-const COLLAPSED_LEAVES = 8;
+// The open branch needs HUB_DX + OUT_DX + COURSE_DX + COURSE_W of room on its
+// own side, which is more than half the stage. Sliding the centre away from
+// the open side buys exactly that, and costs the closed side only what its
+// (single-level) hubs actually use.
+const SHIFT = 168;
+// How many outcomes a tier shows before offering "Show N more" — a tier can
+// hold 30+ courses (Core Competency's own tiers do), and a stage tall enough
+// for all of them by default would bury the rest of the map.
+const COLLAPSED_LEAVES = 6;
 
 // Flat tangents at both ends, so a branch leaves the centre and arrives at its
 // node horizontally — that's what makes a drawn mind map read as branching
@@ -61,12 +79,27 @@ const sCurve = (x1, y1, x2, y2) => {
   return `M ${x1} ${y1} C ${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`;
 };
 
-const leafBase = {
+// Two lines of node text, then an ellipsis — enough for an outcome sentence or
+// a long course title without letting one node set the row height for all of them.
+const clamp2 = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.3 };
+
+// The capability — the reason to take the course. Carries the status dot and a
+// slab of its branch's colour on the edge facing the hub it came from.
+const outcomeBase = {
   position: "absolute", display: "inline-flex", alignItems: "flex-start", gap: 8,
-  width: LEAF_W, padding: "6px 12px", borderRadius: 999, border: "1px solid var(--line)",
+  width: OUT_W, padding: "7px 12px", borderRadius: 12, border: "1px solid var(--line)",
   background: "var(--card)", textAlign: "left", textDecoration: "none",
   fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "var(--ink)",
   boxShadow: "0 2px 8px rgba(10,22,44,.07)",
+};
+
+// The course itself — quieter than the capability it delivers, since it's the
+// means rather than the point.
+const courseBase = {
+  position: "absolute", display: "inline-flex", alignItems: "center", gap: 6,
+  width: COURSE_W, padding: "6px 11px", borderRadius: 999, border: "1px solid var(--line)",
+  background: "var(--bg)", textAlign: "left", textDecoration: "none",
+  fontFamily: "inherit", fontSize: 11, fontWeight: 600, color: "var(--body)",
 };
 
 // Vertical space one tier's block needs: its own hub row, or the fanned-out
@@ -133,7 +166,10 @@ export function JourneyMindMap({ courses }) {
   const visibleRows = shown.length + (hidden > 0 ? 1 : 0);
 
   const { height, place } = layout(groups, open, visibleRows);
-  const cx = STAGE_W / 2;
+  // Slide the centre away from whichever side is open, so the open branch gets
+  // the room its three levels need (see SHIFT).
+  const openSide = openGroup ? place[openGroup.key].side : null;
+  const cx = Math.round(STAGE_W / 2 + (openSide === "left" ? SHIFT : openSide === "right" ? -SHIFT : 0));
   const cy = Math.round(height / 2);
 
   const toggle = (key) => {
@@ -190,44 +226,72 @@ export function JourneyMindMap({ courses }) {
 
     if (!isOpen) return;
 
-    const lx = hx + dir * LEAF_DX;
+    const ox = hx + dir * OUT_DX;        // "what you can do after"
+    const kx = ox + dir * COURSE_DX;     // the course that gets you there
     const rowY = (j) => Math.round(y - ((visibleRows - 1) / 2) * ROW_H + j * ROW_H);
 
     shown.forEach((c, j) => {
       const ly = rowY(j);
       const meta = STATUS_META[c.status] || STATUS_META.not_started;
+      const hasOutcome = Boolean(c.outcome);
+
       paths.push(
         <path
           key={`twig-${c.id}`}
-          d={sCurve(hx + dir * 4, y, lx, ly)}
+          d={sCurve(hx + dir * 4, y, ox, ly)}
           fill="none" stroke={g.color} strokeWidth={1.5} opacity={0.42}
         />
       );
-      const inner = (
-        <>
-          <StatusDot status={c.status} />
-          <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.3 }}>
-            {c.title}
-          </span>
-        </>
-      );
-      const style = { ...leafBase, left: lx, top: ly, transform: anchor };
-      nodes.push(c.link ? (
-        <a
-          key={`leaf-${c.id}`}
-          href={c.link}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={`${c.title} — ${meta.label}`}
-          style={style}
+
+      // The course node — clickable whenever the catalog has a link for it.
+      const courseNode = (x, withDot) => {
+        const inner = (
+          <>
+            {withDot && <StatusDot status={c.status} />}
+            <span style={clamp2}>{c.title}</span>
+            {c.link && <span aria-hidden="true" style={{ marginLeft: "auto", opacity: 0.55 }}>↗</span>}
+          </>
+        );
+        const style = { ...courseBase, left: x, top: ly, transform: anchor, alignItems: withDot ? "flex-start" : "center" };
+        return c.link ? (
+          <a key={`course-${c.id}`} href={c.link} target="_blank" rel="noopener noreferrer" title={`${c.title} — ${meta.label}`} style={style}>
+            {inner}
+          </a>
+        ) : (
+          <div key={`course-${c.id}`} title={`${c.title} — ${meta.label}`} style={style}>
+            {inner}
+          </div>
+        );
+      };
+
+      // No outcome written for this course: its own node takes the middle
+      // level rather than showing an empty capability.
+      if (!hasOutcome) {
+        nodes.push(courseNode(ox, true));
+        return;
+      }
+
+      nodes.push(
+        <div
+          key={`outcome-${c.id}`}
+          title={`${c.outcome} — ${meta.label}`}
+          style={{
+            ...outcomeBase, left: ox, top: ly, transform: anchor,
+            [dir > 0 ? "borderLeft" : "borderRight"]: `3px solid ${g.color}`,
+          }}
         >
-          {inner}
-        </a>
-      ) : (
-        <div key={`leaf-${c.id}`} title={`${c.title} — ${meta.label}`} style={style}>
-          {inner}
+          <StatusDot status={c.status} />
+          <span style={clamp2}>{c.outcome}</span>
         </div>
-      ));
+      );
+      paths.push(
+        <path
+          key={`stem-${c.id}`}
+          d={sCurve(ox + dir * OUT_W, ly, kx, ly)}
+          fill="none" stroke={g.color} strokeWidth={1.5} opacity={0.3}
+        />
+      );
+      nodes.push(courseNode(kx, false));
     });
 
     if (hidden > 0) {
@@ -235,7 +299,7 @@ export function JourneyMindMap({ courses }) {
       paths.push(
         <path
           key={`twig-more-${g.key}`}
-          d={sCurve(hx + dir * 4, y, lx, ly)}
+          d={sCurve(hx + dir * 4, y, ox, ly)}
           fill="none" stroke={g.color} strokeWidth={1.5} opacity={0.42}
         />
       );
@@ -245,9 +309,9 @@ export function JourneyMindMap({ courses }) {
           type="button"
           onClick={() => setShowAll(true)}
           style={{
-            ...leafBase, left: lx, top: ly, transform: anchor, cursor: "pointer",
+            ...outcomeBase, left: ox, top: ly, transform: anchor, cursor: "pointer",
+            alignItems: "center", justifyContent: "center",
             borderStyle: "dashed", background: "var(--bg)", color: "var(--muted)", fontWeight: 700,
-            justifyContent: "center",
           }}
         >
           Show {hidden} more
