@@ -265,6 +265,14 @@ const segBtn = (active) => ({
   background: active ? "#fff" : "transparent", color: active ? "var(--navy)" : "rgba(255,255,255,0.85)",
 });
 const calendarPillBase = { display: "inline-flex", alignItems: "center", gap: 5, borderRadius: 999, padding: "5px 12px", fontSize: 11, fontWeight: 700 };
+// The pill-shaped dropdown used for both the track picker and the "explore
+// earlier levels" picker in the List header — same look, two independent
+// values, so it's factored out once rather than hand-copied a second time.
+const journeySelect = {
+  appearance: "none", WebkitAppearance: "none", fontFamily: "inherit",
+  border: "1px solid var(--line)", background: "var(--card)", color: "var(--ink)",
+  borderRadius: 999, padding: "7px 30px 7px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+};
 
 // One stop on the tier rail. `state` is "done" (assumed fulfilled, or
 // actually finished), "current" (in progress — ring shows `pct`), or
@@ -779,6 +787,12 @@ export default function JourneyPage() {
   // No "all tracks" option — always one specific enrolled track (its id),
   // auto-picked below once trackOptions is known; "" only until then.
   const [selectedTrack, setSelectedTrack] = useState("");
+  // "Explore earlier levels" — browsing a tier strictly before the account's
+  // own raw position, within the selected track. null means not exploring
+  // (the List shows the normal current/early-access view). See
+  // earlierTiers/exploreJourney below for why this needs no gating of its
+  // own beyond "is there an earlier tier at all."
+  const [exploreLevel, setExploreLevel] = useState(null);
   const [position, setPosition] = useState(null);
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false);
   const [annualReviewDate, setAnnualReviewDate] = useState(DEFAULT_ANNUAL_REVIEW_MONTH_DAY);
@@ -908,6 +922,21 @@ export default function JourneyPage() {
   // relevant to see right now.
   const visiblePosition = effectivePosition(journey, position);
   const visibleJourney = filteredJourney.filter((c) => isVisibleNow(c, position, visiblePosition));
+  // "Explore earlier levels" (the level picker in the List header, below) —
+  // every tier strictly before the account's own raw position. Unlike early
+  // access, nothing here is earned or unlocked: a tier below `position` was
+  // already assumed fulfilled the moment the account was promoted to it, so
+  // it's just always available to look back at, independent of
+  // tierJustFinished/atCeiling (those still nudge toward it at the moment
+  // it's most likely to matter — see the milestone banners below — they
+  // just don't gate it). exploreJourney is null while not exploring
+  // (distinct from an empty array, which means "exploring a tier with
+  // nothing in this track") — full Start/quiz interactivity, same as
+  // visibleJourney: the backend never actually gated by tier, only this
+  // page's own display did.
+  const posIdx = position ? POSITION_ORDER.indexOf(position) : -1;
+  const earlierTiers = posIdx > 0 ? POSITION_ORDER.slice(0, posIdx) : [];
+  const exploreJourney = exploreLevel ? filteredJourney.filter((c) => isExpectedByNow(c, exploreLevel)) : null;
   // The "max +1 stage" cap is flat, not recursive (effectivePosition,
   // shared.js) — so someone who finishes the +1 stage TOO hits a wall:
   // nothing new becomes visible until an admin reassigns their position.
@@ -1150,27 +1179,43 @@ export default function JourneyPage() {
                   <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 22, letterSpacing: -0.3, color: "var(--ink)", margin: 0 }}>Your Journey</h1>
                   {journey.length > 0 && (
                     <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-                      <select
-                        value={selectedTrack}
-                        onChange={(e) => setSelectedTrack(e.target.value)}
-                        style={{
-                          appearance: "none", WebkitAppearance: "none", fontFamily: "inherit",
-                          border: "1px solid var(--line)", background: "var(--card)", color: "var(--ink)",
-                          borderRadius: 999, padding: "7px 30px 7px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-                        }}
-                      >
+                      <select value={selectedTrack} onChange={(e) => setSelectedTrack(e.target.value)} style={journeySelect}>
                         {trackOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                      <span aria-hidden="true" style={{ position: "absolute", right: 13, fontSize: 9, color: "var(--muted)", pointerEvents: "none" }}>▾</span>
+                    </div>
+                  )}
+                  {/* "Explore earlier levels" — only offered once there's at
+                      least one tier behind the account's own raw position.
+                      Picking an earlier level swaps the List body below to
+                      that tier's own courses (still fully interactive); picking
+                      the current one back returns to normal. See
+                      earlierTiers/exploreJourney above for why this needs no
+                      "finish your tier first" gate. */}
+                  {journey.length > 0 && earlierTiers.length > 0 && (
+                    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                      <select
+                        value={exploreLevel || position}
+                        onChange={(e) => setExploreLevel(e.target.value === position ? null : e.target.value)}
+                        style={journeySelect}
+                      >
+                        {earlierTiers.map((p) => <option key={p} value={p}>Explore: {POSITION_LABEL[p] || p}</option>)}
+                        <option value={position}>{POSITION_LABEL[position] || position} (current)</option>
                       </select>
                       <span aria-hidden="true" style={{ position: "absolute", right: 13, fontSize: 9, color: "var(--muted)", pointerEvents: "none" }}>▾</span>
                     </div>
                   )}
                 </div>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
-                  {position
-                    ? visiblePosition !== position
+                  {exploreLevel ? (
+                    `Exploring ${POSITION_LABEL[exploreLevel] || exploreLevel} — courses you've already moved past, in ${trackTags[0] || "this track"}. Nothing here affects your ${POSITION_LABEL[position] || position} completion.`
+                  ) : position ? (
+                    visiblePosition !== position
                       ? `Showing ${POSITION_LABEL[position] || position} — you've finished it and unlocked early access to ${POSITION_LABEL[visiblePosition] || visiblePosition} — in ${trackTags[0] || "this track"}.`
                       : `Showing ${POSITION_LABEL[position] || position} — your current stage — in ${trackTags[0] || "this track"}.`
-                    : `Ordered intern → principal, in ${trackTags[0] || "this track"}.`}
+                  ) : (
+                    `Ordered intern → principal, in ${trackTags[0] || "this track"}.`
+                  )}
                 </p>
               </div>
               {isStagingHost && (journey.length > 0 || calendarConnected) && (
@@ -1200,6 +1245,14 @@ export default function JourneyPage() {
                   ) : (
                     <>You've completed every course in {POSITION_LABEL[position] || position} — you've reached the top of the ladder, and you're all set for your annual review on {formatMonthDay(annualReviewDate)}.</>
                   )}
+                  {earlierTiers.length > 0 && (
+                    <>
+                      {" "}
+                      <button type="button" onClick={() => setExploreLevel(earlierTiers[earlierTiers.length - 1])} style={{ ...quickAction, color: "var(--navy)", textDecoration: "underline" }}>
+                        Curious what {POSITION_LABEL[earlierTiers[earlierTiers.length - 1]] || earlierTiers[earlierTiers.length - 1]} courses look like? Explore →
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -1212,6 +1265,14 @@ export default function JourneyPage() {
                 <span aria-hidden="true" style={milestoneIcon}>🎉</span>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--navy)", lineHeight: 1.5 }}>
                   You've completed everything visible through {POSITION_LABEL[visiblePosition] || visiblePosition} — the next stage unlocks once your manager updates your level.
+                  {earlierTiers.length > 0 && (
+                    <>
+                      {" "}
+                      <button type="button" onClick={() => setExploreLevel(earlierTiers[earlierTiers.length - 1])} style={{ ...quickAction, color: "var(--navy)", textDecoration: "underline" }}>
+                        In the meantime, explore {POSITION_LABEL[earlierTiers[earlierTiers.length - 1]] || earlierTiers[earlierTiers.length - 1]} courses →
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -1219,6 +1280,20 @@ export default function JourneyPage() {
               <div style={{ fontSize: 13, color: "var(--muted)" }}>Nothing here yet — enroll in a track from the Learning Hub to start your journey.</div>
             ) : filteredJourney.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>No courses in this track.</div>
+            ) : exploreLevel ? (
+              // Same table, same actions — a lower tier isn't read-only, it's
+              // just outside the account's own graded expectation (see the
+              // comment above exploreJourney's own definition). Switching the
+              // level picker back to the current tier (its own option in that
+              // same dropdown) is how this exits, so there's no separate
+              // "back" control to keep in sync with it.
+              exploreJourney.length === 0 ? (
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>
+                  No courses in {trackTags[0] || "this track"} at the {POSITION_LABEL[exploreLevel] || exploreLevel} level.
+                </div>
+              ) : (
+                <JourneyTable courses={exploreJourney} onUnschedule={(course) => setUnscheduleTarget(course)} onStartCourse={requestStartCourse} onSilentStart={startIfNoConflict} />
+              )
             ) : visibleJourney.length === 0 ? (
               // The track has courses, just none at or below the current stage yet
               // (e.g. a track whose earliest tier is above where this account is) —
