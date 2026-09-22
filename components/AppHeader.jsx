@@ -112,9 +112,12 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
       )}
 
       {/* Sits between the search box and "+", so the two ideas-only controls
-          stay adjacent and the way out of the hub reads as part of the row. */}
+          stay adjacent and the way out of the hub reads as part of the row.
+          Same onboarding-aware destination as the in-hub nav link above
+          (:78) — otherwise an already-enrolled account detours through the
+          track list every time it crosses over from here. */}
       {inIdeas && (
-        <Link href="/learning" className="hdr-cross">🎓 Learning Hub</Link>
+        <Link href={me?.onboarded ? "/learning/journey" : "/learning"} className="hdr-cross">🎓 Learning Hub</Link>
       )}
 
       {inIdeas && (

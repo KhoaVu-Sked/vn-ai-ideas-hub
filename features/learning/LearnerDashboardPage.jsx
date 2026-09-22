@@ -143,15 +143,23 @@ function SkillRow({ skill, dots }) {
 }
 
 // An icon + title + description row — mockup's ".nextrow" (What's next).
-function NextRow({ icon, title, detail }) {
+// `href` makes the row a real link (styled identically to a plain div) —
+// "Finish X" below uses it, the "outcome" row from a past completion
+// doesn't (nothing to click into there, it's a look-back, not a next step).
+function NextRow({ icon, title, detail, href, onClick }) {
+  const Tag = href ? Link : "div";
   return (
-    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+    <Tag
+      href={href}
+      onClick={onClick}
+      style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 0", borderTop: "1px solid var(--line)", textDecoration: "none", color: "inherit" }}
+    >
       <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--bg)", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>{icon}</div>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{title}</div>
         <div style={{ fontSize: 12, color: "var(--muted)" }}>{detail}</div>
       </div>
-    </div>
+    </Tag>
   );
 }
 
@@ -506,6 +514,8 @@ export default function LearnerDashboardPage() {
                               icon="📘"
                               title={`Finish "${nextCourse.title}"`}
                               detail={nextCourse.target_date ? `Target ${fmtDate(nextCourse.target_date)}` : nextCourse.est_hours != null ? `~${nextCourse.est_hours} hrs` : "No target set"}
+                              href={`/learning/journey/${nextCourse.id}/quiz`}
+                              onClick={() => { if (nextCourse.status !== "in_progress" && nextCourse.status !== "complete") startIfNoConflict(nextCourse.id); }}
                             />
                           )}
                           {lastCompletionCourse?.outcome && (

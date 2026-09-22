@@ -44,6 +44,7 @@ import useRevalidateOnFocus from "@/lib/useRevalidateOnFocus";
 import AutoScheduleModal from "@/features/learning/AutoScheduleModal";
 import ConfirmModal from "@/features/learning/ConfirmModal";
 import SwapStartModal from "@/features/learning/SwapStartModal";
+import { TrackCard, TrackPreview } from "@/features/learning/TrackBrowser";
 import {
   card, errBanner, STATUS_META, statusPill, POSITION_LABEL, POSITION_ORDER,
   fmtDate, relTime,
@@ -395,14 +396,17 @@ function JourneyHero({ me, position, visiblePosition, atCeiling, trackTags, hasT
         {/* Permanent home for Calendar-connect — Get Started's own Calendar
             step is skippable, so this is where "do it later" actually
             happens. Same /api/calendar/connect route Auto Schedule's own
-            connect flow uses, but back to the Learning Hub landing page
-            rather than reopening Auto Schedule here. */}
+            connect flow uses, returning here rather than to the Learning
+            Hub — an onboarded account never sees that page anymore (it
+            redirects straight back here — see LearningHubPage.jsx), so
+            sending the round trip through it just delayed the connected
+            state reaching the user by one hop. */}
         {calendarConnected ? (
           <span style={{ ...calendarPillBase, border: "1px solid rgba(255,255,255,0.32)", background: "rgba(255,255,255,0.12)", color: "#fff" }}>
             ✓ Google Calendar connected
           </span>
         ) : (
-          <a href="/api/calendar/connect?returnTo=/learning" style={{ ...calendarPillBase, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.16)", color: "#fff", textDecoration: "none" }}>
+          <a href="/api/calendar/connect?returnTo=/learning/journey" style={{ ...calendarPillBase, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.16)", color: "#fff", textDecoration: "none" }}>
             📅 Connect Google Calendar
           </a>
         )}
@@ -669,6 +673,92 @@ function KnowledgeArtifactsCard({ completions, inProgressCourses }) {
   );
 }
 
+// Persistent view of what Auto Schedule has actually booked — until now,
+// the only way to see that was AutoScheduleModal's own one-time "Booked N
+// sessions..." result screen, or Google Calendar itself. No extra fetch:
+// target_date/has_scheduled_session are already on every course getJourney()
+// returns (that's what already drives each row's own "Remove from
+// calendar" action, below) — this just filters the same list down to the
+// courses with a real booking, soonest first. Hidden entirely with nothing
+// booked, so a learner who's never touched Auto Schedule sees no new card.
+// Scoped to the selected track, matching Up next/Knowledge artifacts next
+// to it, not every enrolled track at once.
+function ScheduledSessionsCard({ courses, onUnschedule }) {
+  const scheduled = courses
+    .filter((c) => c.has_scheduled_session && c.target_date)
+    .sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
+  if (scheduled.length === 0) return null;
+  return (
+    <section style={card}>
+      <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 15, color: "var(--ink)", margin: "0 0 2px" }}>Scheduled sessions</h2>
+      <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 12px" }}>What Auto Schedule has booked on your calendar</p>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {scheduled.map((c, i) => (
+          <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: i > 0 ? "10px 0 0" : "0 0 10px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 2 }}>{c.title}</div>
+              <div style={{ fontSize: 11.5, color: "var(--muted)" }}>Next session {fmtDate(c.target_date)}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onUnschedule(c)}
+              title="Delete this course's calendar event(s) and clear its target date"
+              style={{ flexShrink: 0, background: "none", border: "none", color: "var(--muted)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", padding: 0 }}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── Tracks tab: browse/enroll — the former /learning post-onboarding page,
+// folded in here (see the redirect in LearningHubPage.jsx) so switching
+// between "what should I enroll in" and "what am I working on" never means
+// leaving Journey. `tracks` is null until first fetched (lazily, only once
+// this tab is actually opened — the default "My journey" tab shouldn't pay
+// for a fetch most page loads never use). Its own error state, deliberately
+// not Journey's own `err` above (which carries calendar/unschedule
+// failures) — an enrollment failure has nothing to do with those.
+function TracksTab({ tracks, err, onPreview }) {
+  if (tracks === null) return <Loading label="Loading tracks" />;
+  const enrolledTracks = tracks.filter((t) => t.assigned);
+  return (
+    <>
+      {err && <div style={{ ...errBanner, marginBottom: 14 }}>{err}</div>}
+      <section style={{ ...card, marginBottom: 18 }}>
+        <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", margin: "0 0 4px" }}>Your tracks</h2>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 18px" }}>Tracks you're enrolled in.</p>
+        {enrolledTracks.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>You don't have any tracks yet.</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+            {enrolledTracks.map((t) => <TrackCard key={t.id} track={t} onPreview={onPreview} />)}
+          </div>
+        )}
+      </section>
+      <section style={card}>
+        <h2 style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18, color: "var(--ink)", margin: "0 0 4px" }}>Suggested tracks</h2>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 18px" }}>Pick a track to preview its roadmap, and enroll when you're ready to start it.</p>
+        {tracks.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>No tracks yet.</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+            {tracks.map((t) => <TrackCard key={t.id} track={t} onPreview={onPreview} />)}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+const journeyTab = (active) => ({
+  border: "none", background: "none", cursor: "pointer", padding: "8px 14px", fontSize: 13, fontWeight: 700,
+  color: active ? "var(--blue)" : "var(--muted)", borderBottom: `2px solid ${active ? "var(--blue)" : "transparent"}`, marginBottom: -1,
+});
+
 export default function JourneyPage() {
   const { user: me, refresh } = useSession();
   const router = useRouter();
@@ -693,6 +783,38 @@ export default function JourneyPage() {
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false);
   const [annualReviewDate, setAnnualReviewDate] = useState(DEFAULT_ANNUAL_REVIEW_MONTH_DAY);
   const [calendarConnected, setCalendarConnected] = useState(false);
+  // "My Journey" (default) vs "Tracks" (browse/enroll — see TracksTab,
+  // above). Starts at the safe default rather than reading
+  // window.location.search directly in the initializer, since that would
+  // run during server rendering too, where `window` doesn't exist — the
+  // effect below corrects it client-side on mount instead.
+  const [tab, setTab] = useState("journey");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "tracks") setTab("tracks");
+  }, []);
+  // Tracks tab's own data — null until first fetched, only once that tab is
+  // actually opened (tracksErr, below, is its own error state, separate
+  // from Journey's own `err`: an enrollment failure has nothing to do with
+  // a calendar/unschedule one).
+  const [tracks, setTracks] = useState(null);
+  const [tracksErr, setTracksErr] = useState("");
+  const [previewId, setPreviewId] = useState(null);
+
+  const loadTracks = useCallback(async () => {
+    setTracksErr("");
+    try { const { tracks: t } = await api("/api/tracks"); setTracks(t); } catch (e) { setTracksErr(e.message); }
+  }, []);
+  useEffect(() => { if (tab === "tracks" && tracks === null) loadTracks(); }, [tab, tracks, loadTracks]);
+
+  // A successful enroll (from the Tracks tab's TrackPreview modal) needs
+  // Journey's own course list refreshed too — otherwise the newly-enrolled
+  // track's courses wouldn't show up on "My Journey" until the next tab-
+  // focus revalidation. Optimistic local patch to `tracks` first (so the
+  // card/modal reflect "Enrolled" immediately), the real reload after.
+  const onTrackAssignedChange = (id, assigned) => {
+    setTracks((ts) => (ts ? ts.map((t) => (t.id === id ? { ...t, assigned } : t)) : ts));
+    if (assigned) load();
+  };
 
   // The admin-editable annual review date (Team view's header — TeamPage.jsx)
   // that Auto Schedule defaults its "Complete by" field to. Fetched once on
@@ -707,31 +829,32 @@ export default function JourneyPage() {
       .catch(() => {});
   }, [me]);
 
+  // Not onboarded at all: this page has nothing to show (no tracks to
+  // filter by, an empty course list) — send back to /learning, which is
+  // itself the onboarding gate (mirrors the redirect LearningHubPage now
+  // does the other direction, for an onboarded account landing there).
+  // Preserves the query string, so a `?calendar=` outcome that reaches this
+  // page before any track is enrolled (Auto Schedule's own inline connect
+  // prompt defaults its returnTo here — see the effect below) still reaches
+  // the wizard's own `?calendar=` handling (LearningHubPage.jsx) instead of
+  // being dropped.
+  useEffect(() => {
+    if (me === undefined || me.onboarded) return;
+    router.replace(`/learning${window.location.search}`);
+  }, [me]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Landing back here from /api/calendar/connect/callback — ?calendar=connected
   // means the consent just succeeded, so reopen Auto Schedule right where the
   // learner left off rather than making them click the wand a second time.
   // Any other value is a real failure, shown as the page's own error banner.
   // Read via window.location rather than next/navigation's useSearchParams so
   // this client component doesn't need a Suspense boundary just for this.
-  //
-  // The Get Started wizard's own Calendar step passes ?returnTo=/learning
-  // (app/api/calendar/connect/route.js), so it lands there directly and
-  // never touches this page in the common case. This bounce is a defensive
-  // fallback for the one other way a not-yet-onboarded visitor can still
-  // reach Google Calendar-connect while sitting on THIS page: Auto
-  // Schedule's own inline prompt (a 409 mid-modal), which doesn't pass
-  // returnTo and defaults back here on purpose (see 4.7's own comment) — if
-  // that happens before the account has enrolled in a track, send them to
-  // /learning instead, same param, so the wizard is what reopens and
-  // resumes rather than this page reacting to a param the wizard actually
-  // owns. Gated on `me` actually having loaded, so a not-yet-resolved
-  // session can't misread as "not onboarded" and bounce someone who's
-  // really done with setup.
+  // Only reached once onboarded — the redirect above handles a not-yet-
+  // onboarded visitor before this ever runs.
   useEffect(() => {
-    if (me === undefined) return;
+    if (me === undefined || !me.onboarded) return;
     const cal = new URLSearchParams(window.location.search).get("calendar");
     if (!cal) return;
-    if (!me.onboarded) { router.replace(`/learning?calendar=${encodeURIComponent(cal)}`); return; }
     if (cal === "connected") setAutoScheduleOpen(true);
     else if (cal !== "cancelled") setErr("Couldn't connect Google Calendar — try again from the Auto Schedule button.");
     window.history.replaceState({}, "", window.location.pathname);
@@ -1005,6 +1128,20 @@ export default function JourneyPage() {
               nextTierCoreHoursTotal={nextTierCoreHoursTotal}
               calendarConnected={calendarConnected}
             />
+
+            {/* Tabs — "Tracks" absorbs what used to be its own page
+                (LearningHubPage.jsx's post-onboarding browse UI), so
+                enrolling in more tracks never means leaving Journey. */}
+            <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)", margin: "0 0 18px" }}>
+              {[["journey", "My Journey"], ["tracks", "Tracks"]].map(([key, label]) => (
+                <button key={key} onClick={() => setTab(key)} style={journeyTab(tab === key)}>{label}</button>
+              ))}
+            </div>
+
+            <div key={tab} className="tab-panel">
+            {tab === "tracks" ? (
+              <TracksTab tracks={tracks} err={tracksErr} onPreview={setPreviewId} />
+            ) : (
             <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
             <section style={{ ...card, flex: "2 1 480px", minWidth: 0 }}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
@@ -1102,8 +1239,11 @@ export default function JourneyPage() {
               onAutoSchedule={() => setAutoScheduleOpen(true)}
               calendarConnected={calendarConnected}
             />
+            <ScheduledSessionsCard courses={filteredJourney} onUnschedule={(course) => setUnscheduleTarget(course)} />
             <KnowledgeArtifactsCard completions={recentCompletions} inProgressCourses={inProgressCourses} />
           </div>
+          </div>
+          )}
           </div>
           </>
         )}
@@ -1152,6 +1292,14 @@ export default function JourneyPage() {
           current={pendingSwap.current}
           onResolve={resolveSwap}
           onCancel={() => setPendingSwap(null)}
+        />
+      )}
+
+      {previewId && (
+        <TrackPreview
+          trackId={previewId}
+          onClose={() => setPreviewId(null)}
+          onAssignedChange={onTrackAssignedChange}
         />
       )}
     </div>

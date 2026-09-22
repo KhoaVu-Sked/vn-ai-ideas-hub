@@ -9,6 +9,7 @@
 
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
+import { useSession } from "@/features/auth/SessionProvider";
 
 const HUBS = [
   {
@@ -35,6 +36,11 @@ const HUBS = [
 ];
 
 export default function HubChooserPage() {
+  const { user: me } = useSession();
+  // Learning Hub's own href: straight to Your Journey once onboarded, same
+  // as AppHeader's in-hub nav link — otherwise an already-enrolled account
+  // detours through the track list every time it lands here.
+  const hubs = HUBS.map((h) => (h.href === "/learning" ? { ...h, href: me?.onboarded ? "/learning/journey" : "/learning" } : h));
   return (
     <>
       <AppHeader />
@@ -51,8 +57,8 @@ export default function HubChooserPage() {
         {/* auto-fit rather than a media query: the cards drop to one column
             when there isn't room for two, without picking a breakpoint. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
-          {HUBS.map((h) => (
-            <Link key={h.href} href={h.href} className="hub-card">
+          {hubs.map((h) => (
+            <Link key={h.name} href={h.href} className="hub-card">
               <span style={{ fontSize: 32, lineHeight: 1 }} aria-hidden="true">{h.glyph}</span>
               <span style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 20, color: "var(--ink)", marginTop: 14 }}>
                 {h.name}
