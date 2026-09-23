@@ -6,6 +6,23 @@
 
 import { DRIVE_API } from "./constants";
 
+/**
+ * Which suggestions cannot be told apart by name and owner alone.
+ *
+ * Drive lets two folders share a name, and a real search for "Test" came back
+ * with `Test Cases · owned by selliott@skedulo.com` twice. Both rows watch
+ * different folders and the list gave no way to know which. Only the ambiguous
+ * ones are worth the extra lookup, so they are found first.
+ */
+export function ambiguous(folders) {
+  const seen = new Map();
+  for (const f of folders || []) {
+    const key = `${f.name}\u0000${f.owner || ""}`;
+    seen.set(key, (seen.get(key) || 0) + 1);
+  }
+  return (folders || []).filter((f) => seen.get(`${f.name}\u0000${f.owner || ""}`) > 1);
+}
+
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 // Drive's query language takes single-quoted literals. A backslash escapes the
