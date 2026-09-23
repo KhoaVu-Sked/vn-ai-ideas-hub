@@ -18,7 +18,8 @@ import {
   normaliseSchedule, notifyEmailProblem, describeSchedule, SCHEDULE_PLACEHOLDER,
   FREQUENCIES, DAYS, usesHour, usesDay,
 } from "@/features/tools/drive/settings";
-import { searchFolders } from "@/features/tools/drive/search";
+import { searchFolders, ambiguous } from "@/features/tools/drive/search";
+import { resolveTrails, trailLabel } from "@/features/tools/drive/paths";
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 };
 const label = { fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: ".05em", textTransform: "uppercase" };
@@ -36,6 +37,7 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
   const [msg, setMsg] = useState("");
 
   const [hits, setHits] = useState([]);
+  const [where, setWhere] = useState({});   // folder id -> parent trail, for same-named hits
   const [searching, setSearching] = useState(false);
   const [active, setActive] = useState(-1);
   const [open, setOpen] = useState(false);
@@ -84,6 +86,15 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
         setHits(found);
         setActive(-1);
         setOpen(true);
+
+        // Only folders a name and owner cannot separate get located, so the
+        // common case still costs one request.
+        const same = ambiguous(found);
+        if (same.length) {
+          const trails = await resolveTrails(token, same);
+          if (cancelled) return;
+          setWhere(Object.fromEntries([...trails].map(([id, t]) => [id, trailLabel(t)])));
+        }
       } catch (e) {
         if (!cancelled && e.name !== "AbortError") setHits([]);
       } finally {
@@ -166,8 +177,10 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
   };
 
   // Choosing anything here is what turns "unset" into a schedule, so the patch
-  // is applied over the placeholder rather than over null.
+  // is applied over the placeholder rather than over null. The empty frequency
+  // is the way back: it clears the schedule from the file again.
   const setSchedule = (patch) => {
+    if (patch.frequency === "") { save({ ...settings, schedule: null }); return; }
     const base = settings.schedule || SCHEDULE_PLACEHOLDER;
     save({ ...settings, schedule: normaliseSchedule({ ...base, ...patch }) });
   };
@@ -264,6 +277,7 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
                   </span>
                   <span style={{ display: "block", fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
                     {already ? "Already watched" : f.ownedByMe ? "Yours" : `Owned by ${f.owner || "someone else"}`}
+                    {where[f.id] && ` — in ${where[f.id]}`}
                   </span>
                 </button>
               );
@@ -289,10 +303,11 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
             aria-label="How often the watcher checks"
             style={field}
           >
-            {/* Until someone picks, the file holds no schedule and the script's
-                own setting stands. Showing a frequency here before that would
-                claim a cadence this panel has not set. */}
-            {!chosen && <option value="">Leave as the script has it</option>}
+            {/* Always offered, not only before a choice. Hiding it once a
+                schedule existed made picking one a one-way door: the file kept
+                a schedule for good and the script's own setting could never be
+                handed back control. */}
+            <option value="">Leave as the script has it</option>
             {FREQUENCIES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
 
@@ -334,9 +349,17 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
             style={{ ...field, width: "100%", maxWidth: 380 }}
           />
         </label>
-        {emailProblem && (
+        {emailProblem ? (
           <p style={{ margin: "6px 0 0", fontSize: 12, color: "#c92a2a" }}>{emailProblem}</p>
-        )}
+        ) : settings.notifyEmail ? (
+          // An address already in the settings file reads as a suggestion next
+          // to a placeholder. It is not: the watcher mails it. Saying so is how
+          // someone notices an address they no longer want on the list.
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--muted)" }}>
+            Saved. The watcher emails {settings.notifyEmail.split(/[,;]+/).map((a) => a.trim()).filter(Boolean).join(", ")}.
+            Clear the field to go back to your own Google address.
+          </p>
+        ) : null}
 
         <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.6 }}>
           {describeSchedule(settings.schedule)}, in the timezone set on the Apps Script project rather
