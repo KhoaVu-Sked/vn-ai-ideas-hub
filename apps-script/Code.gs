@@ -62,10 +62,18 @@ const CONFIG = {
 
   /**
    * When the scheduled check runs. Change these, then run installTrigger.
-   *   frequency: 'weekly' or 'daily'
+   *   frequency: 'weekly', 'daily', 'hourly', or one of the sub-hourly values
+   *              'every5min' / 'every10min' / 'every15min' / 'every30min'.
+   *              Sub-hourly is 96–288 runs a day and spends Google's daily
+   *              script-runtime allowance accordingly.
    *   dayOfWeek: for weekly — MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY,
-   *              SATURDAY or SUNDAY. Ignored when daily.
+   *              SATURDAY or SUNDAY. Ignored otherwise.
    *   hour:      0–23, in the script's timezone (Project Settings → Time zone).
+   *              Used by weekly and daily only.
+   *
+   * The browser tool can set all of this now. It writes the schedule into the
+   * settings file only once someone actually picks one there; until then this
+   * block stands and is left alone.
    */
   schedule: {
     frequency: 'weekly',
@@ -277,6 +285,12 @@ function applyDriveSettings_() {
   // paused is absolute: an absent flag means running, never "keep the old value".
   CONFIG.paused = cfg.paused === true;
   if (typeof cfg.notifyEmail === 'string') CONFIG.notifyEmail = cfg.notifyEmail;
+  // Only the object form is read, and deliberately. The browser tool used to
+  // write `schedule` as a bare string, but it was never a choice anyone made:
+  // the old normaliser filled in "weekly" whatever the file said, so every
+  // settings file out there carries that string. Honouring it would reset a
+  // schedule someone had hand-set in CONFIG back to weekly on the next run.
+  // The tool now writes an object, which is what a real choice looks like.
   if (cfg.schedule && typeof cfg.schedule === 'object') {
     const sched = cfg.schedule;
     if (sched.frequency) CONFIG.schedule.frequency = sched.frequency;

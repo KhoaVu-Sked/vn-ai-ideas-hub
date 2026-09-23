@@ -1349,6 +1349,10 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <p>A file&rsquo;s level comes from its widest sharing, so one over-exposed setting decides it however tidy the rest are.</p>
 
+      <p>Above the results, a bar shows how many findings sit at each level, alongside an <b>OK</b> figure &mdash; everything else you own, shared with named people only. Clicking a level narrows the list to it; clicking it again clears the filter. On a Drive large enough that the scan stops early, the panel says so rather than presenting a partial count as a total.</p>
+
+      <p>Each finding names the file, the folder path it sits in (every folder in the path opens in Drive), who owns it, and when it was created.</p>
+
       <div class="note note--warn">
         <span class="note__tag">It will not touch other people&rsquo;s files</span>
         <p>Files someone else owns are listed and classified, but offer <b>Remind owner</b> rather than a change &mdash; it opens an email naming the file and the problem. Google would refuse the change anyway, but the real reason is that quietly re-sharing another team&rsquo;s document is not this tool&rsquo;s call to make.</p>
@@ -1356,7 +1360,14 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <p><b>Change</b>, on your own files, restricts access to named people, limits it to your organisation, or leaves it open at a level you pick. Access it creates is never made discoverable by search. The first time you change something Google asks for broader permission &mdash; scanning alone never needs it.</p>
 
-      <p><b>Watched folders</b> emails you when sharing inside a folder changes, including folders other people own. The watching is a Google Apps Script you install once under your own account, so it runs on Google&rsquo;s timer rather than this app&rsquo;s server, and no token of yours is stored anywhere.</p>
+      <p><b>Watched folders</b> sends an email when sharing inside a folder changes, including folders other people own. Add a folder by typing part of its name and picking it from the suggestions, or by pasting a Drive link. The watching is a Google Apps Script you install once under your own account, so it runs on Google&rsquo;s timer rather than this app&rsquo;s server, and no token of yours is stored anywhere.</p>
+
+      <p>Under <b>When it checks, and who it tells</b> you set how often it runs &mdash; every 15 minutes, every 30 minutes, hourly, daily, or weekly, with a day and time for the last two &mdash; and the address to notify. Leave the address blank and it goes to the Google account running the script; several addresses can be separated by commas. Times follow the timezone set on the Apps Script project, not your own.</p>
+
+      <div class="note">
+        <span class="note__tag">It only writes when something changed</span>
+        <p>Each run compares what it finds against the previous run. No change means no email, so a quiet week is silence rather than an all-clear. Until you pick a schedule here, the watcher keeps whatever one was set in the script itself.</p>
+      </div>
 
       <div class="note">
         <span class="note__tag">What it never does</span>

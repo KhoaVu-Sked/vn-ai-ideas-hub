@@ -1,23 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import useDriveAuth from "@/features/tools/drive/useDriveAuth";
-import { scanDrive, fetchAccountEmail } from "@/features/tools/drive/scan";
+import { scanDrive, fetchAccountEmail, countOwnedFiles } from "@/features/tools/drive/scan";
 import { planOperations, applyPlan, remindMailto } from "@/features/tools/drive/fix";
 import { canWrite } from "@/features/tools/drive/scopes";
 import { SCOPE_WRITE } from "@/features/tools/drive/constants";
 import AccessDialog from "@/features/tools/drive/AccessDialog";
 import WatchedFolders from "@/features/tools/drive/WatchedFolders";
+import SeveritySummary from "@/features/tools/drive/SeveritySummary";
+import { resolveTrails, folderLink } from "@/features/tools/drive/paths";
+import { summarise, toggleLevel, filterByLevel } from "@/features/tools/drive/summary";
+import { formatDate, ownerLabel } from "@/features/tools/drive/format";
 import { pageOf, pageForNewSize, PER_PAGE_OPTIONS, DEFAULT_PER_PAGE } from "@/features/tools/drive/paginate";
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 };
 
 const LEVEL = {
-  Critical: { bg: "#ffe3e3", fg: "#c92a2a" },
-  Warning:  { bg: "#fdf1dd", fg: "#b7791f" },
-  Info:     { bg: "#e8f0ff", fg: "#2f5fd0" },
-  OK:       { bg: "#e6f4ea", fg: "#1f7a3c" },
+  Critical: { bg: "#ffe3e3", fg: "#c92a2a", rail: "#e03131" },
+  Warning:  { bg: "#fdf1dd", fg: "#b7791f", rail: "#f0a020" },
+  Info:     { bg: "#e8f0ff", fg: "#2f5fd0", rail: "#4c7ef3" },
+  OK:       { bg: "#e6f4ea", fg: "#1f7a3c", rail: "#37b24d" },
 };
 const ORDER = { Critical: 0, Warning: 1, Info: 2, OK: 3 };
 
@@ -64,6 +68,40 @@ function Pager({ shown, perPage, onPage, onResize, edge }) {
   );
 }
 
+const MY_DRIVE = "https://drive.google.com/drive/my-drive";
+
+/* Where the file sits, each folder its own link.
+
+   Three states, not two. An empty trail means one of two different things, and
+   showing both as "My Drive" would put a file that lives in a folder this
+   account cannot read at the root of your own Drive — a wrong answer that looks
+   like a confident one. `resolved` separates "still working" from "gave up",
+   which a bare empty Map cannot: `.get()` returns undefined for both. */
+function Trail({ trail, resolved, hasParent }) {
+  if (!resolved) {
+    return <span className="drive-trail"><span>Finding location…</span></span>;
+  }
+  if (!trail?.length) {
+    return (
+      <span className="drive-trail">
+        {hasParent
+          ? <span>Location unavailable</span>
+          : <a href={MY_DRIVE} target="_blank" rel="noreferrer">My Drive</a>}
+      </span>
+    );
+  }
+  return (
+    <span className="drive-trail">
+      {trail.map((folder, i) => (
+        <span key={folder.id} style={{ display: "contents" }}>
+          {i > 0 && <span aria-hidden="true">›</span>}
+          <a href={folderLink(folder.id)} target="_blank" rel="noreferrer">{folder.name}</a>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function DriveSharingCheckPage() {
   const { token, grantedScope, ready, err, configured, authorise, signOut } = useDriveAuth();
   const [busy, setBusy] = useState(false);
@@ -81,21 +119,58 @@ export default function DriveSharingCheckPage() {
   }, [token]);
   const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
+  const [trails, setTrails] = useState(null);
+  const [owned, setOwned] = useState(null);   // total files owned, for the OK figure
+  const [enriching, setEnriching] = useState(false);
+  // Locations and the OK count arrive after the scan that asked for them. A
+  // second scan started meanwhile must not have the first one's answers land on
+  // top of its results, so every run carries a token and stale ones are dropped.
+  const runId = useRef(0);
   const [scanErr, setScanErr] = useState("");
+  const [level, setLevel] = useState(null);       // the severity band being filtered to
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [page, setPage] = useState(1);
 
   const run = async () => {
-    setBusy(true); setScanErr(""); setResult(null); setPage(1);
+    const id = ++runId.current;
+    setBusy(true); setEnriching(false); setScanErr("");
+    setResult(null); setTrails(null); setOwned(null); setPage(1); setLevel(null);
     setProgress({ stage: "link", found: 0 });
+    let scan = null;
     try {
-      setResult(await scanDrive(token, setProgress));
+      scan = await scanDrive(token, setProgress);
+      if (id !== runId.current) return;
+      setResult(scan);
     } catch (e) {
+      if (id !== runId.current) return;
       setScanErr(e.status === 403
         ? "Google refused the request. The account may not have granted Drive access."
         : e.message || "The scan could not finish.");
     } finally {
-      setBusy(false); setProgress(null);
+      if (id === runId.current) { setBusy(false); setProgress(null); }
+    }
+
+    // Locations and the OK figure both resolve after the findings are on
+    // screen. Each is another walk of the Drive, and making the whole list wait
+    // for them would hold back the part people actually came for.
+    if (!scan?.findings?.length) return;
+    setEnriching(true);
+    try {
+      const resolved = await resolveTrails(token, scan.findings);
+      if (id === runId.current) setTrails(resolved);
+    } catch {
+      // An empty Map still counts as resolved: rows fall back to what is known
+      // about their location rather than waiting for an answer already given up
+      // on. Leaving trails null would strand every row on "Finding location…".
+      if (id === runId.current) setTrails(new Map());
+    }
+    try {
+      const count = await countOwnedFiles(token);
+      if (id === runId.current) setOwned(count);
+    } catch {
+      if (id === runId.current) setOwned(null);   // OK stays unknown, never wrong
+    } finally {
+      if (id === runId.current) setEnriching(false);
     }
   };
 
@@ -122,14 +197,27 @@ export default function DriveSharingCheckPage() {
     }
   };
 
-  const rows = result ? [...result.findings].sort(
+  const all = useMemo(() => (result ? [...result.findings].sort(
     (a, b) => (ORDER[a.level] - ORDER[b.level]) || a.name.localeCompare(b.name),
-  ) : [];
+  ) : []), [result]);
+
+  const summary = useMemo(
+    () => summarise(all, {
+      scanned: owned?.total,
+      truncated: owned?.truncated,
+      findingsTruncated: result?.truncated,
+    }),
+    [all, owned, result],
+  );
+
+  const rows = useMemo(() => filterByLevel(all, level), [all, level]);
 
   // pageOf clamps, so the page number never has to be corrected here — a second
-  // scan returning fewer findings lands on the last real page by itself.
+  // scan returning fewer findings lands on the last real page by itself, and so
+  // does switching to a filter with fewer rows than the page you were on.
   const shown = pageOf(rows, page, perPage);
   const resize = (next) => { setPage(pageForNewSize(shown.page, perPage, next)); setPerPage(next); };
+  const filter = (band) => { setLevel(toggleLevel(level, band)); setPage(1); };
 
   return (
     <>
@@ -176,11 +264,11 @@ export default function DriveSharingCheckPage() {
                   : "Connected. Ready to scan."}
               </span>
               <span style={{ display: "flex", gap: 8 }}>
-                <button onClick={run} disabled={busy}
-                  style={{ background: "var(--blue)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 15px", fontSize: 13, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}>
-                  {busy ? "Scanning…" : result ? "Scan again" : "Scan my Drive"}
+                <button onClick={run} disabled={busy || enriching}
+                  style={{ background: "var(--blue)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 15px", fontSize: 13, fontWeight: 700, cursor: busy || enriching ? "wait" : "pointer" }}>
+                  {busy ? "Scanning…" : enriching ? "Finishing…" : result ? "Scan again" : "Scan my Drive"}
                 </button>
-                <button onClick={signOut} disabled={busy}
+                <button onClick={signOut} disabled={busy || enriching}
                   style={{ background: "#fff", color: "var(--muted)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 13px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   Disconnect
                 </button>
@@ -201,6 +289,8 @@ export default function DriveSharingCheckPage() {
               </div>
             )}
 
+            <SeveritySummary summary={summary} active={level} onToggle={filter} />
+
             {result && result.findings.length === 0 && !busy && (
               <div style={{ ...card, textAlign: "center", color: "var(--muted)", fontSize: 13.5 }}>
                 Nothing shared by link or organisation-wide. Nothing to do.
@@ -210,41 +300,70 @@ export default function DriveSharingCheckPage() {
             {rows.length > 0 && (
               <div style={{ ...card, padding: 0, overflow: "hidden" }}>
                 <Pager shown={shown} perPage={perPage} onPage={setPage} onResize={resize} edge="top" />
-                {shown.items.map((f, i) => (
-                  <div key={f.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 15px", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap", ...{ background: LEVEL[f.level].bg, color: LEVEL[f.level].fg } }}>
-                      {f.level}
-                    </span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <a href={f.link} target="_blank" rel="noreferrer"
-                        style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink)", textDecoration: "none", wordBreak: "break-word" }}>
-                        {f.name}
-                      </a>
-                      <span style={{ display: "block", fontSize: 12, color: "var(--muted)", marginTop: 3 }}>{f.label}</span>
+
+                {shown.items.map((f) => (
+                  <div key={f.id} className="drive-row">
+                    <span className="drive-rail" style={{ background: LEVEL[f.level].rail }} />
+
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                        <a href={f.link} target="_blank" rel="noreferrer"
+                          style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink)", textDecoration: "none", wordBreak: "break-word" }}>
+                          {f.name}
+                        </a>
+                        <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", background: LEVEL[f.level].bg, color: LEVEL[f.level].fg }}>
+                          {f.level}
+                        </span>
+                      </span>
+                      <Trail trail={trails?.get(f.id)} resolved={trails !== null} hasParent={(f.parents?.length ?? 0) > 0} />
+                      <span style={{ display: "block", fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{f.label}</span>
+                      <span className="drive-meta">
+                        <span><i>Owner</i><b>{ownerLabel(f.owner, me)}</b></span>
+                        <span><i>Created</i><b>{formatDate(f.createdTime)}</b></span>
+                      </span>
                       {!f.fixable && (
-                        <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 3 }}>
-                          Owned by {f.owner || "someone else"} — listed only, not yours to change
+                        <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 4 }}>
+                          {/* Owning a file and being allowed to reshare it are
+                              different permissions. Saying "ask the owner" on a
+                              row that also says you own it reads as a bug. */}
+                          {f.ownedByMe
+                            ? "Yours, but this account cannot change its sharing"
+                            : "Not yours to change — ask the owner"}
                         </span>
                       )}
                     </span>
+
                     {f.fixable ? (
                       <button onClick={() => openChange(f)}
                         style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--blue)", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
                         Change
                       </button>
                     ) : (
-                      remindMailto(f, me) && (
+                      remindMailto(f, me) ? (
                         <a href={remindMailto(f, me)}
                           style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--muted)", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
                           Remind owner
                         </a>
-                      )
+                      ) : <span />
                     )}
                   </div>
                 ))}
+
                 <Pager shown={shown} perPage={perPage} onPage={setPage} onResize={resize} edge="bottom" />
               </div>
             )}
+
+            {/* A filter can empty the list while the scan itself found plenty. */}
+            {all.length > 0 && rows.length === 0 && (
+              <div style={{ ...card, textAlign: "center", color: "var(--muted)", fontSize: 13.5 }}>
+                No {level} findings.{" "}
+                <button onClick={() => filter(level)}
+                  style={{ border: "none", background: "none", color: "var(--blue)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+                  Show all {all.length}
+                </button>
+              </div>
+            )}
+
             <WatchedFolders
               token={token}
               canEdit={canWrite(grantedScope)}

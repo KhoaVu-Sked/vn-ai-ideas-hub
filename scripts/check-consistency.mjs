@@ -333,6 +333,54 @@ const fail = (check, detail, why) => problems.push({ check, detail, why });
   }
 }
 
+// ── 6b. The schedule vocabulary must agree too ────────────────────
+// The watched-folder panel offers a frequency list and a day list, and Code.gs
+// matches both as exact strings. installTrigger THROWS on a frequency it does
+// not know — and reconcileTrigger_ catches that into a log line — so a value
+// added on one side only leaves the old trigger running while the panel says
+// the new one is in force. Nothing fails; the screen simply lies.
+{
+  const page = read("features/tools/drive/constants.js");
+  const gs = read("apps-script/Code.gs");
+  if (page && gs) {
+    const listOf = (src, name) => {
+      const m = src.match(new RegExp(`export const ${name}\\s*=\\s*\\[([^\\]]*)\\]`));
+      return m ? [...m[1].matchAll(/["']([^"']+)["']/g)].map((x) => x[1]) : null;
+    };
+
+    // Code.gs's own allow-list: ['weekly','daily','hourly'] plus MINUTE_FREQ_'s keys.
+    const minuteKeys = (() => {
+      const m = gs.match(/const MINUTE_FREQ_\s*=\s*\{([^}]*)\}/);
+      return m ? [...m[1].matchAll(/([A-Za-z0-9_]+)\s*:/g)].map((x) => x[1]) : [];
+    })();
+    const gsAllowed = new Set(["weekly", "daily", "hourly", ...minuteKeys]);
+
+    const offered = listOf(page, "FREQUENCY_VALUES");
+    if (!offered) {
+      fail("drive-drift", "FREQUENCY_VALUES", "missing from features/tools/drive/constants.js");
+    } else {
+      for (const value of offered) {
+        if (!gsAllowed.has(value)) {
+          fail("drive-drift", `FREQUENCY_VALUES: ${value}`,
+            `the panel offers it, Code.gs does not accept it — installTrigger would throw and the old schedule would stay`);
+        }
+      }
+    }
+
+    const days = listOf(page, "DAY_VALUES");
+    if (!days) {
+      fail("drive-drift", "DAY_VALUES", "missing from features/tools/drive/constants.js");
+    } else {
+      for (const day of days) {
+        if (!new RegExp(`\\b${day}\\b`).test(gs)) {
+          fail("drive-drift", `DAY_VALUES: ${day}`,
+            "the panel offers it but ScriptApp.WeekDay is never looked up with it in Code.gs");
+        }
+      }
+    }
+  }
+}
+
 function sqlBearingFiles() {
   const out = [];
   const walk = (dir) => {

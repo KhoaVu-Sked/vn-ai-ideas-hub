@@ -69,6 +69,44 @@ export async function fetchAccountEmail(token) {
   return data?.user?.emailAddress || "";
 }
 
+/**
+ * How many files this account owns, ids only.
+ *
+ * Needed for the OK figure, which is everything owned minus everything flagged
+ * — there is no Drive query for "correctly shared", and no total on any
+ * response. Requesting only ids keeps a pass over a large Drive cheap: no
+ * permissions, no names, nothing to classify.
+ *
+ * Deliberately not part of scanDrive. It is a third walk of the whole Drive,
+ * and folding it in would make everyone wait longer to see the findings for the
+ * sake of one number beside them. The caller runs it after the list is on
+ * screen, the same way the folder trails are resolved.
+ *
+ * Folders are counted, and must be: Drive calls them files, a folder shared by
+ * link is a finding like any other, and OK is this total minus those findings.
+ * Filtering folders out of one side of that subtraction and not the other is
+ * how it starts reporting more OK items than the account has.
+ *
+ * Its own truncation is reported separately. A capped count makes OK a floor
+ * rather than a total, and the summary says so instead of rounding it off.
+ */
+export async function countOwnedFiles(token, onProgress) {
+  let total = 0;
+  let pageToken = null;
+  let pages = 0;
+  let truncated = false;
+  do {
+    if (pages++ >= MAX_PAGES) { truncated = true; break; }
+    const params = { q: OWNED, fields: "nextPageToken,files(id)", pageSize: "1000", spaces: "drive", corpora: "user" };
+    if (pageToken) params.pageToken = pageToken;
+    const data = await driveGet(params, token);
+    total += (data.files || []).length;
+    pageToken = data.nextPageToken || null;
+    if (onProgress) onProgress({ stage: "count", found: total });
+  } while (pageToken);
+  return { total, truncated };
+}
+
 export async function scanDrive(token, onProgress = () => {}) {
   const link = await listAll(`${OWNED} and ${LINK_Q}`, token, (n) => onProgress({ stage: "link", found: n }));
   const domain = await listAll(`${OWNED} and ${DOMAIN_Q}`, token, (n) => onProgress({ stage: "domain", found: n }));
@@ -86,6 +124,10 @@ export async function scanDrive(token, onProgress = () => {}) {
       link: f.webViewLink,
       mimeType: f.mimeType,
       modifiedTime: f.modifiedTime,
+      createdTime: f.createdTime,
+      // Drive allows several parents historically; only the first is a real
+      // location now, and the trail is built from it.
+      parents: f.parents || [],
       owner: f.owners?.[0]?.emailAddress || null,
       ownedByMe: f.ownedByMe === true,
       canShare: f.capabilities?.canShare === true,

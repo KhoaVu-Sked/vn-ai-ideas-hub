@@ -34,6 +34,16 @@ export const EDIT_ROLES = { writer: 1, fileOrganizer: 1, organizer: 1 };
 // file's worst grant win over its milder ones.
 export const RANK = { OK: 0, Info: 1, Warning: 2, Critical: 3 };
 
+// The watcher's schedule vocabulary. Code.gs matches these strings exactly and
+// installTrigger throws on one it does not know — a throw reconcileTrigger_
+// turns into a log line, so an invented value leaves the old trigger running
+// while this tool's panel claims the new one. `bun run check` compares this
+// list against Code.gs's own allow-list for exactly that reason.
+export const FREQUENCY_VALUES = ["every15min", "every30min", "hourly", "daily", "weekly"];
+
+// ScriptApp.WeekDay names, which Code.gs looks up by these exact keys.
+export const DAY_VALUES = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+
 export const DRIVE_API = "https://www.googleapis.com/drive/v3";
 
 // Exact strings, never prefixes — see scopesInclude() in scopes.js.
