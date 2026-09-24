@@ -63,6 +63,51 @@ export function trailLabel(trail) {
    down the whole Promise.all below it, and the caller's only recourse was an
    empty Map — losing every trail that had already resolved because one folder
    in the set was unreachable. */
+/**
+ * Labels that say what is DIFFERENT about folders sharing a name.
+ *
+ * Showing the whole path back to the root does technically disambiguate, but
+ * badly. A real pair of "Test Cases" folders both read
+ *   Northcott › 02 — Professional Services › Archive › 240401 WO-013 … › 3 Validate
+ *   Northcott › 02 — Professional Services › Archive › 240401 WO-012 … › 3 Validate
+ * — identical for three levels, identical again at the end, and the one segment
+ * that tells them apart buried in the middle of sixty characters.
+ *
+ * So the prefix every member of a group shares is dropped, leaving the part
+ * that actually distinguishes them, marked with a leading ellipsis when
+ * something was removed.
+ *
+ * @param {Array<{id: string, key: string, trail: Array<{name: string}>}>} items
+ * @returns {Object<string, string>} id → label
+ */
+export function distinguishingLabels(items) {
+  const groups = new Map();
+  for (const item of items || []) {
+    if (!item?.id) continue;
+    const key = item.key ?? "";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  const out = {};
+  for (const members of groups.values()) {
+    const trails = members.map((m) => (Array.isArray(m.trail) ? m.trail.map((p) => p.name) : []));
+
+    // How many leading segments every member has in common. Never all of a
+    // member's trail: dropping everything would leave nothing to show.
+    const shortest = Math.min(...trails.map((t) => t.length));
+    let common = 0;
+    while (common < shortest - 1 && trails.every((t) => t[common] === trails[0][common])) common++;
+
+    members.forEach((m, i) => {
+      const rest = trails[i].slice(common);
+      if (!rest.length) return;                    // no location worth printing
+      out[m.id] = (common ? "… › " : "") + rest.join(" › ");
+    });
+  }
+  return out;
+}
+
 async function fetchFolder(token, id) {
   const url = `${DRIVE_API}/files/${encodeURIComponent(id)}`
     + `?fields=${encodeURIComponent(FOLDER_FIELDS)}&supportsAllDrives=true`;
