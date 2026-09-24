@@ -3,7 +3,7 @@
 
 import { test, expect } from "bun:test";
 import { classify, canFix, verbFor } from "../classify";
-import { scopesInclude, canWrite } from "../scopes";
+import { scopesInclude, canWrite, canSeeCalendar, mergeScopes } from "../scopes";
 
 const owner = { type: "user", role: "owner", id: "o1" };
 
@@ -115,4 +115,39 @@ test("a click event is not mistaken for a scope", () => {
   expect(pickScope("   ", fallback)).toBe(fallback);
   expect(pickScope("https://www.googleapis.com/auth/drive", fallback))
     .toBe("https://www.googleapis.com/auth/drive");
+});
+
+test("the calendar scope is checked whole, not by prefix", () => {
+  // .../auth/calendar is a prefix of both calendar.freebusy and
+  // calendar.events — the same trap the drive scopes documented.
+  expect(canSeeCalendar("https://www.googleapis.com/auth/calendar.freebusy")).toBe(true);
+  expect(canSeeCalendar("https://www.googleapis.com/auth/calendar")).toBe(false);
+  expect(canSeeCalendar("https://www.googleapis.com/auth/calendar.events")).toBe(false);
+  expect(canSeeCalendar("")).toBe(false);
+  expect(canSeeCalendar(null)).toBe(false);
+});
+
+test("asking for a new scope keeps the ones already granted", () => {
+  // Google replaces the grant rather than extending it. Asking for calendar
+  // alone would return a token that cannot read Drive, and Change and Watched
+  // folders would go dead mid-session with no error anywhere.
+  const drive = "https://www.googleapis.com/auth/drive";
+  const cal = "https://www.googleapis.com/auth/calendar.freebusy";
+  expect(mergeScopes(drive, cal).split(" ").sort()).toEqual([cal, drive].sort());
+  expect(canWrite(mergeScopes(drive, cal))).toBe(true);
+  expect(canSeeCalendar(mergeScopes(drive, cal))).toBe(true);
+});
+
+test("merging never repeats a scope already held", () => {
+  const drive = "https://www.googleapis.com/auth/drive";
+  expect(mergeScopes(drive, drive)).toBe(drive);
+  expect(mergeScopes(`${drive} ${drive}`, drive)).toBe(drive);
+});
+
+test("merging copes with nothing on either side", () => {
+  const cal = "https://www.googleapis.com/auth/calendar.freebusy";
+  expect(mergeScopes("", cal)).toBe(cal);
+  expect(mergeScopes(null, cal)).toBe(cal);
+  expect(mergeScopes(cal, "")).toBe(cal);
+  expect(mergeScopes(null, null)).toBe("");
 });

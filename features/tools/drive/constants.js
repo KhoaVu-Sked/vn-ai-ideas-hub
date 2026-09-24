@@ -50,3 +50,9 @@ export const DRIVE_API = "https://www.googleapis.com/drive/v3";
 export const SCOPE_READ = "https://www.googleapis.com/auth/drive.metadata.readonly";
 export const SCOPE_FILE = "https://www.googleapis.com/auth/drive.file";
 export const SCOPE_WRITE = "https://www.googleapis.com/auth/drive";
+
+// Free/busy only. Deliberately not calendar.events: the planner hands a
+// prefilled event to Google Calendar and lets the person save it there, so this
+// tool never holds write access to anyone's calendar. A file-sharing tool
+// asking for one would be a reasonable thing to refuse.
+export const SCOPE_FREEBUSY = "https://www.googleapis.com/auth/calendar.freebusy";

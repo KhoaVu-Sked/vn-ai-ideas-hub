@@ -1360,6 +1360,13 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <p><b>Change</b>, on your own files, restricts access to named people, limits it to your organisation, or leaves it open at a level you pick. Access it creates is never made discoverable by search. The first time you change something Google asks for broader permission &mdash; scanning alone never needs it.</p>
 
+      <p><b>Plan fix time</b> appears once the scan finds anything critical or warning. Pick 15 minutes, 30 minutes or an hour, pick a day in the next working week and a start time, and the event opens in Google Calendar already filled in &mdash; titled, and listing the worst findings with their links so it is a working list rather than a reminder to make one. There is also a <b>.ics</b> download for anyone not on Google Calendar.</p>
+
+      <div class="note">
+        <span class="note__tag">It cannot write to your calendar</span>
+        <p>Saving the event happens in Google Calendar, not here, so the tool never asks for permission to change your calendar. <b>Check my calendar</b> is optional and separate: it asks only for free/busy, which tells it when you are booked and nothing about what the bookings are. Skip it and every working hour is offered instead.</p>
+      </div>
+
       <p><b>Watched folders</b> sends an email when sharing inside a folder changes, including folders other people own. Add a folder by typing part of its name and picking it from the suggestions, or by pasting a Drive link. The watching is a Google Apps Script you install once under your own account, so it runs on Google&rsquo;s timer rather than this app&rsquo;s server, and no token of yours is stored anywhere.</p>
 
       <p>Under <b>When it checks, and who it tells</b> you set how often it runs &mdash; every 15 minutes, every 30 minutes, hourly, daily, or weekly, with a day and time for the last two &mdash; and the address to notify. Leave the address blank and it goes to the Google account running the script; several addresses can be separated by commas. Times follow the timezone set on the Apps Script project, not your own.</p>
