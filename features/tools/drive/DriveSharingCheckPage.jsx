@@ -262,8 +262,8 @@ export default function DriveSharingCheckPage() {
           Drive Sharing Check
         </h1>
         <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "8px 0 20px", lineHeight: 1.6, maxWidth: 680 }}>
-          Finds files in your Drive shared by link or with the whole organisation. It reads names and
-          sharing settings only, never file contents, and nothing it finds leaves your browser.
+          Finds files shared by link or with the whole organisation. Reads names and sharing
+          settings only — never contents, and nothing leaves your browser.
         </p>
 
         {!configured && (
@@ -276,8 +276,7 @@ export default function DriveSharingCheckPage() {
         {configured && !token && (
           <div style={card}>
             <p style={{ margin: "0 0 14px", fontSize: 13.5, color: "var(--body)", lineHeight: 1.6 }}>
-              Connect your Google account to scan your Drive. This is separate from signing in to TS Hub,
-              and it asks for read-only access.
+              Connect your Google account to scan. Separate from your TS Hub sign-in, and read-only.
             </p>
             <button onClick={() => authorise()} disabled={!ready}
               style={{ background: "var(--blue)", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13.5, fontWeight: 700, cursor: ready ? "pointer" : "wait" }}>
