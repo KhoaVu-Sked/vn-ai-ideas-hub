@@ -405,7 +405,10 @@ a {
    and the owner/created pair wraps inside it when there is no room. */
 .drive-row {
   display: grid;
-  grid-template-columns: 3px minmax(0, 1fr) auto;
+  /* rail · tick · content · action. The tick column is fixed like the rail, so
+     the content column still takes whatever is left and the row keeps the
+     property described above: no breakpoint needed. */
+  grid-template-columns: 3px 24px minmax(0, 1fr) auto;
   align-items: start;
   gap: 0 14px;
   padding: 11px 15px 11px 0;
@@ -414,6 +417,15 @@ a {
    list is a div too, so it, not the first row, is the first of its type, and
    the first row drew a rule directly under the pager's own bottom border. */
 .drive-row + .drive-row { border-top: 1px solid var(--line); }
+/* Sits above the pager. Wraps rather than squeezing, so the count and the
+   action stay readable on a narrow screen without a breakpoint. */
+.drive-bulk {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; padding: 10px 15px;
+  border-bottom: 1px solid var(--line); background: var(--bg);
+}
+.drive-tick { display: flex; align-items: center; justify-content: center; min-height: 24px; padding-top: 3px; }
+.drive-tick input { cursor: pointer; }
 .drive-rail { align-self: stretch; border-radius: 0 3px 3px 0; min-height: 40px; }
 
 /* Owner and created. Labelled rather than run together, so neither is mistaken
