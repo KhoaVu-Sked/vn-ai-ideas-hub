@@ -356,6 +356,18 @@ a {
   background: rgba(255, 255, 255, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.28);
   transition: background .15s ease;
+  /* The widest thing in the header, and the one that can afford to give.
+     `nowrap` stops a flex item shrinking below its own text, so without these
+     the header's contents total more than a phone is wide and the avatar — the
+     last item — is pushed off the right edge, taking the account menu with it.
+     Measured on a phone at 390px: 409px of content in a 390px header, the
+     avatar 19px past the edge, on every page of the app.
+
+     Shrink-and-clip rather than ellipsis: ellipsis needs a block box, and
+     changing this away from inline-flex loses the gap and the centring of the
+     icon against the label everywhere else. */
+  min-width: 0;
+  overflow: hidden;
 }
 .hdr-cross:hover { background: rgba(255, 255, 255, 0.26); }
 .hdr-cross--hot {
