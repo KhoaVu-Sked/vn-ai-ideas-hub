@@ -419,6 +419,18 @@ a {
 .drive-row + .drive-row { border-top: 1px solid var(--line); }
 /* Sits above the pager. Wraps rather than squeezing, so the count and the
    action stay readable on a narrow screen without a breakpoint. */
+/* The watcher's own report of its last run. Wraps rather than truncating —
+   the schedule and the result both matter and neither is worth an ellipsis. */
+.drive-status {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 10px 12px; margin-bottom: 12px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--bg);
+  font-size: 12.5px; color: var(--ink);
+}
+.drive-status__dot { width: 8px; height: 8px; border-radius: 999px; margin-top: 5px; flex: none; }
+.drive-status__dot--on { background: #1f7a3c; }
+.drive-status__dot--off { background: var(--faint); }
+
 .drive-bulk {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; flex-wrap: wrap; padding: 10px 15px;

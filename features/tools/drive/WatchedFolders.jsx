@@ -20,6 +20,7 @@ import {
 } from "@/features/tools/drive/settings";
 import { searchFolders, ambiguous } from "@/features/tools/drive/search";
 import { resolveTrails, distinguishingLabels } from "@/features/tools/drive/paths";
+import { readStatus, runState, relTime, watchedSummary, lastResult } from "@/features/tools/drive/status";
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 };
 const label = { fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: ".05em", textTransform: "uppercase" };
@@ -110,6 +111,16 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
 
     return () => { cancelled = true; clearTimeout(timer); controller.abort(); };
   }, [input, token, canEdit]);
+
+  const [status, setStatus] = useState(null);
+  useEffect(() => {
+    if (!token) { setStatus(null); return; }
+    let cancelled = false;
+    // Never blocks or breaks the panel: no status file is the normal state
+    // before the first run.
+    readStatus(token).then((s) => { if (!cancelled) setStatus(s); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [token]);
 
   // Clicking away closes the suggestions without choosing one.
   useEffect(() => {
@@ -220,6 +231,29 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
             onChange={(e) => save({ ...settings, paused: e.target.checked })} />
           Pause the watcher
         </label>
+      </div>
+
+      {/* The page can set the schedule but cannot see the watcher — they are
+          separate programs. This is the script's own report of its last run,
+          and without it the panel can turn monitoring on and then say nothing
+          about whether it ever happened. */}
+      <div className="drive-status">
+        <span className={`drive-status__dot drive-status__dot--${runState(status) === "Active" ? "on" : "off"}`} />
+        <span style={{ minWidth: 0 }}>
+          <b style={{ fontWeight: 700 }}>{runState(status)}</b>
+          {status?.schedule && <span style={{ color: "var(--muted)" }}> · {status.schedule}</span>}
+          {status?.lastRun && <span style={{ color: "var(--muted)" }}> · ran {relTime(status.lastRun)}</span>}
+          <span style={{ display: "block", color: "var(--muted)", marginTop: 2 }}>
+            {status
+              ? [watchedSummary(status), lastResult(status)].filter(Boolean).join(" · ")
+              : "Set a schedule below, then run the Apps Script project once to start it."}
+          </span>
+          {status?.problem && (
+            <span style={{ display: "block", color: "var(--warn, #b7791f)", marginTop: 2 }}>
+              Last run reported: {status.problem}
+            </span>
+          )}
+        </span>
       </div>
 
       {settings.watchlist.length === 0 ? (
