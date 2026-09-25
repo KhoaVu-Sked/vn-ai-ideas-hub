@@ -391,25 +391,24 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
           <p style={{ margin: "6px 0 0", fontSize: 12, color: "#c92a2a" }}>{emailProblem}</p>
         ) : settings.notifyEmail ? (
           // An address already in the settings file reads as a suggestion next
-          // to a placeholder. It is not: the watcher mails it. Saying so is how
+          // to a placeholder. It is not: the watcher mails it. Naming it is how
           // someone notices an address they no longer want on the list.
           <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--muted)" }}>
-            Saved. The watcher emails {settings.notifyEmail.split(/[,;]+/).map((a) => a.trim()).filter(Boolean).join(", ")}.
-            Clear the field to go back to your own Google address.
+            Emails {settings.notifyEmail.split(/[,;]+/).map((a) => a.trim()).filter(Boolean).join(", ")}.
           </p>
         ) : null}
 
+        {/* Two things nobody guesses: whose clock the schedule runs on, and that
+            silence is not an all-clear. Everything else that was here was
+            reassurance, and reassurance is what people stop reading. */}
         <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.6 }}>
-          {describeSchedule(settings.schedule)}, in the timezone set on the Apps Script project rather
-          than yours. Email goes out only when something has actually changed since the last check,
-          so a quiet week is silent rather than reassuring.
+          {describeSchedule(settings.schedule)}, in the script&rsquo;s timezone. It emails only when
+          something changed — silence is not an all-clear.
         </p>
       </div>
 
       <p style={{ margin: "14px 0 0", fontSize: 11.5, color: "var(--faint)", lineHeight: 1.6, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
-        The watcher itself is a Google Apps Script you install once, under your own account. It runs on
-        Google&rsquo;s timer, not on this app&rsquo;s server, which is why no password or token of yours is
-        stored anywhere. Changing the schedule here takes effect on its next run. The script is in{" "}
+        A Google Apps Script under your own account. Changes here apply on its next run &mdash;{" "}
         <code>apps-script/Code.gs</code>.
       </p>
     </div>
