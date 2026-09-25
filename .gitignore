@@ -9,3 +9,7 @@ node_modules/
 
 # A nested clone was accidentally committed as a gitlink once (4b83a30).
 vn-ai-ideas-hub/
+
+# Playwright MCP scratch output. Committed by accident once already —
+# console logs and page snapshots from a debugging session.
+.playwright-mcp/
