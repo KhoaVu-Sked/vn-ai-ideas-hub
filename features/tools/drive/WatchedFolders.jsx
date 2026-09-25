@@ -19,7 +19,7 @@ import {
   FREQUENCIES, DAYS, usesHour, usesDay,
 } from "@/features/tools/drive/settings";
 import { searchFolders, ambiguous } from "@/features/tools/drive/search";
-import { resolveTrails, trailLabel } from "@/features/tools/drive/paths";
+import { resolveTrails, distinguishingLabels } from "@/features/tools/drive/paths";
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 };
 const label = { fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: ".05em", textTransform: "uppercase" };
@@ -93,7 +93,11 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
         if (same.length) {
           const trails = await resolveTrails(token, same);
           if (cancelled) return;
-          setWhere(Object.fromEntries([...trails].map(([id, t]) => [id, trailLabel(t)])));
+          setWhere(distinguishingLabels(same.map((f) => ({
+            id: f.id,
+            key: `${f.name}\u0000${f.owner || ""}`,
+            trail: trails.get(f.id) || [],
+          }))));
         }
       } catch (e) {
         if (!cancelled && e.name !== "AbortError") setHits([]);
