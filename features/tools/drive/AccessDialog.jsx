@@ -22,7 +22,10 @@ const AUDIENCES = [
   { who: "anyone", title: "Anyone with the link", line: "Public to whoever has the link. Leaves it exposed." },
 ];
 
-export default function AccessDialog({ file, me, onCancel, onApply, busy }) {
+// `files` is always a list, even for one. The same choice applies to all of
+// them, so the only thing that changes is what the heading says it applies to —
+// and being specific there matters when the button will rewrite sixty files.
+export default function AccessDialog({ files, me, onCancel, onApply, busy }) {
   const [who, setWho] = useState("restricted");
   const [role, setRole] = useState("reader");
 
@@ -33,7 +36,9 @@ export default function AccessDialog({ file, me, onCancel, onApply, busy }) {
           Change sharing
         </div>
         <div style={{ fontSize: 12.5, color: "var(--muted)", margin: "3px 0 16px", wordBreak: "break-word" }}>
-          {file.name}
+          {files.length === 1
+            ? files[0].name
+            : `${files.length} files — the same change applies to every one`}
         </div>
 
         <p style={{ ...label, margin: "0 0 8px" }}>Who can open it</p>

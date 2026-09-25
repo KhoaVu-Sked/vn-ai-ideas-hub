@@ -11,6 +11,7 @@ import AccessDialog from "@/features/tools/drive/AccessDialog";
 import PlanFixTime from "@/features/tools/drive/PlanFixTime";
 import WatchedFolders from "@/features/tools/drive/WatchedFolders";
 import SeveritySummary from "@/features/tools/drive/SeveritySummary";
+import { toggleId, selectAll, clearWithin, resolveSelection, pruneSelection } from "@/features/tools/drive/select";
 import { resolveTrails, folderLink } from "@/features/tools/drive/paths";
 import { summarise, toggleLevel, filterByLevel } from "@/features/tools/drive/summary";
 import { formatDate, ownerLabel } from "@/features/tools/drive/format";
@@ -130,6 +131,7 @@ export default function DriveSharingCheckPage() {
   const [scanErr, setScanErr] = useState("");
   const [planning, setPlanning] = useState(false);
   const [level, setLevel] = useState(null);       // the severity band being filtered to
+  const [selected, setSelected] = useState(() => new Set());
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [page, setPage] = useState(1);
 
@@ -176,21 +178,39 @@ export default function DriveSharingCheckPage() {
     }
   };
 
-  const openChange = (f) => {
+  const openChange = (target) => {
     setNote("");
+    const files = Array.isArray(target) ? target : [target];
+    if (!files.length) return;
     // Ask for write access here rather than at connect time. Someone who only
     // wants to look never grants it.
     if (!canWrite(grantedScope)) { authorise(SCOPE_WRITE); return; }
-    setEditing(f);
+    setEditing(files);
   };
 
   const applyChange = async (target) => {
     setApplying(true); setNote("");
     try {
-      const { ops, summary } = planOperations(editing, target, me);
-      if (ops.length) await applyPlan(editing.id, ops, token);
-      setNote(`${editing.name} — ${summary}`);
+      const done = [];
+      const failed = [];
+      // One at a time on purpose: each file gets its own plan, and one refusal
+      // must not abandon the rest. Drive has no bulk permissions call anyway.
+      for (const file of editing) {
+        try {
+          const { ops, summary } = planOperations(file, target, me);
+          if (ops.length) await applyPlan(file.id, ops, token);
+          done.push({ name: file.name, summary });
+        } catch (e) {
+          failed.push(`${file.name}: ${e.message || "refused"}`);
+        }
+      }
+      setNote(
+        editing.length === 1 && !failed.length
+          ? `${done[0].name} — ${done[0].summary}`
+          : [`${done.length} of ${editing.length} changed.`, ...failed].join(" "),
+      );
       setEditing(null);
+      setSelected(new Set());
       await run();                      // re-scan, so the list reflects Drive rather than hope
     } catch (e) {
       setNote(e.message || "The change could not be applied.");
@@ -213,6 +233,16 @@ export default function DriveSharingCheckPage() {
   );
 
   const rows = useMemo(() => filterByLevel(all, level), [all, level]);
+  // Counted against everything, not the filtered view: a tick made under one
+  // filter is still a tick after you change the filter, and a bar that said
+  // "0 selected" while holding five would be lying about what Change will do.
+  const picked = useMemo(() => resolveSelection(selected, all), [selected, all]);
+  // Scoped to what is in front of you, for the select-all box only.
+  const inView = useMemo(() => resolveSelection(selected, rows), [selected, rows]);
+
+  // A scan rebuilds the findings; ticks for files that are gone must go with
+  // them, or the bar counts files the list no longer has.
+  useEffect(() => { setSelected((cur) => pruneSelection(cur, all)); }, [all]);
 
   // pageOf clamps, so the page number never has to be corrected here — a second
   // scan returning fewer findings lands on the last real page by itself, and so
@@ -220,6 +250,9 @@ export default function DriveSharingCheckPage() {
   const shown = pageOf(rows, page, perPage);
   const resize = (next) => { setPage(pageForNewSize(shown.page, perPage, next)); setPerPage(next); };
   const filter = (band) => { setLevel(toggleLevel(level, band)); setPage(1); };
+  const tick = (id) => setSelected((cur) => toggleId(cur, id));
+  const tickAll = () => setSelected((cur) =>
+    inView.allSelected ? clearWithin(cur, rows) : selectAll(cur, rows));
 
   return (
     <>
@@ -316,11 +349,47 @@ export default function DriveSharingCheckPage() {
 
             {rows.length > 0 && (
               <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+                {(inView.selectable > 0 || picked.count > 0) && (
+                  <div className="drive-bulk">
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--muted)", cursor: "pointer" }}>
+                      <input type="checkbox" checked={inView.allSelected} onChange={tickAll}
+                        aria-label={inView.allSelected ? "Clear what is shown" : "Select all changeable files shown"} />
+                      {picked.count
+                        ? `${picked.count} selected${
+                            picked.count > inView.count ? ` · ${picked.count - inView.count} outside this filter` : ""
+                          }`
+                        : `Select all ${inView.selectable} you can change`}
+                    </label>
+                    {picked.count > 0 && (
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <button onClick={() => setSelected(new Set())}
+                          style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--muted)", borderRadius: 7, padding: "5px 11px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                          Clear
+                        </button>
+                        <button onClick={() => openChange(picked.files)}
+                          style={{ border: "none", background: "var(--blue)", color: "#fff", borderRadius: 7, padding: "5px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                          Change {picked.count} file{picked.count === 1 ? "" : "s"}
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                )}
                 <Pager shown={shown} perPage={perPage} onPage={setPage} onResize={resize} edge="top" />
 
                 {shown.items.map((f) => (
                   <div key={f.id} className="drive-row">
                     <span className="drive-rail" style={{ background: LEVEL[f.level].rail }} />
+
+                    {/* A fixed column, so the content column still takes what is
+                        left and the row needs no breakpoint. Files that are not
+                        ours hold the space rather than shifting the row. */}
+                    <span className="drive-tick">
+                      {f.fixable && (
+                        <input type="checkbox" checked={selected.has(f.id)}
+                          onChange={() => tick(f.id)}
+                          aria-label={`Select ${f.name}`} />
+                      )}
+                    </span>
 
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
@@ -401,7 +470,7 @@ export default function DriveSharingCheckPage() {
 
         {editing && (
           <AccessDialog
-            file={editing}
+            files={editing}
             me={me}
             busy={applying}
             onCancel={() => setEditing(null)}
