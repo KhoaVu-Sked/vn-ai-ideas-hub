@@ -21,6 +21,27 @@ export function canWrite(grantedScopeString) {
   return scopesInclude(grantedScopeString, "https://www.googleapis.com/auth/drive");
 }
 
+export function canSeeCalendar(grantedScopeString) {
+  // Note the prefix trap applies here too: .../auth/calendar is a prefix of
+  // both .../auth/calendar.freebusy and .../auth/calendar.events, so this must
+  // go through scopesInclude like everything else.
+  return scopesInclude(grantedScopeString, "https://www.googleapis.com/auth/calendar.freebusy");
+}
+
+/**
+ * The scope string to ask Google for, given what is already granted.
+ *
+ * Google replaces the grant with whatever is requested rather than adding to
+ * it. Asking for the calendar scope alone would therefore hand back a token
+ * that cannot read Drive, and Change and Watched folders would quietly stop
+ * working mid-session. Everything already held is re-requested alongside.
+ */
+export function mergeScopes(grantedScopeString, wanted) {
+  const have = String(grantedScopeString || "").split(/\s+/).filter(Boolean);
+  const add = String(wanted || "").split(/\s+/).filter(Boolean);
+  return [...new Set([...have, ...add])].join(" ");
+}
+
 // Which scope a request should ask for.
 //
 // Exists because `onClick={authorise}` hands the handler a React

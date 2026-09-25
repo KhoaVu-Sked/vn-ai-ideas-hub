@@ -8,6 +8,7 @@ import { planOperations, applyPlan, remindMailto } from "@/features/tools/drive/
 import { canWrite } from "@/features/tools/drive/scopes";
 import { SCOPE_WRITE } from "@/features/tools/drive/constants";
 import AccessDialog from "@/features/tools/drive/AccessDialog";
+import PlanFixTime from "@/features/tools/drive/PlanFixTime";
 import WatchedFolders from "@/features/tools/drive/WatchedFolders";
 import SeveritySummary from "@/features/tools/drive/SeveritySummary";
 import { resolveTrails, folderLink } from "@/features/tools/drive/paths";
@@ -127,6 +128,7 @@ export default function DriveSharingCheckPage() {
   // top of its results, so every run carries a token and stale ones are dropped.
   const runId = useRef(0);
   const [scanErr, setScanErr] = useState("");
+  const [planning, setPlanning] = useState(false);
   const [level, setLevel] = useState(null);       // the severity band being filtered to
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [page, setPage] = useState(1);
@@ -264,6 +266,14 @@ export default function DriveSharingCheckPage() {
                   : "Connected. Ready to scan."}
               </span>
               <span style={{ display: "flex", gap: 8 }}>
+                {/* Only Critical and Warning go into the event, so the button
+                    appears only when there is something worth booking time for. */}
+                {summary.Critical + summary.Warning > 0 && !busy && (
+                  <button onClick={() => setPlanning(true)}
+                    style={{ background: "#fff", color: "var(--blue)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 15px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                    Plan fix time
+                  </button>
+                )}
                 <button onClick={run} disabled={busy || enriching}
                   style={{ background: "var(--blue)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 15px", fontSize: 13, fontWeight: 700, cursor: busy || enriching ? "wait" : "pointer" }}>
                   {busy ? "Scanning…" : enriching ? "Finishing…" : result ? "Scan again" : "Scan my Drive"}
@@ -277,6 +287,13 @@ export default function DriveSharingCheckPage() {
 
             {note && (
               <div style={{ ...card, fontSize: 13, marginBottom: 14, color: "var(--body)" }}>{note}</div>
+            )}
+
+            {/* Errors from a scope request made mid-session. The sign-in card
+                renders `err`, but it is gone by then — a refused calendar or
+                write prompt reported itself to nobody. */}
+            {err && err !== "not-configured" && (
+              <div style={{ ...card, background: "#fff4f4", borderColor: "#ffc9c9", color: "#c92a2a", fontSize: 13.5, marginBottom: 14 }}>{err}</div>
             )}
 
             {scanErr && (
@@ -370,6 +387,16 @@ export default function DriveSharingCheckPage() {
               onNeedScope={() => authorise(SCOPE_WRITE)}
             />
           </>
+        )}
+
+        {planning && (
+          <PlanFixTime
+            findings={all}
+            token={token}
+            grantedScope={grantedScope}
+            onNeedScope={(want) => authorise(want)}
+            onClose={() => setPlanning(false)}
+          />
         )}
 
         {editing && (

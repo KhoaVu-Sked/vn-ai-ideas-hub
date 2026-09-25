@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SCOPE_READ } from "./constants";
-import { pickScope } from "./scopes";
+import { pickScope, mergeScopes, scopesInclude } from "./scopes";
 
 const GIS_SRC = "https://accounts.google.com/gsi/client";
 
@@ -57,7 +57,11 @@ export default function useDriveAuth(scope = SCOPE_READ) {
     if (!ready || !window.google?.accounts?.oauth2) return;
     // A new client per scope: Google caches the scope on the token client, so
     // reusing one silently re-requests the scope it was built with.
-    const asking = pickScope(wantScope, scope);
+    // Everything already granted is re-requested alongside whatever is being
+    // added. Google replaces the grant rather than extending it, so asking for
+    // the calendar scope on its own would hand back a token that cannot read
+    // Drive — Change and Watched folders would go dead with no error.
+    const asking = mergeScopes(grantedScope, pickScope(wantScope, scope));
     if (!clientRef.current || clientRef.current.__scope !== asking) {
       clientRef.current = window.google.accounts.oauth2.initTokenClient({
         client_id: clientId,
@@ -72,14 +76,33 @@ export default function useDriveAuth(scope = SCOPE_READ) {
               : "Google refused the request. If this persists, this site's address is probably not registered on the OAuth client.");
             return;
           }
+          const granted = res.scope || "";
           setToken(res.access_token || null);
-          setGrantedScope(res.scope || "");
+          setGrantedScope(granted);
+
+          // Consent is per-scope, and Google will happily return a token
+          // carrying less than was asked for. Without this the tool sits in a
+          // state where the gate says no and the prompt never reappears,
+          // because the token itself arrived fine.
+          const missing = asking.split(/\s+/).filter(Boolean).filter((w) => !scopesInclude(granted, w));
+          if (missing.length) {
+            setErr("Google granted only part of what was asked for. Try again and leave every box ticked.");
+          }
+        },
+        // Without this, declining the prompt or having the popup blocked does
+        // nothing at all on screen — the callback above never fires for either.
+        error_callback: (e) => {
+          setErr(e?.type === "popup_closed"
+            ? "The Google window was closed before access was granted."
+            : e?.type === "popup_failed_to_open"
+            ? "The browser blocked Google's window. Allow popups for this site and try again."
+            : "Google did not grant access.");
         },
       });
       clientRef.current.__scope = asking;
     }
     clientRef.current.requestAccessToken();
-  }, [ready, clientId, scope]);
+  }, [ready, clientId, scope, grantedScope]);
 
   // Hand the token back to Google and drop it here. Closing the tab does the
   // same thing; this just makes it deliberate.
