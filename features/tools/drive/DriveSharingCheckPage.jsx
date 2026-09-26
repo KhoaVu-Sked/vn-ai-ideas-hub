@@ -11,7 +11,7 @@ import AccessDialog from "@/features/tools/drive/AccessDialog";
 import PlanFixTime from "@/features/tools/drive/PlanFixTime";
 import WatchedFolders from "@/features/tools/drive/WatchedFolders";
 import FindingRow from "@/features/tools/drive/FindingRow";
-import { groupByAudience, verdict, BAND_OPEN } from "@/features/tools/drive/bands";
+import { groupByAudience, verdict, openBandKey, toggleBand, BAND_OPEN } from "@/features/tools/drive/bands";
 import { toggleId, selectAll, clearWithin, resolveSelection, pruneSelection } from "@/features/tools/drive/select";
 import { resolveTrails, folderLink } from "@/features/tools/drive/paths";
 import { summarise } from "@/features/tools/drive/summary";
@@ -211,7 +211,7 @@ export default function DriveSharingCheckPage() {
   // The worst band is open unless someone chose another. Deriving it here
   // rather than storing it means a re-scan that empties that band opens
   // whatever is now worst, instead of leaving the page with nothing open.
-  const openKey = openBand === undefined ? bands[0]?.key : openBand;
+  const openKey = openBandKey(bands, openBand);
   const shownBand = bands.find((b) => b.key === openKey) || null;
   const rows = shownBand ? shownBand.items : [];
   // Counted against everything, not the filtered view: a tick made under one
@@ -229,7 +229,7 @@ export default function DriveSharingCheckPage() {
   // does switching to a filter with fewer rows than the page you were on.
   const shown = pageOf(rows, page, perPage);
   const resize = (next) => { setPage(pageForNewSize(shown.page, perPage, next)); setPerPage(next); };
-  const showBand = (key) => { setOpenBand(key === openKey ? null : key); setPage(1); };
+  const showBand = (key) => { setOpenBand(toggleBand(openKey, key)); setPage(1); };
   const tick = (id) => setSelected((cur) => toggleId(cur, id));
   const tickEverything = () => setSelected((cur) =>
     picked.count === anySelectable ? new Set() : selectAll(cur, all));

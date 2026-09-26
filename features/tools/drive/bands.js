@@ -106,3 +106,23 @@ export function verdict(bands, scanned = null) {
 
   return { headline, detail: [...rest, ...context].join(" ") };
 }
+
+/**
+ * Which band is expanded.
+ *
+ * Three states, and one value cannot carry two of them. `undefined` is nobody
+ * has chosen and the worst band should be open; `null` is closed on purpose; a
+ * key is that band. Collapsing used to write null and fall straight back to the
+ * default, which reopened the band the click was trying to shut.
+ */
+export function openBandKey(bands, chosen) {
+  const list = Array.isArray(bands) ? bands : [];
+  if (chosen === undefined) return list[0]?.key ?? null;
+  if (chosen === null) return null;
+  return list.some((b) => b.key === chosen) ? chosen : (list[0]?.key ?? null);
+}
+
+/** What a click on `key` should store, given what is open now. */
+export function toggleBand(openKey, key) {
+  return openKey === key ? null : key;
+}
