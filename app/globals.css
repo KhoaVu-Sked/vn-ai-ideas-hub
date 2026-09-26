@@ -417,13 +417,14 @@ a {
    and the owner/created pair wraps inside it when there is no room. */
 .drive-row {
   display: grid;
-  /* rail · tick · content · action. The tick column is fixed like the rail, so
-     the content column still takes whatever is left and the row keeps the
-     property described above: no breakpoint needed. */
-  grid-template-columns: 3px 24px minmax(0, 1fr) auto;
+  /* tick · content · action. The severity rail is gone — the band heading says
+     what it used to say — so this is three columns, not four. The tick column
+     is fixed, which leaves the content column taking whatever is left and keeps
+     the row's no-breakpoint property. */
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: start;
-  gap: 0 14px;
-  padding: 11px 15px 11px 0;
+  gap: 0 12px;
+  padding: 11px 15px;
 }
 /* Only between rows. :first-of-type cannot express this — the pager above the
    list is a div too, so it, not the first row, is the first of its type, and
