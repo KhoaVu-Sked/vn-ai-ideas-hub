@@ -417,13 +417,14 @@ a {
    and the owner/created pair wraps inside it when there is no room. */
 .drive-row {
   display: grid;
-  /* rail · tick · content · action. The tick column is fixed like the rail, so
-     the content column still takes whatever is left and the row keeps the
-     property described above: no breakpoint needed. */
-  grid-template-columns: 3px 24px minmax(0, 1fr) auto;
+  /* tick · content · action. The severity rail is gone — the band heading says
+     what it used to say — so this is three columns, not four. The tick column
+     is fixed, which leaves the content column taking whatever is left and keeps
+     the row's no-breakpoint property. */
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: start;
-  gap: 0 14px;
-  padding: 11px 15px 11px 0;
+  gap: 0 12px;
+  padding: 11px 15px;
 }
 /* Only between rows. :first-of-type cannot express this — the pager above the
    list is a div too, so it, not the first row, is the first of its type, and
@@ -431,6 +432,39 @@ a {
 .drive-row + .drive-row { border-top: 1px solid var(--line); }
 /* Sits above the pager. Wraps rather than squeezing, so the count and the
    action stay readable on a narrow screen without a breakpoint. */
+/* The verdict. One sentence that has already done the adding up, so the reader
+   does not have to. text-wrap:balance because a headline that breaks one word
+   onto its own line reads as a mistake. */
+.drive-verdict {
+  font-family: var(--font-sora), system-ui, sans-serif;
+  font-weight: 600; font-size: 25px; line-height: 1.32; color: var(--ink);
+  margin: 0 0 8px; max-width: 30ch; text-wrap: balance;
+}
+.drive-verdict-sub { margin: 0 0 20px; font-size: 13.5px; color: var(--muted); max-width: 62ch; line-height: 1.6; }
+
+/* A band is an audience: who can open these files, in their words rather than
+   ours. The heading carries the classification so the rows do not have to. */
+.drive-band-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+.drive-band-head {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+  width: 100%; padding: 13px 16px; border: 0; background: none;
+  text-align: left; font: inherit; cursor: pointer;
+}
+.drive-band-head:hover { background: #fbfcfe; }
+.drive-band-who { font-weight: 600; font-size: 14.5px; color: var(--ink); }
+.drive-band-n { justify-self: end; align-self: baseline; font-size: 13px; color: var(--muted); }
+.drive-band-why { grid-column: 1; font-size: 12.5px; color: var(--muted); }
+.drive-band-head[aria-expanded="true"] { border-bottom: 1px solid var(--line); }
+
+/* All of the page's weight, spent in one place: the files anyone can open. */
+.drive-band-card--urgent { border-color: #f3c3c3; }
+.drive-band-card--urgent .drive-band-head { background: #fff6f6; }
+.drive-band-card--urgent .drive-band-head:hover { background: #fff0f0; }
+.drive-band-card--urgent .drive-band-head[aria-expanded="true"] { border-bottom-color: #f3c3c3; }
+.drive-band-card--urgent .drive-band-who { color: #c92a2a; }
+
+.drive-bulk--top { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; }
+
 /* The watcher's own report of its last run. Wraps rather than truncating —
    the schedule and the result both matter and neither is worth an ellipsis. */
 .drive-status {

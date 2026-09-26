@@ -10,10 +10,11 @@ import { SCOPE_WRITE } from "@/features/tools/drive/constants";
 import AccessDialog from "@/features/tools/drive/AccessDialog";
 import PlanFixTime from "@/features/tools/drive/PlanFixTime";
 import WatchedFolders from "@/features/tools/drive/WatchedFolders";
-import SeveritySummary from "@/features/tools/drive/SeveritySummary";
+import FindingRow from "@/features/tools/drive/FindingRow";
+import { groupByAudience, verdict, BAND_OPEN } from "@/features/tools/drive/bands";
 import { toggleId, selectAll, clearWithin, resolveSelection, pruneSelection } from "@/features/tools/drive/select";
 import { resolveTrails, folderLink } from "@/features/tools/drive/paths";
-import { summarise, toggleLevel, filterByLevel } from "@/features/tools/drive/summary";
+import { summarise } from "@/features/tools/drive/summary";
 import { formatDate, ownerLabel } from "@/features/tools/drive/format";
 import { pageOf, pageForNewSize, PER_PAGE_OPTIONS, DEFAULT_PER_PAGE } from "@/features/tools/drive/paginate";
 
@@ -70,39 +71,7 @@ function Pager({ shown, perPage, onPage, onResize, edge }) {
   );
 }
 
-const MY_DRIVE = "https://drive.google.com/drive/my-drive";
 
-/* Where the file sits, each folder its own link.
-
-   Three states, not two. An empty trail means one of two different things, and
-   showing both as "My Drive" would put a file that lives in a folder this
-   account cannot read at the root of your own Drive — a wrong answer that looks
-   like a confident one. `resolved` separates "still working" from "gave up",
-   which a bare empty Map cannot: `.get()` returns undefined for both. */
-function Trail({ trail, resolved, hasParent }) {
-  if (!resolved) {
-    return <span className="drive-trail"><span>Finding location…</span></span>;
-  }
-  if (!trail?.length) {
-    return (
-      <span className="drive-trail">
-        {hasParent
-          ? <span>Location unavailable</span>
-          : <a href={MY_DRIVE} target="_blank" rel="noreferrer">My Drive</a>}
-      </span>
-    );
-  }
-  return (
-    <span className="drive-trail">
-      {trail.map((folder, i) => (
-        <span key={folder.id} style={{ display: "contents" }}>
-          {i > 0 && <span aria-hidden="true">›</span>}
-          <a href={folderLink(folder.id)} target="_blank" rel="noreferrer">{folder.name}</a>
-        </span>
-      ))}
-    </span>
-  );
-}
 
 export default function DriveSharingCheckPage() {
   const { token, grantedScope, ready, err, configured, authorise, signOut } = useDriveAuth();
@@ -130,15 +99,15 @@ export default function DriveSharingCheckPage() {
   const runId = useRef(0);
   const [scanErr, setScanErr] = useState("");
   const [planning, setPlanning] = useState(false);
-  const [level, setLevel] = useState(null);       // the severity band being filtered to
   const [selected, setSelected] = useState(() => new Set());
+  const [openBand, setOpenBand] = useState(null);   // null = whichever is worst
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [page, setPage] = useState(1);
 
   const run = async () => {
     const id = ++runId.current;
     setBusy(true); setEnriching(false); setScanErr("");
-    setResult(null); setTrails(null); setOwned(null); setPage(1); setLevel(null);
+    setResult(null); setTrails(null); setOwned(null); setPage(1); setOpenBand(null);
     setProgress({ stage: "link", found: 0 });
     let scan = null;
     try {
@@ -232,13 +201,19 @@ export default function DriveSharingCheckPage() {
     [all, owned, result],
   );
 
-  const rows = useMemo(() => filterByLevel(all, level), [all, level]);
+  const bands = useMemo(() => groupByAudience(all), [all]);
+  const said = useMemo(() => verdict(bands, owned?.total), [bands, owned]);
+
+  // The worst band is open unless someone chose another. Deriving it here
+  // rather than storing it means a re-scan that empties that band opens
+  // whatever is now worst, instead of leaving the page with nothing open.
+  const shownBand = bands.find((b) => b.key === openBand) || bands[0] || null;
+  const rows = shownBand ? shownBand.items : [];
   // Counted against everything, not the filtered view: a tick made under one
   // filter is still a tick after you change the filter, and a bar that said
   // "0 selected" while holding five would be lying about what Change will do.
   const picked = useMemo(() => resolveSelection(selected, all), [selected, all]);
-  // Scoped to what is in front of you, for the select-all box only.
-  const inView = useMemo(() => resolveSelection(selected, rows), [selected, rows]);
+  const anySelectable = useMemo(() => resolveSelection(new Set(), all).selectable, [all]);
 
   // A scan rebuilds the findings; ticks for files that are gone must go with
   // them, or the bar counts files the list no longer has.
@@ -249,18 +224,18 @@ export default function DriveSharingCheckPage() {
   // does switching to a filter with fewer rows than the page you were on.
   const shown = pageOf(rows, page, perPage);
   const resize = (next) => { setPage(pageForNewSize(shown.page, perPage, next)); setPerPage(next); };
-  const filter = (band) => { setLevel(toggleLevel(level, band)); setPage(1); };
+  const showBand = (key) => { setOpenBand(key === shownBand?.key ? null : key); setPage(1); };
   const tick = (id) => setSelected((cur) => toggleId(cur, id));
-  const tickAll = () => setSelected((cur) =>
-    inView.allSelected ? clearWithin(cur, rows) : selectAll(cur, rows));
+  const tickEverything = () => setSelected((cur) =>
+    picked.count === anySelectable ? new Set() : selectAll(cur, all));
 
   return (
     <>
       <AppHeader />
       <main style={{ maxWidth: 980, margin: "0 auto", padding: "30px 20px 44px" }}>
-        <h1 style={{ fontFamily: "var(--font-sora)", fontWeight: 800, fontSize: 23, color: "var(--ink)", margin: 0 }}>
+        <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--muted)", margin: "0 0 10px" }}>
           Drive Sharing Check
-        </h1>
+        </p>
         <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "8px 0 20px", lineHeight: 1.6, maxWidth: 680 }}>
           Finds files shared by link or with the whole organisation. Reads names and sharing
           settings only — never contents, and nothing leaves your browser.
@@ -288,13 +263,20 @@ export default function DriveSharingCheckPage() {
           </div>
         )}
 
+        {token && result && !busy && (
+          <>
+            <h1 className="drive-verdict">{said.headline}</h1>
+            {said.detail && <p className="drive-verdict-sub">{said.detail}</p>}
+          </>
+        )}
+
         {token && (
           <>
             <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
               <span style={{ fontSize: 13.5, color: "var(--body)" }}>
                 {busy
                   ? `Scanning… ${progress?.found ?? 0} found so far`
-                  : result ? `${result.counts.total} file${result.counts.total === 1 ? "" : "s"} shared more widely than named people`
+                  : result ? `${result.counts.total} flagged of ${owned?.total ?? "—"} checked`
                   : "Connected. Ready to scan."}
               </span>
               <span style={{ display: "flex", gap: 8 }}>
@@ -338,116 +320,68 @@ export default function DriveSharingCheckPage() {
               </div>
             )}
 
-            <SeveritySummary summary={summary} active={level} onToggle={filter} />
-
             {result && result.findings.length === 0 && !busy && (
               <div style={{ ...card, textAlign: "center", color: "var(--muted)", fontSize: 13.5 }}>
                 Nothing shared by link or organisation-wide. Nothing to do.
               </div>
             )}
 
-            {rows.length > 0 && (
-              <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-                {(inView.selectable > 0 || picked.count > 0) && (
-                  <div className="drive-bulk">
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--muted)", cursor: "pointer" }}>
-                      <input type="checkbox" checked={inView.allSelected} onChange={tickAll}
-                        aria-label={inView.allSelected ? "Clear what is shown" : "Select all changeable files shown"} />
-                      {picked.count
-                        ? `${picked.count} selected${
-                            picked.count > inView.count ? ` · ${picked.count - inView.count} outside this filter` : ""
-                          }`
-                        : `Select all ${inView.selectable} you can change`}
-                    </label>
-                    {picked.count > 0 && (
-                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <button onClick={() => setSelected(new Set())}
-                          style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--muted)", borderRadius: 7, padding: "5px 11px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
-                          Clear
-                        </button>
-                        <button onClick={() => openChange(picked.files)}
-                          style={{ border: "none", background: "var(--blue)", color: "#fff", borderRadius: 7, padding: "5px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
-                          Change {picked.count} file{picked.count === 1 ? "" : "s"}
-                        </button>
-                      </span>
-                    )}
-                  </div>
+            {/* One global bar: a selection spans bands, so its count has to as
+                well. Hidden until there is something to select. */}
+            {(picked.count > 0 || bands.length > 0) && anySelectable > 0 && (
+              <div className="drive-bulk drive-bulk--top">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--muted)", cursor: "pointer" }}>
+                  <input type="checkbox" checked={picked.count > 0 && picked.count === anySelectable}
+                    onChange={tickEverything}
+                    aria-label={picked.count ? "Clear selection" : "Select every file you can change"} />
+                  {picked.count ? `${picked.count} selected` : `Select all ${anySelectable} you can change`}
+                </label>
+                {picked.count > 0 && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button onClick={() => setSelected(new Set())}
+                      style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--muted)", borderRadius: 7, padding: "5px 11px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                      Clear
+                    </button>
+                    <button onClick={() => openChange(picked.files)}
+                      style={{ border: "none", background: "var(--blue)", color: "#fff", borderRadius: 7, padding: "5px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                      Change {picked.count} file{picked.count === 1 ? "" : "s"}
+                    </button>
+                  </span>
                 )}
-                <Pager shown={shown} perPage={perPage} onPage={setPage} onResize={resize} edge="top" />
-
-                {shown.items.map((f) => (
-                  <div key={f.id} className="drive-row">
-                    <span className="drive-rail" style={{ background: LEVEL[f.level].rail }} />
-
-                    {/* A fixed column, so the content column still takes what is
-                        left and the row needs no breakpoint. Files that are not
-                        ours hold the space rather than shifting the row. */}
-                    <span className="drive-tick">
-                      {f.fixable && (
-                        <input type="checkbox" checked={selected.has(f.id)}
-                          onChange={() => tick(f.id)}
-                          aria-label={`Select ${f.name}`} />
-                      )}
-                    </span>
-
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                        <a href={f.link} target="_blank" rel="noreferrer"
-                          style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink)", textDecoration: "none", wordBreak: "break-word" }}>
-                          {f.name}
-                        </a>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", background: LEVEL[f.level].bg, color: LEVEL[f.level].fg }}>
-                          {f.level}
-                        </span>
-                      </span>
-                      <Trail trail={trails?.get(f.id)} resolved={trails !== null} hasParent={(f.parents?.length ?? 0) > 0} />
-                      <span style={{ display: "block", fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{f.label}</span>
-                      <span className="drive-meta">
-                        <span><i>Owner</i><b>{ownerLabel(f.owner, me)}</b></span>
-                        <span><i>Created</i><b>{formatDate(f.createdTime)}</b></span>
-                      </span>
-                      {!f.fixable && (
-                        <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 4 }}>
-                          {/* Owning a file and being allowed to reshare it are
-                              different permissions. Saying "ask the owner" on a
-                              row that also says you own it reads as a bug. */}
-                          {f.ownedByMe
-                            ? "Yours, but this account cannot change its sharing"
-                            : "Not yours to change — ask the owner"}
-                        </span>
-                      )}
-                    </span>
-
-                    {f.fixable ? (
-                      <button onClick={() => openChange(f)}
-                        style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--blue)", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                        Change
-                      </button>
-                    ) : (
-                      remindMailto(f, me) ? (
-                        <a href={remindMailto(f, me)}
-                          style={{ border: "1px solid var(--line)", background: "#fff", color: "var(--muted)", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
-                          Remind owner
-                        </a>
-                      ) : <span />
-                    )}
-                  </div>
-                ))}
-
-                <Pager shown={shown} perPage={perPage} onPage={setPage} onResize={resize} edge="bottom" />
               </div>
             )}
 
-            {/* A filter can empty the list while the scan itself found plenty. */}
-            {all.length > 0 && rows.length === 0 && (
-              <div style={{ ...card, textAlign: "center", color: "var(--muted)", fontSize: 13.5 }}>
-                No {level} findings.{" "}
-                <button onClick={() => filter(level)}
-                  style={{ border: "none", background: "none", color: "var(--blue)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", padding: 0 }}>
-                  Show all {all.length}
-                </button>
-              </div>
-            )}
+            {bands.map((band, i) => {
+              const isOpen = openBand === band.key;
+              const urgent = band.key === BAND_OPEN;
+              const page = isOpen ? shown : null;
+              return (
+                <section key={band.key} className={`drive-band-card${urgent ? " drive-band-card--urgent" : ""}`}>
+                  <button className="drive-band-head" onClick={() => showBand(band.key)}
+                    aria-expanded={isOpen}>
+                    <span className="drive-band-who">{band.who}</span>
+                    <span className="drive-band-n">{band.items.length} file{band.items.length === 1 ? "" : "s"}</span>
+                    <span className="drive-band-why">{band.why}</span>
+                  </button>
+
+                  {isOpen && (
+                    <>
+                      {page.pages > 1 && (
+                        <Pager shown={page} perPage={perPage} onPage={setPage} onResize={resize} edge="top" />
+                      )}
+                      {page.items.map((f) => (
+                        <FindingRow key={f.id} f={f} me={me} urgent={urgent}
+                          trail={trails?.get(f.id)} trailsResolved={trails !== null}
+                          checked={selected.has(f.id)} onTick={tick} onChange={openChange} />
+                      ))}
+                      {page.pages > 1 && (
+                        <Pager shown={page} perPage={perPage} onPage={setPage} onResize={resize} edge="bottom" />
+                      )}
+                    </>
+                  )}
+                </section>
+              );
+            })}
 
             <WatchedFolders
               token={token}
