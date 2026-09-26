@@ -11,7 +11,7 @@ import AccessDialog from "@/features/tools/drive/AccessDialog";
 import PlanFixTime from "@/features/tools/drive/PlanFixTime";
 import WatchedFolders from "@/features/tools/drive/WatchedFolders";
 import FindingRow from "@/features/tools/drive/FindingRow";
-import { groupByAudience, verdict, BAND_OPEN } from "@/features/tools/drive/bands";
+import { groupByAudience, verdict, openBandKey, toggleBand, BAND_OPEN } from "@/features/tools/drive/bands";
 import { toggleId, selectAll, clearWithin, resolveSelection, pruneSelection } from "@/features/tools/drive/select";
 import { resolveTrails, folderLink } from "@/features/tools/drive/paths";
 import { summarise } from "@/features/tools/drive/summary";
@@ -100,14 +100,18 @@ export default function DriveSharingCheckPage() {
   const [scanErr, setScanErr] = useState("");
   const [planning, setPlanning] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
-  const [openBand, setOpenBand] = useState(null);   // null = whichever is worst
+  // Three states, and null cannot carry two of them: undefined is "nobody has
+  // chosen", null is "chosen to close them all", a key is that band. Collapsing
+  // to null used to fall straight back to the default and reopen the band the
+  // click was trying to shut.
+  const [openBand, setOpenBand] = useState(undefined);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [page, setPage] = useState(1);
 
   const run = async () => {
     const id = ++runId.current;
     setBusy(true); setEnriching(false); setScanErr("");
-    setResult(null); setTrails(null); setOwned(null); setPage(1); setOpenBand(null);
+    setResult(null); setTrails(null); setOwned(null); setPage(1); setOpenBand(undefined);
     setProgress({ stage: "link", found: 0 });
     let scan = null;
     try {
@@ -207,7 +211,8 @@ export default function DriveSharingCheckPage() {
   // The worst band is open unless someone chose another. Deriving it here
   // rather than storing it means a re-scan that empties that band opens
   // whatever is now worst, instead of leaving the page with nothing open.
-  const shownBand = bands.find((b) => b.key === openBand) || bands[0] || null;
+  const openKey = openBandKey(bands, openBand);
+  const shownBand = bands.find((b) => b.key === openKey) || null;
   const rows = shownBand ? shownBand.items : [];
   // Counted against everything, not the filtered view: a tick made under one
   // filter is still a tick after you change the filter, and a bar that said
@@ -224,7 +229,7 @@ export default function DriveSharingCheckPage() {
   // does switching to a filter with fewer rows than the page you were on.
   const shown = pageOf(rows, page, perPage);
   const resize = (next) => { setPage(pageForNewSize(shown.page, perPage, next)); setPerPage(next); };
-  const showBand = (key) => { setOpenBand(key === shownBand?.key ? null : key); setPage(1); };
+  const showBand = (key) => { setOpenBand(toggleBand(openKey, key)); setPage(1); };
   const tick = (id) => setSelected((cur) => toggleId(cur, id));
   const tickEverything = () => setSelected((cur) =>
     picked.count === anySelectable ? new Set() : selectAll(cur, all));
@@ -352,7 +357,7 @@ export default function DriveSharingCheckPage() {
             )}
 
             {bands.map((band, i) => {
-              const isOpen = openBand === band.key;
+              const isOpen = openKey === band.key;
               const urgent = band.key === BAND_OPEN;
               const page = isOpen ? shown : null;
               return (

@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import {
-  bandOf, groupByAudience, verdict,
+  bandOf, groupByAudience, verdict, openBandKey, toggleBand,
   BAND_OPEN, BAND_ORG_EDIT, BAND_ORG_VIEW,
 } from "@/features/tools/drive/bands";
 
@@ -111,4 +111,41 @@ test("a clean Drive says so rather than showing an empty list", () => {
 test("the count of files checked is optional", () => {
   expect(say([anyone("a")]).detail).toBe("");
   expect(say([]).detail).toBe("");
+});
+
+// ── which band is open ────────────────────────────────────────────
+
+const three = () => groupByAudience([anyone("a"), org("b", "writer"), org("c", "reader")]);
+
+test("before anyone chooses, the worst band is the open one", () => {
+  // The bug this guards: the page painted three headings and no findings,
+  // because nothing was expanded until the first click.
+  expect(openBandKey(three(), undefined)).toBe(BAND_OPEN);
+});
+
+test("closing on purpose closes, rather than falling back to the default", () => {
+  // null used to mean both "not chosen" and "closed", so collapsing the open
+  // band reopened it.
+  expect(openBandKey(three(), null)).toBe(null);
+});
+
+test("a chosen band stays chosen", () => {
+  expect(openBandKey(three(), BAND_ORG_VIEW)).toBe(BAND_ORG_VIEW);
+});
+
+test("a choice that no longer exists falls back rather than showing nothing", () => {
+  // A re-scan can empty the band you had open.
+  expect(openBandKey(groupByAudience([org("b", "writer")]), BAND_OPEN)).toBe(BAND_ORG_EDIT);
+});
+
+test("no bands at all opens nothing, and does not throw", () => {
+  expect(openBandKey([], undefined)).toBe(null);
+  expect(openBandKey(null, undefined)).toBe(null);
+  expect(openBandKey([], "anything")).toBe(null);
+});
+
+test("clicking the open band closes it, clicking another switches", () => {
+  expect(toggleBand(BAND_OPEN, BAND_OPEN)).toBe(null);
+  expect(toggleBand(BAND_OPEN, BAND_ORG_EDIT)).toBe(BAND_ORG_EDIT);
+  expect(toggleBand(null, BAND_OPEN)).toBe(BAND_OPEN);
 });
