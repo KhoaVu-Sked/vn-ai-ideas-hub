@@ -553,3 +553,48 @@ a {
 @media (max-width: 680px) {
   .hub-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Updates archive ──────────────────────────────────────────────
+   A list beside the note, not above it. The list is sticky so you can
+   switch without scrolling back up, and it stacks on a narrow screen
+   where two columns would leave neither readable. */
+.updates-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.updates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: sticky;
+  top: 18px;
+}
+.updates-list__item {
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--muted);
+  font: inherit;
+  transition: border-color .12s ease, background .12s ease;
+}
+.updates-list__item:hover { border-color: #c9d6ea; }
+.updates-list__item.is-active {
+  border-color: var(--blue);
+  background: #f5f9ff;
+  color: var(--ink);
+}
+.updates-body {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px 24px;
+}
+@media (max-width: 760px) {
+  .updates-layout { grid-template-columns: 1fr; }
+  .updates-list { position: static; }
+}
