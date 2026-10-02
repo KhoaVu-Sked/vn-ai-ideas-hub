@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SCOPE_READ } from "./constants";
-import { pickScope, mergeScopes, scopesInclude } from "./scopes";
+import { pickScope, mergeScopes, scopesInclude, tokenRequestOptions } from "./scopes";
 
 const GIS_SRC = "https://accounts.google.com/gsi/client";
 
@@ -35,12 +35,18 @@ function loadGis() {
   });
 }
 
-export default function useDriveAuth(scope = SCOPE_READ) {
+// `hint` is the address the person signed in to TS Hub with. See
+// tokenRequestOptions: it is what lets a returning visit skip the account
+// chooser and the consent screen.
+export default function useDriveAuth(scope = SCOPE_READ, { hint } = {}) {
   const [token, setToken] = useState(null);
   const [grantedScope, setGrantedScope] = useState("");
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState("");
   const clientRef = useRef(null);
+  // Set by Disconnect, cleared on the next grant: the one time the chooser
+  // should come back is right after someone deliberately let go of an account.
+  const chooseAccountNext = useRef(false);
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_CLIENT_ID || "";
 
   useEffect(() => {
@@ -77,6 +83,7 @@ export default function useDriveAuth(scope = SCOPE_READ) {
             return;
           }
           const granted = res.scope || "";
+          chooseAccountNext.current = false;
           setToken(res.access_token || null);
           setGrantedScope(granted);
 
@@ -101,8 +108,10 @@ export default function useDriveAuth(scope = SCOPE_READ) {
       });
       clientRef.current.__scope = asking;
     }
-    clientRef.current.requestAccessToken();
-  }, [ready, clientId, scope, grantedScope]);
+    clientRef.current.requestAccessToken(
+      tokenRequestOptions(hint, { chooseAccount: chooseAccountNext.current }),
+    );
+  }, [ready, clientId, scope, grantedScope, hint]);
 
   // Hand the token back to Google and drop it here. Closing the tab does the
   // same thing; this just makes it deliberate.
@@ -112,6 +121,7 @@ export default function useDriveAuth(scope = SCOPE_READ) {
     }
     setToken(null);
     setGrantedScope("");
+    chooseAccountNext.current = true;
   }, [token]);
 
   return { token, grantedScope, ready, err, configured: Boolean(clientId), authorise, signOut };

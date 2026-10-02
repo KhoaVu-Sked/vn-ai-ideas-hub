@@ -52,3 +52,26 @@ export function mergeScopes(grantedScopeString, wanted) {
 export function pickScope(wanted, fallback) {
   return typeof wanted === "string" && wanted.trim() ? wanted : fallback;
 }
+
+/**
+ * How to ask Google for the token.
+ *
+ * Google's default for a token request is `select_account`, so every visit
+ * showed the account chooser even to someone who had granted access the day
+ * before — signed in to TS Hub with Google, then asked to pick a Google account
+ * again. An empty prompt means "only ask what has not been answered": after the
+ * first consent the popup opens and closes by itself. The hint is the address
+ * the person signed in to TS Hub with, so Google does not have to ask which
+ * account either.
+ *
+ * `chooseAccount` puts the chooser back. After Disconnect that is what someone
+ * means — otherwise the hint would pin the tool to one account for good, with
+ * no way to scan a different Drive.
+ */
+export function tokenRequestOptions(hint, { chooseAccount = false } = {}) {
+  if (chooseAccount) return { prompt: "select_account" };
+  const email = typeof hint === "string" ? hint.trim() : "";
+  const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return looksLikeEmail ? { prompt: "", login_hint: email } : { prompt: "" };
+}
+

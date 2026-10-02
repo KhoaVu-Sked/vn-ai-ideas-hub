@@ -7,7 +7,7 @@ import { endSession } from "@/lib/apiClient";
 //
 //   user === undefined → still loading
 //   user === null      → not signed in (or the fetch failed)
-//   user               → { id, username, role, name, avatar_color, avatar_url,
+//   user               → { id, username, email, role, name, avatar_color, avatar_url,
 //                          position, calendar_connected, onboarded }
 //
 // Call refresh() after changing your own profile so the header avatar and
