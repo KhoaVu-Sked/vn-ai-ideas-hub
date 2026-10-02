@@ -1,19 +1,84 @@
-// "What's New", shown once per person per release.
+// "What's New", and the archive behind it.
 //
-// The only database involvement is accounts.last_seen_release, which remembers
-// the key someone last dismissed. Each release changes RELEASE and NEWS below —
-// no SQL, no admin screen. Because the announcement ships with the deploy it
-// describes, it cannot advertise something that is not live yet.
+// RELEASES is every note ever shown, newest first. The modal still shows one —
+// the newest — and accounts.last_seen_release still remembers the key someone
+// dismissed, so the dismissal logic and /api/whats-new are unchanged. The
+// archive at /updates is simply a second reader of the same list.
 //
 // A null last_seen_release counts as "not seen", so someone joining today gets
 // the current note rather than nothing.
 //
-// Bump RELEASE whenever NEWS changes, or nobody who dismissed the previous note
-// will ever see the new one.
+// To publish an update: add an entry at the TOP of RELEASES. RELEASE and NEWS
+// derive from it, so there is nothing else to bump — and forgetting to bump was
+// the old failure, where a changed note reached nobody who had dismissed the
+// previous one.
+//
+// `key` identifies a release and must never change once shipped: it is the
+// value sitting in people's accounts rows. `date` is content, shown in the
+// archive — which is why it is a field rather than something parsed back out of
+// the key.
 
-export const RELEASE = "2026-09-03-ts-hub-learning";
+export const RELEASES = [
+  {
+    key: "2026-10-02-tools-and-core-competency",
+    date: "2 October 2026",
+    greeting: "Thanks for using TS Hub \u2727 \u00b7 \u2726 \u00b7 \u2727",
+    title: "What's New: Tools, and the Core Competency track",
+    intro: "Two things this time. TS Hub has a third section called Tools, holding small "
+         + "utilities that work on your own account \u2014 the first is a check for Google Drive "
+         + "files shared more widely than you meant. And the Core Competency track now covers "
+         + "the Junior tier as well as Intern.",
 
-export const NEWS = {
+    items: [
+      {
+        heading: "Tools, and the first one in it",
+        body: "The home page now offers a third choice. Tools holds small utilities that run on "
+            + "your own account and your own data, rather than anything stored centrally here. "
+            + "It is its own section with its own list, so more can be added without crowding "
+            + "the ideas board or the Learning Hub.",
+      },
+      {
+        heading: "Drive Sharing Check",
+        body: "Finds files in your Google Drive shared by link or with the whole organisation, "
+            + "grouped by who can actually open them, and lets you narrow that access back down "
+            + "without leaving the page. You can change several files at once. It reads file "
+            + "names and sharing settings only \u2014 never what is inside a file \u2014 and nothing it "
+            + "finds is sent to this app or stored anywhere central.",
+      },
+      {
+        heading: "It will not touch files you do not own",
+        body: "Files owned by someone else are listed and classified, but offer Remind owner "
+            + "instead of a change, which opens an email naming the file and the problem. Google "
+            + "would refuse the change anyway, but the real reason is that quietly re-sharing "
+            + "another team's document is not this tool's call to make.",
+      },
+      {
+        heading: "Watched folders",
+        body: "Name a folder and you get an email when the sharing inside it changes, including "
+            + "folders other people own. The watching is a Google Apps Script you install once "
+            + "under your own account, so it runs on Google's timer rather than this app's "
+            + "server, and no password or token of yours is stored anywhere.",
+      },
+      {
+        heading: "Core Competency now reaches Junior",
+        body: "The Core Competency track \u2014 our own career-ladder learning plan, as distinct from "
+            + "the AI Track \u2014 has gained the Junior tier: twelve more courses with their "
+            + "quizzes, on top of the thirty-six already there at Intern. The master plan runs "
+            + "all the way to Principal and the remaining tiers follow the same route as that "
+            + "content is prepared.",
+      },
+      {
+        heading: "Every update in one place",
+        body: "There is now an Updates section on the home page keeping every one of these notes, "
+            + "including the previous ones. If you dismissed something before reading it, or "
+            + "want to check what changed and when, it is all there.",
+      },
+    ],
+  },
+
+  {
+    key: "2026-09-03-ts-hub-learning",
+    date: "3 September 2026",
   greeting: "Thanks for using TS Hub 𓇼 ⋆.˚ 𓆉 𓆝 𓆡⋆.˚ 𓇼",
   title: "What's New: TS Hub, and a Learning Hub",
   intro: "This is a bigger update than usual. The app now has two halves — the ideas board you "
@@ -97,4 +162,11 @@ export const NEWS = {
           + "saving you from accidental clicks.",
     },
   ],
-};
+  },
+];
+
+// The newest note is the one the modal shows and the one dismissal compares
+// against. Deriving both means a new entry cannot be added without also
+// becoming current, which is the mistake this used to invite.
+export const RELEASE = RELEASES[0].key;
+export const NEWS = RELEASES[0];

@@ -540,3 +540,16 @@ a {
 }
 .drive-suggest button:hover, .drive-suggest button[data-active="true"] { background: var(--bg); }
 .drive-suggest button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+
+/* ── Hub chooser grid ─────────────────────────────────────────────
+   Deliberately a fixed pair rather than auto-fit. With four cards,
+   auto-fit resolves to three columns at common widths and leaves the
+   fourth alone on a second row; an even grid never does. */
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+@media (max-width: 680px) {
+  .hub-grid { grid-template-columns: 1fr; }
+}

@@ -33,6 +33,13 @@ const HUBS = [
     cta: "Open Tools",
     glyph: "🧰",
   },
+  {
+    href: "/updates",
+    name: "Updates",
+    line: "Everything that has changed in TS Hub, including any note you dismissed before reading it.",
+    cta: "See what's new",
+    glyph: "📣",
+  },
 ];
 
 export default function HubChooserPage() {
@@ -50,13 +57,16 @@ export default function HubChooserPage() {
             Where are you headed?
           </h1>
           <p style={{ fontSize: 14.5, color: "var(--muted)", margin: "10px 0 0", lineHeight: 1.6 }}>
-            Two halves of one place. You can switch between them at any time from the header.
+            Pick where you're working. You can switch at any time from the header.
           </p>
         </div>
 
-        {/* auto-fit rather than a media query: the cards drop to one column
-            when there isn't room for two, without picking a breakpoint. */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
+        {/* Two columns, not auto-fit. With four cards auto-fit resolves to three
+            at common widths and strands the fourth alone on its own row, which
+            reads as a rendering fault rather than a layout. A fixed pair stays
+            even however many cards there are, and .hub-grid drops to one column
+            on a narrow screen. */}
+        <div className="hub-grid">
           {hubs.map((h) => (
             <Link key={h.name} href={h.href} className="hub-card">
               <span style={{ fontSize: 32, lineHeight: 1 }} aria-hidden="true">{h.glyph}</span>

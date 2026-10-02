@@ -236,13 +236,31 @@ const fail = (check, detail, why) => problems.push({ check, detail, why });
 {
   const src = read("features/announcements/release.js");
   if (src) {
-    const rel = (src.match(/export const RELEASE = "([^"]+)"/) || [])[1];
-    if (!rel) fail("release", "features/announcements/release.js", "no RELEASE constant");
-    else {
-      // The key is a date plus a slug; a stale one is the common mistake.
-      const dated = /^\d{4}-\d{2}-\d{2}/.test(rel);
-      if (!dated) {
-        fail("release", `RELEASE = "${rel}"`, "start it with a date so a stale key is obvious at a glance");
+    const keys = [...src.matchAll(/^\s*key:\s*"([^"]+)"/gm)].map((m) => m[1]);
+
+    if (!/export const RELEASE = RELEASES\[0\]\.key/.test(src)) {
+      fail("release", "features/announcements/release.js",
+        "RELEASE must derive from RELEASES[0].key — a hand-written one can fall out of step with the note it is meant to identify");
+    }
+    if (keys.length === 0) fail("release", "features/announcements/release.js", "no releases in RELEASES");
+
+    for (const k of keys) {
+      if (!/^\d{4}-\d{2}-\d{2}/.test(k)) {
+        fail("release", `key "${k}"`, "start it with a date so a stale key is obvious at a glance");
+      }
+    }
+    // A duplicate key means dismissing one note silently dismisses the other,
+    // and the archive renders two entries that claim to be the same release.
+    const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
+    for (const k of new Set(dupes)) fail("release", `key "${k}"`, "appears twice; keys identify a release and live in people's accounts rows");
+
+    // RELEASE is RELEASES[0], so the newest note must be first. Out of order,
+    // the modal advertises an old release and the new one reaches nobody.
+    const dates = keys.map((k) => k.slice(0, 10));
+    for (let i = 1; i < dates.length; i++) {
+      if (dates[i] > dates[i - 1]) {
+        fail("release", `${keys[i]} after ${keys[i - 1]}`,
+          "RELEASES must be newest first — RELEASE takes the first entry, so a later date further down never becomes current");
       }
     }
   }

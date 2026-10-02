@@ -29,6 +29,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
   const hub = pathname === "/" ? null
     : pathname.startsWith("/learning") ? "learning"
     : pathname.startsWith("/tools") ? "tools"
+    : pathname.startsWith("/updates") ? "updates"
     : "ideas";
   const { user: me } = useSession();
   const [openMenu, setOpenMenu] = useState(null); // 'manage' | 'avatar'
@@ -47,6 +48,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
   const inIdeas = hub === "ideas";
   const inLearning = hub === "learning";
   const inTools = hub === "tools";
+  const inUpdates = hub === "updates";
   const hubAdmin = Boolean(hub) && admin; // Tasks/Activity/Manage: shared by every hub, admin only
   const signOut = async () => { try { await fetch("/api/auth/logout", { method: "POST" }); } finally { window.location.href = "/login"; } };
 
@@ -79,6 +81,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
         {inLearning && me?.onboarded && <Link href="/learning/dashboard" className="hdr-nav">My Dashboard</Link>}
         {inLearning && admin && <Link href="/learning/team" className="hdr-nav">Team</Link>}
         {inTools && <Link href="/tools" className="hdr-nav">All tools</Link>}
+        {inUpdates && <Link href="/updates" className="hdr-nav">All updates</Link>}
         {hubAdmin && <Link href="/tasks" className="hdr-nav">Tasks</Link>}
         {hubAdmin && <Link href="/activity" className="hdr-nav">Activity</Link>}
         {hubAdmin && (
@@ -95,7 +98,7 @@ export default function AppHeader({ crumb, onNewIdea, search, onSearch }) {
 
       <span className="app-header__spacer" />
 
-      {(inLearning || inTools) && (
+      {(inLearning || inTools || inUpdates) && (
         <Link href="/ideas" className="hdr-cross hdr-cross--hot">💡 Go to the Ideas Hub</Link>
       )}
 
