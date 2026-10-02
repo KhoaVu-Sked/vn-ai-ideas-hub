@@ -3,7 +3,7 @@
 
 import { test, expect } from "bun:test";
 import { classify, canFix, verbFor } from "../classify";
-import { scopesInclude, canWrite, canSeeCalendar, mergeScopes } from "../scopes";
+import { scopesInclude, canWrite, canSeeCalendar, mergeScopes, tokenRequestOptions } from "../scopes";
 
 const owner = { type: "user", role: "owner", id: "o1" };
 
@@ -150,4 +150,26 @@ test("merging copes with nothing on either side", () => {
   expect(mergeScopes(null, cal)).toBe(cal);
   expect(mergeScopes(cal, "")).toBe(cal);
   expect(mergeScopes(null, null)).toBe("");
+});
+
+test("a returning visit asks Google for nothing it has already been told", () => {
+  // Google's default is select_account, so every visit showed the chooser even
+  // to someone already signed in to TS Hub with that same Google account.
+  expect(tokenRequestOptions("tlai@skedulo.com")).toEqual({ prompt: "", login_hint: "tlai@skedulo.com" });
+});
+
+test("no usable address still skips the chooser, just without a hint", () => {
+  expect(tokenRequestOptions("")).toEqual({ prompt: "" });
+  expect(tokenRequestOptions(null)).toEqual({ prompt: "" });
+  expect(tokenRequestOptions("not-an-email")).toEqual({ prompt: "" });
+  expect(tokenRequestOptions({ email: "x@y.com" })).toEqual({ prompt: "" });
+});
+
+test("a hint with stray spaces is trimmed, not sent as typed", () => {
+  expect(tokenRequestOptions("  tlai@skedulo.com ").login_hint).toBe("tlai@skedulo.com");
+});
+
+test("after Disconnect the account chooser comes back", () => {
+  // Without this the hint pins the tool to one Google account for good.
+  expect(tokenRequestOptions("tlai@skedulo.com", { chooseAccount: true })).toEqual({ prompt: "select_account" });
 });

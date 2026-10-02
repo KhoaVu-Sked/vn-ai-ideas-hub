@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import useDriveAuth from "@/features/tools/drive/useDriveAuth";
+import ConnectCard from "@/features/tools/drive/ConnectCard";
+import { useSession } from "@/features/auth/SessionProvider";
 import { scanDrive, fetchAccountEmail, countOwnedFiles } from "@/features/tools/drive/scan";
 import { planOperations, applyPlan, remindMailto } from "@/features/tools/drive/fix";
 import { canWrite } from "@/features/tools/drive/scopes";
@@ -74,7 +76,9 @@ function Pager({ shown, perPage, onPage, onResize, edge }) {
 
 
 export default function DriveSharingCheckPage() {
-  const { token, grantedScope, ready, err, configured, authorise, signOut } = useDriveAuth();
+  const { user } = useSession();
+  const { token, grantedScope, ready, err, configured, authorise, signOut } =
+    useDriveAuth(undefined, { hint: user?.email });
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(null);   // the file whose dialog is open
   const [applying, setApplying] = useState(false);
@@ -150,6 +154,17 @@ export default function DriveSharingCheckPage() {
       if (id === runId.current) setEnriching(false);
     }
   };
+
+  // One button where there used to be two. Pressing Scan before Google has
+  // handed over a token asks for one, and the scan starts when it arrives.
+  const [scanOnConnect, setScanOnConnect] = useState(false);
+  const connectAndScan = () => { setScanOnConnect(true); authorise(); };
+  useEffect(() => {
+    if (token && scanOnConnect) { setScanOnConnect(false); run(); }
+  }, [token, scanOnConnect]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // A refused or closed prompt must not leave a scan queued for some later,
+  // unrelated grant to set off.
+  useEffect(() => { if (err) setScanOnConnect(false); }, [err]);
 
   const openChange = (target) => {
     setNote("");
@@ -254,18 +269,7 @@ export default function DriveSharingCheckPage() {
         )}
 
         {configured && !token && (
-          <div style={card}>
-            <p style={{ margin: "0 0 14px", fontSize: 13.5, color: "var(--body)", lineHeight: 1.6 }}>
-              Connect your Google account to scan. Separate from your TS Hub sign-in, and read-only.
-            </p>
-            <button onClick={() => authorise()} disabled={!ready}
-              style={{ background: "var(--blue)", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13.5, fontWeight: 700, cursor: ready ? "pointer" : "wait" }}>
-              {ready ? "Connect Google Drive" : "Loading…"}
-            </button>
-            {err && err !== "not-configured" && (
-              <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12.5, color: "#c92a2a", lineHeight: 1.6 }}>{err}</p>
-            )}
-          </div>
+          <ConnectCard ready={ready} pending={scanOnConnect} err={err} onScan={connectAndScan} />
         )}
 
         {token && result && !busy && (

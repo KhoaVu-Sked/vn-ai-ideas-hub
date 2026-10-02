@@ -13,6 +13,10 @@ export async function GET() {
     user: {
       id: user.uid,
       username: user.username,
+      // The person's own address, returned only to themselves. The Drive tool
+      // passes it to Google as a login hint, which is what lets a returning
+      // visit skip the account chooser.
+      email: profile?.email || null,
       role: user.role,
       name: profile?.name || null,
       avatar_color: profile?.avatar_color || null,

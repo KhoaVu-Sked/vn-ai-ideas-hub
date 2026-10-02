@@ -1340,7 +1340,9 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);
 
       <p>Finds files in your Google Drive shared by link or with the whole organisation, and lets you narrow that access back down. Originally built by Thao Lai as a standalone tool.</p>
 
-      <p>You connect your Google account separately from signing in to TS Hub. That is deliberate: asking for your Drive at sign-in would prompt everyone who opens the ideas board, whether or not they ever use this.</p>
+      <p><b>Scan my Drive</b> asks Google for read-only access and starts the scan as soon as it is granted. The first time, Google asks you to allow it. After that it is one click: Google already knows which account you signed in to TS Hub with, so the window opens and closes by itself without asking you to pick an account.</p>
+
+      <p>It is still a separate permission from your TS Hub sign-in, on purpose: asking for your Drive at sign-in would prompt everyone who opens the ideas board, whether or not they ever use this. The access lasts until you close the tab. <b>Disconnect</b> hands it back to Google entirely, so the next scan asks you to choose an account and allow it again.</p>
 
       <div class="tw">
         <table>
