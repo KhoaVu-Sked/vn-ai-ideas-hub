@@ -68,12 +68,15 @@ export function relTime(iso, now = Date.now()) {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
-/** What the last run covered, named rather than counted where possible. */
-export function watchedSummary(status) {
-  if (!status) return "";
-  if (status.watchedRoots.length) return `Watching ${status.watchedRoots.join(", ")}`;
-  if (status.watching) return `Watching ${status.watching} item${status.watching === 1 ? "" : "s"}`;
-  return "Watching nothing yet";
+/**
+ * What the last run covered, named rather than counted where possible. Split in
+ * two so the folder names can be set apart from the sentence around them.
+ */
+export function watchedParts(status) {
+  if (!status) return null;
+  if (status.watchedRoots.length) return { lead: "Watching", names: status.watchedRoots.join(", ") };
+  if (status.watching) return { lead: `Watching ${status.watching} item${status.watching === 1 ? "" : "s"}`, names: "" };
+  return { lead: "Watching nothing yet", names: "" };
 }
 
 /** What the last run found, or that it found nothing. */

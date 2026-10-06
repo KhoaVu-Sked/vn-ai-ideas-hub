@@ -15,12 +15,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   readSettings, writeSettings, lookupFolder, folderIdFrom, looksLikeDriveUrl,
-  normaliseSchedule, notifyEmailProblem, describeSchedule, SCHEDULE_PLACEHOLDER,
+  normaliseSchedule, notifyEmailProblem, SCHEDULE_PLACEHOLDER,
   FREQUENCIES, DAYS, usesHour, usesDay,
 } from "@/features/tools/drive/settings";
 import { searchFolders, ambiguous } from "@/features/tools/drive/search";
 import { resolveTrails, distinguishingLabels } from "@/features/tools/drive/paths";
-import { readStatus, runState, relTime, watchedSummary, lastResult } from "@/features/tools/drive/status";
+import { readStatus, runState, relTime, watchedParts, lastResult } from "@/features/tools/drive/status";
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 };
 const label = { fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: ".05em", textTransform: "uppercase" };
@@ -221,6 +221,8 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
   const chosen = normaliseSchedule(settings.schedule);
   const schedule = chosen || SCHEDULE_PLACEHOLDER;
   const emailProblem = notifyEmailProblem(emailDraft);
+  const parts = watchedParts(status);
+  const result = lastResult(status);
 
   return (
     <div style={{ ...card, marginTop: 16 }}>
@@ -244,9 +246,13 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
           {status?.schedule && <span style={{ color: "var(--muted)" }}> · {status.schedule}</span>}
           {status?.lastRun && <span style={{ color: "var(--muted)" }}> · ran {relTime(status.lastRun)}</span>}
           <span style={{ display: "block", color: "var(--muted)", marginTop: 2 }}>
-            {status
-              ? [watchedSummary(status), lastResult(status)].filter(Boolean).join(" · ")
-              : "Set a schedule below, then run the Apps Script project once to start it."}
+            {parts ? (
+              <>
+                {parts.lead}
+                {parts.names && <> <b style={{ fontWeight: 700, color: "var(--ink)" }}>{parts.names}</b></>}
+                {result && ` · ${result}`}
+              </>
+            ) : "Set a schedule below, then run the Apps Script project once to start it."}
           </span>
           {status?.problem && (
             <span style={{ display: "block", color: "var(--warn, #b7791f)", marginTop: 2 }}>
@@ -265,7 +271,7 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
         <div style={{ marginBottom: 12 }}>
           {settings.watchlist.map((id) => (
             <div key={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: "1px solid var(--line)" }}>
-              <span style={{ fontSize: 13, color: "var(--ink)", wordBreak: "break-all" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", wordBreak: "break-all" }}>
                 {names[id] || id}
               </span>
               <button disabled={busy}
@@ -345,7 +351,7 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
                 schedule existed made picking one a one-way door: the file kept
                 a schedule for good and the script's own setting could never be
                 handed back control. */}
-            <option value="">Leave as the script has it</option>
+            <option value="">Not set</option>
             {FREQUENCIES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
 
@@ -397,14 +403,6 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
             Emails {settings.notifyEmail.split(/[,;]+/).map((a) => a.trim()).filter(Boolean).join(", ")}.
           </p>
         ) : null}
-
-        {/* Two things nobody guesses: whose clock the schedule runs on, and that
-            silence is not an all-clear. Everything else that was here was
-            reassurance, and reassurance is what people stop reading. */}
-        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.6 }}>
-          {describeSchedule(settings.schedule)}, in the script&rsquo;s timezone. It emails only when
-          something changed — silence is not an all-clear.
-        </p>
       </div>
 
       <p style={{ margin: "14px 0 0", fontSize: 11.5, color: "var(--faint)", lineHeight: 1.6, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
