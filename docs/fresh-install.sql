@@ -387,3 +387,42 @@ values ('skedadmin', 'khoa.vu@skedulo.com', '$2b$10$jXuVkyeenk74ziHvW17gtuAZMdtD
 on conflict (username) do nothing;
 update accounts set name = 'Sked Admin' where username = 'skedadmin' and name is null;
 update accounts set email = 'khoa.vu@skedulo.com' where username = 'skedadmin' and email is null;
+
+-- ── /game: roulette ──
+create table if not exists game_rounds (
+  id          bigserial primary key,
+  game        text not null default 'roulette',
+  opened_at   timestamptz not null default now(),
+  closes_at   timestamptz not null,          -- betting deadline
+  result      integer,                       -- 0..36, null until settled
+  settled_at  timestamptz
+);
+create unique index if not exists game_rounds_open_one
+  on game_rounds (game) where settled_at is null;
+create table if not exists game_bets (
+  id         bigserial primary key,
+  round_id   bigint not null references game_rounds(id) on delete cascade,
+  account_id uuid not null references accounts(id) on delete cascade,
+  kind       text not null,     -- number | red | black | odd | even | low | high | dozen | column
+  value      text,              -- the number, dozen or column; null where kind says enough
+  stake      integer not null check (stake > 0),
+  payout     integer,           -- null until settled; 0 means lost
+  created_at timestamptz not null default now()
+);
+create index if not exists game_bets_round on game_bets (round_id);
+create table if not exists game_balances (
+  account_id uuid primary key references accounts(id) on delete cascade,
+  coins      integer not null default 10000 check (coins >= 0),
+  updated_at timestamptz not null default now()
+);
+create table if not exists game_chat (
+  id         bigserial primary key,
+  account_id uuid not null references accounts(id) on delete cascade,
+  body       text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists game_chat_recent on game_chat (created_at desc);
+create table if not exists game_presence (
+  account_id uuid primary key references accounts(id) on delete cascade,
+  seen_at    timestamptz not null default now()
+);

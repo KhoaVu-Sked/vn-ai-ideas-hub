@@ -18,6 +18,14 @@ This repo also hosts a second, largely independent feature — **AI Learning** (
 
 One deliberate exception to "independent": both dashboards' Application cards read the Ideas Hub's own `ideas` table (status, plus `features/ideas/constants.js`'s status vocabulary/colors) for "ideas shipped by learners." Team view's card stays owner-only (`initiator_account_id`); the Learner Dashboard's own card also reads `idea_members` so an idea a learner joined in a non-Initiator role (AI Design, Tester, ...) shows up too, tagged with that role. Renaming an idea status reaches AI Learning too now — see `docs/change-map.md`.
 
+## A hidden /game area
+
+`/game` holds small multiplayer games, reachable only by typing the URL —
+nothing links to it and neither guide mentions it, on purpose. The first is
+roulette at `/game/roulette`: one shared table, server-drawn results, play coins
+with no value. Tables are `game_*` (migration 031); the logic worth trusting is
+`features/game/roulette/payouts.js`, which is pure and tested.
+
 ## Before changing anything — read this first
 
 **Read [`docs/change-map.md`](docs/change-map.md) before editing code.** It lists

@@ -107,6 +107,23 @@ literal one.
 There is a third copy — Thao Lai's original tool, still live. This checker
 cannot see that one.
 
+### Anything under /game
+
+**Do not add it to the guides, the home page, or the header.** `/game` is
+reachable only by typing the URL, and that is the point — it is a toy, not a
+feature of the product. This is a deliberate exception to the rule above about
+anything a user sees, and the exception is easy to "fix" by accident.
+
+It is still behind sign-in: `middleware.js`'s matcher covers it like any other
+page. Hidden is not the same as open.
+
+| Also true | Why |
+|---|---|
+| The wheel reads the last *settled* round | An open round has no result, so reading it off the current round means the wheel never turns |
+| The result is drawn with `crypto.randomInt` | Not because anyone will attack a toy, but a predictable wheel stops being a game |
+| Settling is `where settled_at is null` | Every client asks; the first wins and the rest write nothing, which is why there is no scheduler |
+| Coins are play money | No value, no exchange, no real stake. If that ever changes, this becomes a different conversation entirely |
+
 ### A shared component
 
 `components/` is used by more than one feature; `features/<name>/` is not.
