@@ -65,52 +65,47 @@ test("every finding lands in exactly one band", () => {
 
 // ── the sentence ──────────────────────────────────────────────────
 
-const say = (findings, scanned) => verdict(groupByAudience(findings), scanned);
+const say = (findings) => verdict(groupByAudience(findings));
 
 test("one open file reads as a sentence, not a counter", () => {
-  const v = say([anyone("a")], 502);
-  expect(v.headline).toBe("One file is open to anyone with the link.");
-  expect(v.detail).toBe("502 files checked.");
+  expect(say([anyone("a")])).toBe("One file is open to anyone with the link.");
 });
 
 test("the open band leads even when another band is larger", () => {
   // The only one with a deadline goes first, however small.
   const v = say([anyone("a"), ...Array.from({ length: 60 }, (_, i) => org(`v${i}`, "reader"))]);
-  expect(v.headline).toBe("One file is open to anyone with the link.");
-  expect(v.detail).toContain("60 are visible across the company but not editable.");
+  expect(v).toBe("One file is open to anyone with the link.");
 });
 
 test("with nothing open, the widest band that exists leads", () => {
-  expect(say([org("a", "writer")]).headline)
-    .toBe("One file can be edited by everyone at your organisation.");
-  expect(say([org("a", "reader")]).headline)
-    .toBe("One file is visible across your organisation.");
+  expect(say([org("a", "writer")])).toBe("One file can be edited by everyone at your organisation.");
+  expect(say([org("a", "reader")])).toBe("One file is visible across your organisation.");
 });
 
 test("small numbers are words and large ones are digits", () => {
-  expect(say(Array.from({ length: 6 }, (_, i) => anyone(`a${i}`))).headline)
+  expect(say(Array.from({ length: 6 }, (_, i) => anyone(`a${i}`))))
     .toBe("Six files are open to anyone with the link.");
-  expect(say(Array.from({ length: 23 }, (_, i) => anyone(`a${i}`))).headline)
+  expect(say(Array.from({ length: 23 }, (_, i) => anyone(`a${i}`))))
     .toBe("23 files are open to anyone with the link.");
 });
 
-test("singular and plural agree in every clause", () => {
-  const v = say([anyone("a"), org("b", "writer"), org("c", "reader")], 1);
-  expect(v.headline).toBe("One file is open to anyone with the link.");
-  expect(v.detail).toContain("One more can be edited");
-  expect(v.detail).toContain("1 is visible across the company");
-  expect(v.detail).toContain("1 file checked.");
+test("singular and plural agree in every branch", () => {
+  expect(say([anyone("a")])).toBe("One file is open to anyone with the link.");
+  expect(say([anyone("a"), anyone("b")])).toBe("Two files are open to anyone with the link.");
+  expect(say([org("a", "writer"), org("b", "writer")]))
+    .toBe("Two files can be edited by everyone at your organisation.");
+  expect(say([org("a", "reader")])).toBe("One file is visible across your organisation.");
+  expect(say([org("a", "reader"), org("b", "reader")]))
+    .toBe("Two files are visible across your organisation.");
 });
 
 test("a clean Drive says so rather than showing an empty list", () => {
-  const v = say([], 502);
-  expect(v.headline).toBe("Nothing is shared more widely than named people.");
-  expect(v.detail).toBe("502 files checked.");
+  expect(say([])).toBe("Nothing is shared more widely than named people.");
 });
 
-test("the count of files checked is optional", () => {
-  expect(say([anyone("a")]).detail).toBe("");
-  expect(say([]).detail).toBe("");
+test("the verdict is only the sentence, with nothing trailing it", () => {
+  // The line under the headline repeated numbers the bands already show.
+  expect(typeof say([anyone("a"), org("b", "writer"), org("c", "reader")])).toBe("string");
 });
 
 // ── which band is open ────────────────────────────────────────────

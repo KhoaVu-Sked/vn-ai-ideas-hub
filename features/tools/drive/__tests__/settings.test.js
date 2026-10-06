@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import {
   normaliseSettings, folderIdFrom, looksLikeDriveUrl, normaliseSchedule, notifyEmailProblem,
-  describeSchedule, usesHour, usesDay, FREQUENCIES, DAYS,
+  usesHour, usesDay, FREQUENCIES, DAYS,
 } from "../settings";
 
 test("an absent paused key means not paused, never the previous value", () => {
@@ -140,17 +140,6 @@ test("a mistyped address is caught before the watcher mails nowhere", () => {
 test("the notification address is trimmed on the way in", () => {
   expect(normaliseSettings({ notifyEmail: "  a@x.com  " }).notifyEmail).toBe("a@x.com");
   expect(normaliseSettings({ notifyEmail: 42 }).notifyEmail).toBe("");
-});
-
-test("a schedule reads back the way the watcher describes itself", () => {
-  expect(describeSchedule({ frequency: "weekly", dayOfWeek: "MONDAY", hour: 9 })).toBe("Every Monday at 09:00");
-  expect(describeSchedule({ frequency: "daily", hour: 17 })).toBe("Every day at 17:00");
-  expect(describeSchedule({ frequency: "hourly" })).toBe("Every hour");
-  expect(describeSchedule({ frequency: "every15min" })).toBe("Every 15 minutes");
-  // Nothing chosen is its own sentence. Naming a cadence here would describe a
-  // schedule this tool has not set and cannot see.
-  expect(describeSchedule(null)).toBe("On whatever schedule the script itself is set to");
-  expect(describeSchedule("weekly")).toBe("On whatever schedule the script itself is set to");
 });
 
 test("only a URL counts as a pasted link, not any id-shaped name", () => {

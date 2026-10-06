@@ -438,9 +438,8 @@ a {
 .drive-verdict {
   font-family: var(--font-sora), system-ui, sans-serif;
   font-weight: 600; font-size: 25px; line-height: 1.32; color: var(--ink);
-  margin: 0 0 8px; max-width: 30ch; text-wrap: balance;
+  margin: 0 0 16px; max-width: 30ch; text-wrap: balance;
 }
-.drive-verdict-sub { margin: 0 0 20px; font-size: 13.5px; color: var(--muted); max-width: 62ch; line-height: 1.6; }
 
 /* A band is an audience: who can open these files, in their words rather than
    ours. The heading carries the classification so the rows do not have to. */

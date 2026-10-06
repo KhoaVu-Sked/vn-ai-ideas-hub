@@ -67,44 +67,20 @@ const count = (n) => (n <= 10 ? WORDS[n] : String(n));
 const files = (n) => `file${n === 1 ? "" : "s"}`;
 
 /**
- * The headline, and the line under it.
- *
  * One sentence that answers the question, rather than a row of counters the
- * reader has to add up. The worst band leads because that is the only one with
- * a deadline; everything else is context and reads as context.
+ * reader has to add up. The worst band leads because it is the only one with a
+ * deadline.
  */
-export function verdict(bands, scanned = null) {
+export function verdict(bands) {
   const byKey = new Map(bands.map((b) => [b.key, b.items.length]));
   const open = byKey.get(BAND_OPEN) || 0;
   const edit = byKey.get(BAND_ORG_EDIT) || 0;
   const view = byKey.get(BAND_ORG_VIEW) || 0;
 
-  const context = [];
-  if (scanned) context.push(`${scanned} ${files(scanned)} checked.`);
-
-  if (!open && !edit && !view) {
-    return {
-      headline: "Nothing is shared more widely than named people.",
-      detail: context.join(" "),
-    };
-  }
-
-  let headline;
-  if (open) {
-    headline = `${count(open)} ${files(open)} ${open === 1 ? "is" : "are"} open to anyone with the link.`;
-  } else if (edit) {
-    headline = `${count(edit)} ${files(edit)} can be edited by everyone at your organisation.`;
-  } else {
-    headline = `${count(view)} ${files(view)} ${view === 1 ? "is" : "are"} visible across your organisation.`;
-  }
-
-  const rest = [];
-  if (open && edit) rest.push(`${count(edit)} more can be edited by everyone at your organisation.`);
-  if ((open || edit) && view) {
-    rest.push(`${view} ${view === 1 ? "is" : "are"} visible across the company but not editable.`);
-  }
-
-  return { headline, detail: [...rest, ...context].join(" ") };
+  if (open) return `${count(open)} ${files(open)} ${open === 1 ? "is" : "are"} open to anyone with the link.`;
+  if (edit) return `${count(edit)} ${files(edit)} can be edited by everyone at your organisation.`;
+  if (view) return `${count(view)} ${files(view)} ${view === 1 ? "is" : "are"} visible across your organisation.`;
+  return "Nothing is shared more widely than named people.";
 }
 
 /**

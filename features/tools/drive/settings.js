@@ -95,24 +95,6 @@ export function notifyEmailProblem(value) {
   return bad ? `${bad} is not an email address.` : null;
 }
 
-/**
- * Reads back the way the watcher's own email footer describes itself, so the
- * two never appear to disagree about what was configured. Null is its own
- * sentence: the panel must not claim a cadence it has not set.
- */
-export function describeSchedule(schedule) {
-  const s = normaliseSchedule(schedule);
-  if (!s) return "On whatever schedule the script itself is set to";
-  const option = FREQUENCIES.find((f) => f.value === s.frequency);
-  const at = ` at ${String(s.hour).padStart(2, "0")}:00`;
-  if (s.frequency === "weekly") {
-    const day = s.dayOfWeek.charAt(0) + s.dayOfWeek.slice(1).toLowerCase();
-    return `Every ${day}${at}`;
-  }
-  if (s.frequency === "daily") return `Every day${at}`;
-  return option?.label || "Every week";
-}
-
 async function findSettingsFile(token) {
   const url = new URL(`${DRIVE_API}/files`);
   url.searchParams.set("q", `name = '${escapeQueryValue(SETTINGS_NAME)}' and trashed = false`);

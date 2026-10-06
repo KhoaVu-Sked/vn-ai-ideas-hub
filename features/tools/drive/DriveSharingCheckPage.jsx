@@ -221,7 +221,7 @@ export default function DriveSharingCheckPage() {
   );
 
   const bands = useMemo(() => groupByAudience(all), [all]);
-  const said = useMemo(() => verdict(bands, owned?.total), [bands, owned]);
+  const said = useMemo(() => verdict(bands), [bands]);
 
   // The worst band is open unless someone chose another. Deriving it here
   // rather than storing it means a re-scan that empties that band opens
@@ -257,8 +257,7 @@ export default function DriveSharingCheckPage() {
           Drive Sharing Check
         </p>
         <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "8px 0 20px", lineHeight: 1.6, maxWidth: 680 }}>
-          Finds files shared by link or with the whole organisation. Reads names and sharing
-          settings only — never contents, and nothing leaves your browser.
+          Finds files shared by link or with the whole organisation.
         </p>
 
         {!configured && (
@@ -273,10 +272,7 @@ export default function DriveSharingCheckPage() {
         )}
 
         {token && result && !busy && (
-          <>
-            <h1 className="drive-verdict">{said.headline}</h1>
-            {said.detail && <p className="drive-verdict-sub">{said.detail}</p>}
-          </>
+          <h1 className="drive-verdict">{said}</h1>
         )}
 
         {token && (
