@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import {
-  normaliseStatus, runState, relTime, watchedParts, lastResult,
+  normaliseStatus, runState, relTime, lastResult,
 } from "@/features/tools/drive/status";
 
 const ok = (over = {}) => normaliseStatus({
@@ -98,27 +98,6 @@ test("a missing or unparseable timestamp renders nothing", () => {
 });
 
 // ── what it covered, and what it found ────────────────────────────
-
-test("watched folders are named when the script named them", () => {
-  expect(watchedParts(ok({ watchedRoots: ["INITIATIVES", "Handover"] })))
-    .toEqual({ lead: "Watching", names: "INITIATIVES, Handover" });
-});
-
-test("the names are kept apart from the sentence so they can be set in bold", () => {
-  const p = watchedParts(ok({ watchedRoots: ["Test Team Folder"] }));
-  expect(p.lead).not.toContain("Test Team Folder");
-  expect(p.names).toBe("Test Team Folder");
-});
-
-test("with no names it falls back to a count, and says so when there is nothing", () => {
-  expect(watchedParts(ok({ watchedRoots: [], watching: 3 }))).toEqual({ lead: "Watching 3 items", names: "" });
-  expect(watchedParts(ok({ watchedRoots: [], watching: 1 }))).toEqual({ lead: "Watching 1 item", names: "" });
-  expect(watchedParts(ok({ watchedRoots: [], watching: 0 }))).toEqual({ lead: "Watching nothing yet", names: "" });
-});
-
-test("no status at all has no parts to show", () => {
-  expect(watchedParts(null)).toBe(null);
-});
 
 test("a run that found nothing says so rather than showing blanks", () => {
   expect(lastResult(ok())).toBe("Nothing open");

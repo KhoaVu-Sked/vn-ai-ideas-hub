@@ -20,7 +20,7 @@ import {
 } from "@/features/tools/drive/settings";
 import { searchFolders, ambiguous } from "@/features/tools/drive/search";
 import { resolveTrails, distinguishingLabels } from "@/features/tools/drive/paths";
-import { readStatus, runState, relTime, watchedParts, lastResult } from "@/features/tools/drive/status";
+import { readStatus, runState, relTime, lastResult } from "@/features/tools/drive/status";
 
 const card = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 };
 const label = { fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: ".05em", textTransform: "uppercase" };
@@ -221,7 +221,6 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
   const chosen = normaliseSchedule(settings.schedule);
   const schedule = chosen || SCHEDULE_PLACEHOLDER;
   const emailProblem = notifyEmailProblem(emailDraft);
-  const parts = watchedParts(status);
   const result = lastResult(status);
 
   return (
@@ -245,15 +244,13 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
           <b style={{ fontWeight: 700 }}>{runState(status)}</b>
           {status?.schedule && <span style={{ color: "var(--muted)" }}> · {status.schedule}</span>}
           {status?.lastRun && <span style={{ color: "var(--muted)" }}> · ran {relTime(status.lastRun)}</span>}
-          <span style={{ display: "block", color: "var(--muted)", marginTop: 2 }}>
-            {parts ? (
-              <>
-                {parts.lead}
-                {parts.names && <> <b style={{ fontWeight: 700, color: "var(--ink)" }}>{parts.names}</b></>}
-                {result && ` · ${result}`}
-              </>
-            ) : "Set a schedule below, then run the Apps Script project once to start it."}
-          </span>
+          {/* No folder names here: this is the last run's report, so it kept
+              naming a folder after it was removed. The list below is live. */}
+          {(result || !status) && (
+            <span style={{ display: "block", color: "var(--muted)", marginTop: 2 }}>
+              {status ? result : "Set a schedule below, then run the Apps Script project once to start it."}
+            </span>
+          )}
           {status?.problem && (
             <span style={{ display: "block", color: "var(--warn, #b7791f)", marginTop: 2 }}>
               Last run reported: {status.problem}
@@ -264,8 +261,7 @@ export default function WatchedFolders({ token, canEdit, onNeedScope }) {
 
       {settings.watchlist.length === 0 ? (
         <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
-          Nothing watched yet. Add a folder and the watcher will email you when its sharing changes —
-          including folders other people own.
+          Nothing watched yet.
         </p>
       ) : (
         <div style={{ marginBottom: 12 }}>
