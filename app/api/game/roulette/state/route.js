@@ -1,5 +1,6 @@
 import { jsonError } from "@/lib/sql";
 import { requireUser } from "@/features/auth/guard";
+import { worthShouting } from "@/features/game/roulette/payouts";
 import {
   ensureBalance, currentRound, openRound, recentResults, betsFor,
   recentChat, heartbeat, whoIsHere, SPIN_MS,
@@ -27,6 +28,16 @@ export async function GET() {
       whoIsHere(),
     ]);
 
+    // Who the last spin paid enough to announce. Read back off the settled
+    // rows rather than handed to whoever settled, so every screen raises the
+    // same shout at the same point in its own spin — before, the one client
+    // that won the settle race was the only one that ever saw a win go up.
+    const last = results[0] || null;
+    const lastBets = last ? await betsFor(last.id) : [];
+    const shouts = lastBets
+      .filter((b) => b.payout != null && worthShouting(b, b.payout))
+      .map((b) => ({ who: b.who, payout: b.payout, kind: b.kind, value: b.value }));
+
     return Response.json({
       me: { id: user.uid, coins },
       round: round && {
@@ -39,8 +50,8 @@ export async function GET() {
       //
       // These two facts are the whole of the shared-table claim: every client
       // computes the same final angle from the same settled row.
-      lastSpin: results[0]
-        ? { roundId: String(results[0].id), result: results[0].result, settledAt: results[0].settled_at }
+      lastSpin: last
+        ? { roundId: String(last.id), result: last.result, settledAt: last.settled_at, shouts }
         : null,
       spinMs: SPIN_MS,
       results: results.map((r) => ({ id: String(r.id), result: r.result, settledAt: r.settled_at })),

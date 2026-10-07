@@ -600,97 +600,141 @@ a {
 
 /* ── /game: roulette ──────────────────────────────────────────────
    Felt green rather than the hub's blues, because a game that looks
-   like the admin screens invites being treated like one. */
-.rl-wrap { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
-.rl-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; align-items: start; }
+   like the admin screens invites being treated like one.
+
+   Sized for a table people lean toward: the felt is the thing being
+   used, so it gets the width and the hit targets. */
+.rl-wrap { max-width: 1320px; margin: 0 auto; padding: 18px 20px 40px; }
+.rl-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
 .rl-main { min-width: 0; }
 .rl-label { font-size: 10.5px; font-weight: 700; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
 .rl-empty { font-size: 12.5px; color: var(--faint); }
 
-.rl-last { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
-.rl-last__n { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center;
-  justify-content: center; font-size: 11.5px; font-weight: 700; color: #fff; }
+.rl-last { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.rl-last__n { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; font-size: 13px; font-weight: 700; color: #fff; }
 
-
-.rl-stage { display: flex; gap: 20px; align-items: center; background: #0f3d2e;
-  border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+.rl-stage { display: flex; gap: 26px; align-items: center; background: #0f3d2e;
+  border-radius: 14px; padding: 22px; margin-bottom: 14px; }
 .rl-status { color: #e8f3ee; }
-.rl-coins { font-family: var(--font-sora); font-weight: 800; font-size: 26px; }
-.rl-coins span { font-size: 12px; font-weight: 600; opacity: .75; }
-.rl-phase { font-size: 13px; margin-top: 6px; opacity: .9; }
-.rl-broke { font-size: 12.5px; margin-top: 8px; line-height: 1.55; max-width: 320px; background: rgba(255,255,255,.1);
-  border-radius: 8px; padding: 9px 11px; }
-.rl-mybets { font-size: 11.5px; margin-top: 8px; opacity: .8; line-height: 1.5; max-width: 320px; }
+.rl-coins { font-family: var(--font-sora); font-weight: 800; font-size: 30px; }
+.rl-coins span { font-size: 13px; font-weight: 600; opacity: .75; }
+.rl-phase { font-size: 14px; margin-top: 7px; opacity: .9; }
+.rl-broke { font-size: 13px; margin-top: 9px; line-height: 1.55; max-width: 340px; background: rgba(255,255,255,.1);
+  border-radius: 8px; padding: 10px 12px; }
+.rl-mybets { font-size: 12px; margin-top: 9px; opacity: .8; line-height: 1.5; max-width: 340px; }
 .rl-err { background: #fff4f4; border: 1px solid #ffc9c9; color: #c92a2a; border-radius: 9px;
   padding: 9px 12px; font-size: 13px; margin-bottom: 12px; }
 
 /* The wheel. Its final angle is a pure function of the result, so every
    screen stops on the same pocket however long it has been open. */
-.rl-wheel { position: relative; width: 210px; height: 210px; flex: none; }
+.rl-wheel { position: relative; width: 264px; height: 264px; flex: none; }
 .rl-wheel__face { position: absolute; inset: 0; border-radius: 50%; background: #14281f;
-  border: 5px solid #caa14a; }
+  border: 6px solid #caa14a; }
 .rl-pocket { position: absolute; left: 50%; top: 0; width: 0; height: 50%; transform-origin: 50% 100%;
-  font-size: 8.5px; font-weight: 700; }
-.rl-pocket b { position: absolute; top: 3px; left: -7px; width: 14px; text-align: center;
+  font-size: 9.5px; font-weight: 700; }
+.rl-pocket b { position: absolute; top: 4px; left: -9px; width: 18px; text-align: center;
   border-radius: 3px; padding: 1px 0; }
 .rl-wheel__hub { position: absolute; inset: 34%; border-radius: 50%; background: #0b1e14;
   border: 3px solid #caa14a; display: flex; align-items: center; justify-content: center; }
-.rl-hub-num { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center;
-  justify-content: center; font-weight: 800; font-size: 15px; }
-.rl-hub-idle { color: #4a6b5a; font-size: 20px; }
-.rl-wheel__pointer { position: absolute; left: 50%; top: -6px; margin-left: -7px; width: 0; height: 0;
-  border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 13px solid #caa14a; z-index: 2; }
+.rl-hub-num { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-weight: 800; font-size: 19px; }
+.rl-hub-idle { color: #4a6b5a; font-size: 22px; }
+.rl-wheel__pointer { position: absolute; left: 50%; top: -7px; margin-left: -8px; width: 0; height: 0;
+  border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 15px solid #caa14a; z-index: 2; }
 
-.rl-felt { background: #15543f; border-radius: 12px; padding: 14px; }
-.rl-stakes { display: flex; align-items: center; gap: 7px; margin-bottom: 11px; flex-wrap: wrap; }
+/* The three bet groups have to be legible as geometry, not just as labels.
+   --rl-zero and --rl-cols are the two strips flanking the numbers; the rows
+   below are inset by exactly those, so "1st 12" sits under the first four
+   columns of numbers and nothing else. */
+.rl-felt { --rl-zero: 48px; --rl-cols: 62px; --rl-gap: 5px;
+  background: #15543f; border-radius: 12px; padding: 18px; }
+.rl-stakes { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
 .rl-stakes .rl-label { color: #bcd9cd; }
 .rl-chip { border: 2px solid #caa14a; background: #0f3d2e; color: #f2e4c2; border-radius: 999px;
-  padding: 4px 11px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  padding: 6px 15px; font-size: 13.5px; font-weight: 700; cursor: pointer; }
 .rl-chip.is-on { background: #caa14a; color: #1a1a1a; }
 .rl-chip:disabled { opacity: .35; cursor: not-allowed; }
-.rl-reason { font-size: 11.5px; color: #ffd8a8; margin-left: auto; }
+.rl-reason { font-size: 12px; color: #ffd8a8; margin-left: auto; }
 
-.rl-grid { display: flex; gap: 4px; margin-bottom: 4px; }
-.rl-zero { width: 34px; }
-.rl-numbers { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; flex: 1; }
-.rl-outside { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin-top: 4px; }
+.rl-grid { display: flex; gap: var(--rl-gap); }
+/* Column-major, like a real felt: 1-2-3 run DOWN the first column, so each of
+   the three rows IS one of the column bets. Laid out row-major the numbers
+   read 1..12 across the top and "Column 2" names nothing you can point at. */
+.rl-numbers { display: grid; grid-template-rows: repeat(3, auto); grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr); gap: var(--rl-gap); flex: 1; }
+.rl-cols { display: flex; flex-direction: column; gap: var(--rl-gap);
+  width: var(--rl-cols); flex: none; }
+.rl-cols .rl-cell { flex: 1; font-size: 13px; }
+.rl-below { margin-left: calc(var(--rl-zero) + var(--rl-gap));
+  margin-right: calc(var(--rl-cols) + var(--rl-gap)); }
+.rl-outside { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--rl-gap); margin-top: var(--rl-gap); }
 .rl-outside:has(.rl-wide) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .rl-cell { border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.07); color: #eaf5f0;
-  border-radius: 6px; padding: 7px 0; font-size: 12px; font-weight: 700; cursor: pointer; }
+  border-radius: 7px; padding: 13px 0; font-size: 15px; font-weight: 700; cursor: pointer; }
 .rl-cell:hover:not(:disabled) { outline: 2px solid #caa14a; }
 .rl-cell:disabled { opacity: .45; cursor: not-allowed; }
+/* After .rl-cell, not before: same specificity, so the later rule wins and a
+   zero declared above would silently keep the grid's font size. */
+.rl-zero { width: var(--rl-zero); font-size: 19px; }
 
 .rl-side { display: flex; flex-direction: column; gap: 12px; }
-.rl-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; }
-.rl-card--grow { display: flex; flex-direction: column; min-height: 300px; }
+.rl-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; }
+.rl-card--grow { display: flex; flex-direction: column; min-height: 340px; }
 .rl-card__head { font-size: 10.5px; font-weight: 700; color: var(--muted); letter-spacing: .05em;
   text-transform: uppercase; margin-bottom: 9px; }
-.rl-players { display: flex; flex-direction: column; gap: 7px; }
-.rl-player { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.rl-players { display: flex; flex-direction: column; gap: 8px; }
+.rl-player { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .rl-player__name { flex: 1; color: var(--ink); font-weight: 600; }
-.rl-player__coins { color: var(--muted); font-size: 11.5px; }
-.rl-ava { width: 24px; height: 24px; border-radius: 50%; color: #fff; font-size: 10px; font-weight: 700;
+.rl-player__coins { color: var(--muted); font-size: 12px; }
+.rl-ava { width: 26px; height: 26px; border-radius: 50%; color: #fff; font-size: 10.5px; font-weight: 700;
   display: flex; align-items: center; justify-content: center; flex: none; }
-.rl-chat { flex: 1; overflow-y: auto; max-height: 300px; display: flex; flex-direction: column; gap: 6px; }
-.rl-msg { font-size: 12.5px; color: var(--body); line-height: 1.5; word-break: break-word; }
+.rl-chat { flex: 1; overflow-y: auto; max-height: 340px; display: flex; flex-direction: column; gap: 6px; }
+.rl-msg { font-size: 13px; color: var(--body); line-height: 1.5; word-break: break-word; }
 .rl-msg b { color: var(--ink); }
 .rl-chat__input { display: flex; gap: 6px; margin-top: 10px; }
 .rl-chat__input input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px;
-  padding: 7px 9px; font-size: 12.5px; }
+  padding: 8px 10px; font-size: 13px; }
 .rl-chat__input button { border: none; background: var(--blue); color: #fff; border-radius: 8px;
-  padding: 7px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  padding: 8px 13px; font-size: 13px; font-weight: 700; cursor: pointer; }
 .rl-chat__input button:disabled { opacity: .4; cursor: not-allowed; }
 
-/* Shouts cross the top so the room sees a win, not just the winner. */
-.rl-shouts { position: fixed; top: 60px; left: 0; right: 0; display: flex; flex-direction: column;
+/* Shouts float so the room sees a win, not just the winner. Along the bottom
+   rather than under the header: the Last 10 row wraps to two lines on a narrow
+   window, and a fixed strip at the top lands straight on it. */
+.rl-shouts { position: fixed; bottom: 22px; left: 0; right: 0; display: flex; flex-direction: column;
   align-items: center; gap: 6px; pointer-events: none; z-index: 60; }
-.rl-shout { background: #caa14a; color: #1a1a1a; border-radius: 999px; padding: 7px 16px;
-  font-size: 13px; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,.2); animation: rlShout .3s ease both; }
-@keyframes rlShout { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+.rl-shout { background: #caa14a; color: #1a1a1a; border-radius: 999px; padding: 8px 18px;
+  font-size: 13.5px; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,.2); animation: rlShout .3s ease both; }
+@keyframes rlShout { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-@media (max-width: 880px) {
+/* The side panel is a fixed 300px, so between here and roughly 1180px it eats
+   the felt rather than the margins: twelve number columns were down to 28px
+   while the same screen one pixel narrower gave them 51px. Drop the panel
+   under the table before that happens, not after. */
+@media (max-width: 1080px) {
   .rl-layout { grid-template-columns: 1fr; }
   .rl-stage { flex-direction: column; align-items: flex-start; }
+}
+/* Twelve columns do not get narrower than the numbers in them. Below this the
+   felt keeps its shape by shrinking the type, not by wrapping. */
+@media (max-width: 620px) {
+  .rl-wheel { width: 220px; height: 220px; }
+  .rl-cell { padding: 9px 0; font-size: 12.5px; border-radius: 6px; }
+  .rl-zero { font-size: 15px; }
+  .rl-cols .rl-cell { font-size: 10.5px; }
+  .rl-felt { --rl-zero: 32px; --rl-cols: 44px; --rl-gap: 4px; padding: 13px; }
+}
+/* Twelve columns on a phone leave a two-digit number about sixteen pixels.
+   The type comes down to fit the cell; the alternative is a number that
+   overflows its own button, which is how a felt stops being readable. */
+@media (max-width: 520px) {
+  .rl-cell { padding: 7px 0; font-size: 10px; }
+  .rl-zero { font-size: 13px; }
+  .rl-cols .rl-cell { font-size: 8.5px; }
+  .rl-below .rl-cell { font-size: 10.5px; }
+  .rl-felt { --rl-zero: 24px; --rl-cols: 34px; --rl-gap: 3px; padding: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rl-wheel__face { transition: none !important; }

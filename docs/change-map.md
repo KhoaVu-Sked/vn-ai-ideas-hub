@@ -123,6 +123,9 @@ page. Hidden is not the same as open.
 | The result is drawn with `crypto.randomInt` | Not because anyone will attack a toy, but a predictable wheel stops being a game |
 | Settling is `where settled_at is null` | Every client asks; the first wins and the rest write nothing, which is why there is no scheduler |
 | Coins are play money | No value, no exchange, no real stake. If that ever changes, this becomes a different conversation entirely |
+| The board lags the server by one spin | `reveal.js` freezes coins, results and announcements until this screen's own wheel stops. Refetch straight after a settle and the number arrives before the wheel turns a degree |
+| Announcements come from `/state`, not from the settle response | Only one client wins the settle race, so anything returned there is seen by exactly one person at the table |
+| The felt is laid out column-major | 1-2-3 run DOWN the first column, which makes each row one of the three column bets. Row-major it reads 1..12 across the top and "Column 2" names nothing you can point at |
 
 ### A shared component
 

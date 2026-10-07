@@ -5,13 +5,20 @@
 // State is read from the server, never invented here. The client's clock is
 // used only to decide when to *ask* whether a round is over; the server checks
 // the deadline against its own clock before settling anything.
+//
+// Two things are tracked and they are deliberately out of step. `live` is what
+// the server last said, and it decides when to ask for a settle. `view` is what
+// the screen draws, and it lags `live` by one spin so the number, the balances
+// and the announcement arrive WITH the wheel instead of ahead of it. See
+// reveal.js.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import RouletteWheel from "@/features/game/roulette/RouletteWheel";
 import BettingTable from "@/features/game/roulette/BettingTable";
 import SidePanel from "@/features/game/roulette/SidePanel";
 import { colourOf } from "@/features/game/roulette/wheel";
+import { holdMs, isNewSpin, shoutsToRaise, spinIdOf, tableView } from "@/features/game/roulette/reveal";
 import { api } from "@/lib/apiClient";
 import useLive from "@/features/realtime/useLive";
 import { GAME_SCOPE } from "@/features/game/scope";
@@ -19,15 +26,28 @@ import { GAME_SCOPE } from "@/features/game/scope";
 const POLL_MS = 5_000;   // the fallback. Redis makes it feel instant; this makes it work.
 
 export default function RoulettePage() {
-  const [state, setState] = useState(null);
+  const [live, setLive] = useState(null);
+  const [held, setHeld] = useState(null);      // { snapshot, until } while the wheel turns
   const [stake, setStake] = useState(100);
   const [err, setErr] = useState("");
   const [shouts, setShouts] = useState([]);
   const settling = useRef(false);
+  const liveRef = useRef(null);
+  const seenSpin = useRef(undefined);
 
   const load = useCallback(async () => {
     try {
-      setState(await api("/api/game/roulette/state"));
+      const next = await api("/api/game/roulette/state");
+      const prev = liveRef.current;
+      // Freeze the board on a spin we have not shown yet. Checked against
+      // seenSpin rather than against the hold, so the polls that arrive during
+      // a hold cannot keep restarting it and strand the result off screen.
+      if (prev && isNewSpin(seenSpin.current, next)) {
+        setHeld({ snapshot: prev, until: Date.now() + holdMs(next.spinMs) });
+      }
+      seenSpin.current = spinIdOf(next);
+      liveRef.current = next;
+      setLive(next);
     } catch (e) {
       setErr(e.message || "Lost the table.");
     }
@@ -44,25 +64,47 @@ export default function RoulettePage() {
 
   useLive(GAME_SCOPE, load);
 
+  // The hold ends when this screen's own wheel stops.
+  useEffect(() => {
+    if (!held) return undefined;
+    const t = setTimeout(() => setHeld(null), Math.max(0, held.until - Date.now()));
+    return () => clearTimeout(t);
+  }, [held]);
+
   // Ask the server to settle once the deadline has passed. Every client asks;
   // the first wins and the rest are no-ops, which is why no scheduler exists.
+  // Scheduled off `live`, never off the view — a frozen board is still a table
+  // whose next round is running.
   useEffect(() => {
-    const r = state?.round;
+    const r = live?.round;
     if (!r) return undefined;
     const due = new Date(r.closesAt).getTime() - Date.now();
     const t = setTimeout(async () => {
       if (settling.current) return;
       settling.current = true;
-      try {
-        const res = await api("/api/game/roulette/settle", { method: "POST" });
-        if (res?.shouts?.length) {
-          setShouts((s) => [...s, ...res.shouts.map((x) => ({ ...x, key: `${Date.now()}-${x.who}` }))]);
-        }
-      } catch { /* someone else got there, or the network blinked */ }
+      try { await api("/api/game/roulette/settle", { method: "POST" }); }
+      catch { /* someone else got there, or the network blinked */ }
       finally { settling.current = false; load(); }
     }, Math.max(0, due) + 400);   // a beat past the deadline, so the server agrees
     return () => clearTimeout(t);
-  }, [state?.round?.id, state?.round?.closesAt, load]);
+  }, [live?.round?.id, live?.round?.closesAt, load]);
+
+  const view = useMemo(() => tableView(live, held), [live, held]);
+  const shownSpin = view?.lastSpin ?? null;
+
+  // Announcements belong to the spin the screen is showing, not to whoever won
+  // the settle race. Reading them off the settle response meant exactly one
+  // client saw a 5× win go up and the rest of the table never did.
+  const shoutedFor = useRef(undefined);
+  useEffect(() => {
+    if (!view) return;
+    const next = shoutsToRaise(shoutedFor.current, shownSpin);
+    if (!next) return;
+    shoutedFor.current = next.at;
+    if (next.raise.length) {
+      setShouts((s) => [...s, ...next.raise.map((x, i) => ({ ...x, key: `${next.at}-${i}` }))]);
+    }
+  }, [view, shownSpin]);
 
   // Shouts fade on their own.
   useEffect(() => {
@@ -77,7 +119,14 @@ export default function RoulettePage() {
       const res = await api("/api/game/roulette/bet", {
         method: "POST", body: JSON.stringify({ kind, value, stake }),
       });
-      setState((s) => (s ? { ...s, me: { ...s.me, coins: res.coins } } : s));
+      // Your own debit shows at once — it is the RESULT that waits for the
+      // wheel, and betting is closed by the time anything is held.
+      const now = liveRef.current;
+      if (now) {
+        const next = { ...now, me: { ...now.me, coins: res.coins } };
+        liveRef.current = next;
+        setLive(next);
+      }
       load();
     } catch (e) {
       setErr(e.message || "That bet did not go on.");
@@ -89,11 +138,11 @@ export default function RoulettePage() {
     catch (e) { setErr(e.message || "Message did not send."); }
   };
 
-  if (!state) {
+  if (!view) {
     return (<><AppHeader /><main className="rl-wrap"><p className="rl-empty">Finding the table…</p></main></>);
   }
 
-  const { me, round, lastSpin, results, bets, chat, players, spinMs } = state;
+  const { me, round, results, bets, chat, players } = view;
   const closed = !round || new Date(round.closesAt).getTime() <= Date.now();
   const broke = me.coins <= 0;
   const myBets = (bets || []).filter((b) => b.accountId === me.id);
@@ -122,7 +171,9 @@ export default function RoulettePage() {
         <div className="rl-layout">
           <div className="rl-main">
             <div className="rl-stage">
-              <RouletteWheel result={lastSpin?.result ?? null} settledAt={lastSpin?.settledAt ?? null} spinMs={spinMs} />
+              {/* The one thing read from `live` rather than the view: the wheel
+                  is what everything else is waiting for. */}
+              <RouletteWheel result={live.lastSpin?.result ?? null} settledAt={live.lastSpin?.settledAt ?? null} spinMs={live.spinMs} />
               <div className="rl-status">
                 <div className="rl-coins">{Number(me.coins).toLocaleString()} <span>coins</span></div>
                 {broke
