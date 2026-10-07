@@ -125,6 +125,8 @@ page. Hidden is not the same as open.
 | Coins are play money | No value, no exchange, no real stake. If that ever changes, this becomes a different conversation entirely |
 | The board lags the server by one spin | `reveal.js` freezes coins, results and announcements until this screen's own wheel stops. Refetch straight after a settle and the number arrives before the wheel turns a degree |
 | Announcements come from `/state`, not from the settle response | Only one client wins the settle race, so anything returned there is seen by exactly one person at the table |
+| The table is sized off one unit, `--rl-u` | Every length in the `.rl-` block is a multiple of it, so the page scales with the window. Add a raw px size and it stops scaling with everything else |
+| `--rl-u` tracks the SHORTER axis | 1.6vh is the largest coefficient where the whole table still fits a 1440x800 or 1920x940 window without scrolling. Raising it makes big screens nicer and short windows scroll |
 | The felt is laid out column-major | 1-2-3 run DOWN the first column, which makes each row one of the three column bets. Row-major it reads 1..12 across the top and "Column 2" names nothing you can point at |
 
 ### A shared component
